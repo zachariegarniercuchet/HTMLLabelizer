@@ -63,79 +63,55 @@
     });
   }
 
-  function getStyleBlockLineCount(text = "") {
-  if (typeof text !== "string") return 0;
-  const match = text.match(/<style[\s\S]*?<\/style>/i);
-  return match ? match[0].split(/\r?\n/).length : 0;
-}
-
-function getScrollPositionIgnoringStyle(textarea) {
-  if (!textarea || !("value" in textarea)) return 0; // ✅ sécurise
-  const text = textarea.value || "";
-  const styleLines = getStyleBlockLineCount(text);
-
-  const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 18;
-  const stylePixelHeight = styleLines * lineHeight;
-
-  const scrollTop = textarea.scrollTop;
-  const scrollHeight = textarea.scrollHeight;
-  const clientHeight = textarea.clientHeight;
-
+function getScrollPosition(element) {
+  const scrollTop = element.scrollTop;
+  const scrollHeight = element.scrollHeight;
+  const clientHeight = element.clientHeight;
+  
   if (scrollHeight <= clientHeight) return 0;
-
-  const effectiveHeight = scrollHeight - stylePixelHeight;
-  return Math.max(0, Math.min(1, scrollTop / (effectiveHeight - clientHeight)));
-}
-
-function setScrollPositionIgnoringStyle(textarea, ratio) {
-  if (!textarea || !("value" in textarea)) return; // ✅ sécurise
-  const text = textarea.value || "";
-  const styleLines = getStyleBlockLineCount(text);
-
-  const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 18;
-  const stylePixelHeight = styleLines * lineHeight;
-
-  const scrollHeight = textarea.scrollHeight;
-  const clientHeight = textarea.clientHeight;
-
-  if (scrollHeight <= clientHeight) return;
-
-  const effectiveHeight = scrollHeight - stylePixelHeight;
-  const maxScroll = effectiveHeight - clientHeight;
-
-  textarea.scrollTop = stylePixelHeight + maxScroll * ratio;
-}
-
-
-  function getScrollPosition(element) {
-  const ignoringStyle = element.tagName === "TEXTAREA"; // ✅ seulement pour la source
-  if (ignoringStyle) {
-    return getScrollPositionIgnoringStyle(element);
-  } else {
-    const scrollTop = element.scrollTop;
-    const scrollHeight = element.scrollHeight;
-    const clientHeight = element.clientHeight;
-    if (scrollHeight <= clientHeight) return 0;
-    return scrollTop / (scrollHeight - clientHeight);
-  }
+  return scrollTop / (scrollHeight - clientHeight);
 }
 
 function setScrollPosition(element, ratio) {
-
-  const ignoringStyle = true;
-  if (ignoringStyle) {
-    return setScrollPositionIgnoringStyle(element, ratio)
-  }
-  else {
-    const scrollHeight = element.scrollHeight;
-    const clientHeight = element.clientHeight;
-    
-    if (scrollHeight <= clientHeight) return;
-    
-    const maxScroll = scrollHeight - clientHeight;
-    element.scrollTop = maxScroll * ratio;
-  }
+  const scrollHeight = element.scrollHeight;
+  const clientHeight = element.clientHeight;
+  
+  if (scrollHeight <= clientHeight) return;
+  
+  const maxScroll = scrollHeight - clientHeight;
+  element.scrollTop = maxScroll * ratio;
 }
+
+function getBodyStartRatio(sourceContent) {
+  const bodyMatch = sourceContent.match(/<body[^>]*>/i);
+  if (!bodyMatch) return 0;
+  
+  const bodyStartIndex = bodyMatch.index;
+  const totalLines = sourceContent.split('\n').length;
+  const contentBeforeBody = sourceContent.substring(0, bodyStartIndex);
+  const linesBeforeBody = contentBeforeBody.split('\n').length;
+  
+  return linesBeforeBody / totalLines;
+}
+
+function mapRenderedToSource(renderedRatio, sourceContent) {
+  const bodyStartRatio = getBodyStartRatio(sourceContent);
+  // Linear mapping: 0% rendered = body start, 100% rendered = 100% source
+  return bodyStartRatio + (renderedRatio * (1 - bodyStartRatio));
+}
+
+function mapSourceToRendered(sourceRatio, sourceContent) {
+  const bodyStartRatio = getBodyStartRatio(sourceContent);
+  
+  if (sourceRatio <= bodyStartRatio) {
+    return 0; // Before body = start of rendered
+  }
+  
+  // Linear mapping: source ratio between body start and end
+  return (sourceRatio - bodyStartRatio) / (1 - bodyStartRatio);
+}
+
+
 
   // ======= Enhanced Label Management =======
 
@@ -1140,16 +1116,17 @@ function toggleView() {
   
   // Get current scroll position before switching
   if (isSourceView) {
-    currentScrollRatio = getScrollPosition(elements.sourceView);
+    const sourceRatio = getScrollPosition(elements.sourceView);
+    currentScrollRatio = mapSourceToRendered(sourceRatio, elements.sourceView.value);
     
     // If switching from source view and it was modified, ask user
     if (sourceViewModified) {
       const shouldSave = confirm(
-  "You have unsaved changes in the source view.\n\n" +
-  "👉 Press Ctrl+S to save your changes.\n" +
-  "👉 Press Ctrl+Z to undo recent edits.\n\n" +
-  "Do you want to apply them now? (Cancel will discard changes)"
-);
+        "You have unsaved changes in the source view.\n\n" +
+        "👉 Press Ctrl+S to save your changes.\n" +
+        "👉 Press Ctrl+Z to undo recent edits.\n\n" +
+        "Do you want to apply them now? (Cancel will discard changes)"
+      );
       if (shouldSave) {
         applySourceChanges();
       } else {
@@ -1159,7 +1136,8 @@ function toggleView() {
       }
     }
   } else {
-    currentScrollRatio = getScrollPosition(elements.htmlContent);
+    const renderedRatio = getScrollPosition(elements.htmlContent);
+    currentScrollRatio = renderedRatio; // Store rendered ratio for mapping
   }
   
   // Toggle view state
@@ -1180,8 +1158,11 @@ function toggleView() {
   // Apply scroll position to new view after a small delay
   setTimeout(() => {
     if (isSourceView) {
-      setScrollPosition(elements.sourceView, currentScrollRatio);
+      // Map rendered ratio to source ratio
+      const sourceRatio = mapRenderedToSource(currentScrollRatio, elements.sourceView.value);
+      setScrollPosition(elements.sourceView, sourceRatio);
     } else {
+      // Direct mapping for rendered view
       setScrollPosition(elements.htmlContent, currentScrollRatio);
     }
   }, 10);
