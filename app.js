@@ -2,6 +2,8 @@
   // ======= State =======
   let currentHtml = '';
   let currentFileName = '';
+  let isSourceView = false;
+  let sourceViewModified = false;
   let htmlContent = null;
   const labels = new Map(); // name -> {color, type, sublabels, params}
   let currentSelection = null;
@@ -30,7 +32,9 @@
     saveParams: document.getElementById('save-params'),
     cancelParams: document.getElementById('cancel-params'),
     totalMentions: document.getElementById('total-mentions'),
-    labelTypes: document.getElementById('label-types')
+    labelTypes: document.getElementById('label-types'),
+    sourceView: document.getElementById('source-view'),
+    viewToggle: document.getElementById('view-toggle')
   };
 
   
@@ -58,6 +62,80 @@
       reader.readAsText(file);
     });
   }
+
+  function getStyleBlockLineCount(text = "") {
+  if (typeof text !== "string") return 0;
+  const match = text.match(/<style[\s\S]*?<\/style>/i);
+  return match ? match[0].split(/\r?\n/).length : 0;
+}
+
+function getScrollPositionIgnoringStyle(textarea) {
+  if (!textarea || !("value" in textarea)) return 0; // ✅ sécurise
+  const text = textarea.value || "";
+  const styleLines = getStyleBlockLineCount(text);
+
+  const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 18;
+  const stylePixelHeight = styleLines * lineHeight;
+
+  const scrollTop = textarea.scrollTop;
+  const scrollHeight = textarea.scrollHeight;
+  const clientHeight = textarea.clientHeight;
+
+  if (scrollHeight <= clientHeight) return 0;
+
+  const effectiveHeight = scrollHeight - stylePixelHeight;
+  return Math.max(0, Math.min(1, scrollTop / (effectiveHeight - clientHeight)));
+}
+
+function setScrollPositionIgnoringStyle(textarea, ratio) {
+  if (!textarea || !("value" in textarea)) return; // ✅ sécurise
+  const text = textarea.value || "";
+  const styleLines = getStyleBlockLineCount(text);
+
+  const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 18;
+  const stylePixelHeight = styleLines * lineHeight;
+
+  const scrollHeight = textarea.scrollHeight;
+  const clientHeight = textarea.clientHeight;
+
+  if (scrollHeight <= clientHeight) return;
+
+  const effectiveHeight = scrollHeight - stylePixelHeight;
+  const maxScroll = effectiveHeight - clientHeight;
+
+  textarea.scrollTop = stylePixelHeight + maxScroll * ratio;
+}
+
+
+  function getScrollPosition(element) {
+  const ignoringStyle = element.tagName === "TEXTAREA"; // ✅ seulement pour la source
+  if (ignoringStyle) {
+    return getScrollPositionIgnoringStyle(element);
+  } else {
+    const scrollTop = element.scrollTop;
+    const scrollHeight = element.scrollHeight;
+    const clientHeight = element.clientHeight;
+    if (scrollHeight <= clientHeight) return 0;
+    return scrollTop / (scrollHeight - clientHeight);
+  }
+}
+
+function setScrollPosition(element, ratio) {
+
+  const ignoringStyle = true;
+  if (ignoringStyle) {
+    return setScrollPositionIgnoringStyle(element, ratio)
+  }
+  else {
+    const scrollHeight = element.scrollHeight;
+    const clientHeight = element.clientHeight;
+    
+    if (scrollHeight <= clientHeight) return;
+    
+    const maxScroll = scrollHeight - clientHeight;
+    element.scrollTop = maxScroll * ratio;
+  }
+}
 
   // ======= Enhanced Label Management =======
 
@@ -1054,6 +1132,97 @@ function handleSuggestionKeydown(event, input, dropdown) {
     });
   }
 
+// ======= toggle view function =======
+function toggleView() {
+  if (!currentHtml) return;
+  
+  let currentScrollRatio = 0;
+  
+  // Get current scroll position before switching
+  if (isSourceView) {
+    currentScrollRatio = getScrollPosition(elements.sourceView);
+    
+    // If switching from source view and it was modified, ask user
+    if (sourceViewModified) {
+      const shouldSave = confirm(
+  "You have unsaved changes in the source view.\n\n" +
+  "👉 Press Ctrl+S to save your changes.\n" +
+  "👉 Press Ctrl+Z to undo recent edits.\n\n" +
+  "Do you want to apply them now? (Cancel will discard changes)"
+);
+      if (shouldSave) {
+        applySourceChanges();
+      } else {
+        // Reset source view to current HTML
+        elements.sourceView.value = currentHtml;
+        sourceViewModified = false;
+      }
+    }
+  } else {
+    currentScrollRatio = getScrollPosition(elements.htmlContent);
+  }
+  
+  // Toggle view state
+  isSourceView = !isSourceView;
+  
+  // Update button text and style
+  if (isSourceView) {
+    elements.viewToggle.textContent = 'View Rendered';
+    elements.viewToggle.classList.add('active');
+  } else {
+    elements.viewToggle.textContent = 'View Source';
+    elements.viewToggle.classList.remove('active');
+  }
+  
+  // Re-render content
+  renderHtmlContent();
+  
+  // Apply scroll position to new view after a small delay
+  setTimeout(() => {
+    if (isSourceView) {
+      setScrollPosition(elements.sourceView, currentScrollRatio);
+    } else {
+      setScrollPosition(elements.htmlContent, currentScrollRatio);
+    }
+  }, 10);
+}
+
+function applySourceChanges() {
+  try {
+    const newHtml = elements.sourceView.value;
+    
+    // Validate HTML by parsing it
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(newHtml, 'text/html');
+    
+    // Check for parsing errors
+    const parserError = doc.querySelector('parsererror');
+    if (parserError) {
+      throw new Error('Invalid HTML syntax');
+    }
+    
+    // Update current HTML
+    currentHtml = newHtml;
+    
+    // Re-extract labels from the modified HTML
+    extractExistingLabels(currentHtml);
+    
+    // Reset modification flag
+    sourceViewModified = false;
+    
+    // If we're in rendered view, update it
+    if (!isSourceView) {
+      renderHtmlContent();
+    }
+    
+    console.log('Source changes applied successfully');
+    
+  } catch (error) {
+    alert('Error applying changes: ' + error.message + '\nPlease check your HTML syntax.');
+    console.error('Error applying source changes:', error);
+  }
+}
+
   // ======= HTML Processing =======
   function extractExistingLabels(htmlString) {
   labels.clear();
@@ -1128,6 +1297,22 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
         elements.currentFilename.textContent = '';
       }
       return;
+    }
+
+    // Update filename display
+    if (isSourceView) {
+      elements.htmlContent.style.display = 'none';
+      elements.sourceView.style.display = 'block';
+      
+      // Set the value only if it hasn't been modified or if we're refreshing
+      if (!sourceViewModified) {
+        elements.sourceView.value = currentHtml;
+      }
+      
+      return; // Return early when showing source view
+    } else {
+      elements.htmlContent.style.display = 'block';
+      elements.sourceView.style.display = 'none';
     }
 
     const parser = new DOMParser();
@@ -1441,15 +1626,26 @@ function isFormattingElement(element) {
     try {
       currentHtml = await readFileAsText(file);
       currentFileName = file.name;
+
+      // Reset source view state
+      sourceViewModified = false;
+      isSourceView = false;
+      elements.viewToggle.textContent = 'View Source';
+      elements.viewToggle.classList.remove('active');
       
       extractExistingLabels(currentHtml);
       renderHtmlContent();
       elements.downloadBtn.disabled = false;
+      elements.viewToggle.disabled = false;
+
       
     } catch (error) {
-      alert('Error reading HTML file');
-      console.error(error);
-    }
+    alert('Error reading HTML file');
+    console.error(error);
+  } finally {
+    // ✅ Reset input so the same file can be uploaded again
+    e.target.value = '';
+  }
   });
 
   // Download
@@ -1522,9 +1718,15 @@ function isFormattingElement(element) {
       labels.clear();
       expandedNodes.clear();
       selectedNode = null;
+      sourceViewModified = false;
+      isSourceView = false;
+      elements.viewToggle.textContent = 'View Source';
+      elements.viewToggle.classList.remove('active');
       renderHtmlContent();
       refreshTreeUI();
       elements.downloadBtn.disabled = true;
+      elements.viewToggle.disabled = true;
+
     }
   });
 
@@ -1602,6 +1804,35 @@ function isFormattingElement(element) {
   elements.paramMenu.addEventListener('click', (e) => {
     e.stopPropagation();
   });
+
+  // Source view input tracking
+elements.viewToggle.addEventListener('click', toggleView);
+elements.sourceView.addEventListener('input', () => {
+  sourceViewModified = true;
+});
+
+
+
+// ADD KEYBOARD SHORTCUTS FOR SOURCE VIEW
+elements.sourceView.addEventListener('keydown', (e) => {
+  // Ctrl+S or Cmd+S to save changes
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    applySourceChanges();
+  }
+  
+  // Ctrl+Z or Cmd+Z to discard changes
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+    e.preventDefault();
+    if (sourceViewModified) {
+      const shouldDiscard = confirm('Discard all changes in source view?');
+      if (shouldDiscard) {
+        elements.sourceView.value = currentHtml;
+        sourceViewModified = false;
+      }
+    }
+  }
+});
 
   // ======= Initialize =======
   elements.newLabelColor.value = generateRandomColor();

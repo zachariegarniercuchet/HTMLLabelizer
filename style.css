@@ -106,12 +106,6 @@
       cursor: pointer;
     }
 
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      filter: none;
-    }
-
     .layout {
       padding: 20px;
       display: grid;
@@ -784,4 +778,54 @@
 
 
 
+/* Source View */
+.source-view {
+  display: none; /* toggled by your JS */
+  height: calc(100vh - 40px - 200px); /* match .html-content */
+  min-height: 300px; /* fallback to keep it usable */
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #0c1227;
+  color: var(--text);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre;
+  resize: vertical; /* let user resize if they want */
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
 
+/* Focus effect */
+.source-view:focus {
+  border-color: #6aa3ff;
+  box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
+}
+
+.view-toggle {
+  background: #6aa3ff;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.view-toggle:hover {
+  background: #5a91e6;
+}
+
+.view-toggle.active {
+  background: #4c7ce5;
+}
+
+.html-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}

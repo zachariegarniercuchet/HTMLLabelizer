@@ -27,7 +27,10 @@
       <div class="card">
         <div class="card-header">
           <div class="title">
-            <h2>HTML Content</h2>
+            <div class="html-header-controls">
+                <h2>HTML Content</h2>
+                <button id="view-toggle" class="view-toggle" disabled>View Source</button>
+            </div>
             <span class="filename" id="current-filename"></span>
           </div>
         </div>
@@ -38,6 +41,7 @@
               <p>Upload an HTML file to start labeling</p>
             </div>
           </div>
+          <textarea class="source-view" id="source-view" placeholder="HTML source will appear here..."></textarea>
         </div>
       </div>
     </div>
