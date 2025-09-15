@@ -133,7 +133,7 @@ Planned enhancements:
 
 You don’t need to install anything — just open the web app in your browser:
 
-👉 [HTML Labelizer](https://zachgarnier.github.io/HTMLLabelizer/)
+👉 [HTML Labelizer](https://zachariegarniercuchet.github.io/HTMLLabelizer/)
 
 1. Upload your HTML file.
 2. If an `HTMLLabelizer` comment is found, the label tree will be reconstructed automatically.
@@ -164,7 +164,7 @@ You can also reload a previously labeled HTML file to continue your work.
 If you use **HTML Labelizer** in your research or project, please cite it as:
 
 > Zacharie Garnier-Cuchet. *HTML Labelizer: A lightweight web-based tool for structured HTML annotation.* GitHub, 2025.
-> [https://zachgarnier.github.io/HTMLLabelizer/](https://zachgarnier.github.io/HTMLLabelizer/)
+> [https://zachariegarniercuchet.github.io/HTMLLabelizer/](https://zachariegarniercuchet.github.io/HTMLLabelizer/)
 
 You may also reference the GitHub repository:
 
@@ -173,7 +173,7 @@ You may also reference the GitHub repository:
   author       = {Zacharie Garnier-Cuchet},
   title        = {HTML Labelizer: A lightweight web-based tool for structured HTML annotation},
   year         = {2025},
-  howpublished = {\url{https://zachgarnier.github.io/HTMLLabelizer/}},
+  howpublished = {\url{https://zachariegarniercuchet.github.io/HTMLLabelizer/}},
 }
 ```
 
