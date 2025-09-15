@@ -735,3 +735,53 @@
   background: #1ea87d;
 }
 
+
+
+/* Suggestion Dropdown Styles (lighter + integrated look) */
+.suggestion-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 33%;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 1002;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+
+.suggestion-item {
+  padding: 5px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text);
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid var(--border);
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.highlighted {
+  background-color: var(--hover);
+}
+
+.suggestion-item.highlighted {
+  background: linear-gradient(90deg, var(--accent), rgba(106, 163, 255, 0.8));
+  color: white;
+}
+
+/* Ensure input container has relative positioning for dropdown */
+.param-row {
+  position: relative;
+}
+
+
+
+

@@ -9,6 +9,7 @@
   let selectedNode = null; // Track selected tree node
   let editingNode = null; // Track node being edited
   let currentParamElement = null; // Track element being edited for parameters
+  
 
   // ======= DOM Elements =======
   const elements = {
@@ -697,7 +698,7 @@ function showParameterMenu(labelElement, x, y) {
   currentParamElement = labelElement;
 
   const labelName = labelElement.getAttribute("labelName");
-  const parent = labelElement.getAttribute("parent");
+  const parent = labelElement.getAttribute("parent") || "";
 
   if (!labelName) return;
 
@@ -714,9 +715,9 @@ function showParameterMenu(labelElement, x, y) {
 
   // Create inputs depending on param type
   labelData.params.forEach((paramDef, paramName) => {
-
     const paramRow = document.createElement("div");
     paramRow.className = "param-row";
+    paramRow.style.position = "relative"; // For dropdown positioning
 
     const label = document.createElement("label");
     label.textContent = paramName + ":";
@@ -727,12 +728,48 @@ function showParameterMenu(labelElement, x, y) {
       const type = paramDef.type;
       const currentVal = labelElement.getAttribute(paramName) ?? paramDef.default ?? "";
 
-
-
       if (type === "string") {
         input = document.createElement("input");
         input.type = "text";
         input.value = currentVal;
+        
+        // ADD SUGGESTION FUNCTIONALITY FOR STRING INPUTS
+        const allSuggestions = collectParameterSuggestions(labelName, parent, paramName);
+        
+        let suggestionDropdown = null;
+        
+        input.oninput = (e) => {
+          const inputValue = e.target.value;
+          const filtered = filterSuggestions(allSuggestions, inputValue);
+          
+          if (suggestionDropdown) suggestionDropdown.remove();
+          
+          if (filtered.length > 0 && inputValue.length > 0) {
+            suggestionDropdown = createSuggestionDropdown(input, filtered);
+            if (suggestionDropdown) {
+              paramRow.appendChild(suggestionDropdown);
+            }
+          }
+        };
+        
+        input.onkeydown = (e) => {
+          if (handleSuggestionKeydown(e, input, suggestionDropdown)) {
+            if (e.key === 'Enter' || e.key === 'Escape') {
+              suggestionDropdown = null;
+            }
+          }
+        };
+        
+        input.onblur = () => {
+          // Delay removal to allow clicking on suggestions
+          setTimeout(() => {
+            if (suggestionDropdown) {
+              suggestionDropdown.remove();
+              suggestionDropdown = null;
+            }
+          }, 200);
+        };
+        
       } else if (type === "checkbox") {
         input = document.createElement("input");
         input.type = "checkbox";
@@ -748,10 +785,46 @@ function showParameterMenu(labelElement, x, y) {
         });
       }
     } else {
-      // Fallback: treat as string
+      // Fallback: treat as string with suggestions
       input = document.createElement("input");
       input.type = "text";
       input.value = labelElement.getAttribute(paramName) || paramDef || "";
+      
+      // ADD SUGGESTION FUNCTIONALITY FOR FALLBACK STRING INPUTS
+      const allSuggestions = collectParameterSuggestions(labelName, parent, paramName);
+      
+      let suggestionDropdown = null;
+      
+      input.oninput = (e) => {
+        const inputValue = e.target.value;
+        const filtered = filterSuggestions(allSuggestions, inputValue);
+        
+        if (suggestionDropdown) suggestionDropdown.remove();
+        
+        if (filtered.length > 0 && inputValue.length > 0) {
+          suggestionDropdown = createSuggestionDropdown(input, filtered);
+          if (suggestionDropdown) {
+            paramRow.appendChild(suggestionDropdown);
+          }
+        }
+      };
+      
+      input.onkeydown = (e) => {
+        if (handleSuggestionKeydown(e, input, suggestionDropdown)) {
+          if (e.key === 'Enter' || e.key === 'Escape') {
+            suggestionDropdown = null;
+          }
+        }
+      };
+      
+      input.onblur = () => {
+        setTimeout(() => {
+          if (suggestionDropdown) {
+            suggestionDropdown.remove();
+            suggestionDropdown = null;
+          }
+        }, 200);
+      };
     }
 
     input.dataset.paramName = paramName;
@@ -823,6 +896,116 @@ function showParameterMenu(labelElement, x, y) {
 
   hideParameterMenu();
   updateStats();
+}
+
+// Function to collect existing parameter values for suggestions
+function collectParameterSuggestions(labelName, parent, paramName) {
+  const suggestions = new Set();
+  
+  // Find all mentions with same label and parent
+  const mentions = elements.htmlContent.querySelectorAll('manual_label');
+  mentions.forEach(mention => {
+    const mentionLabel = mention.getAttribute('labelName');
+    const mentionParent = mention.getAttribute('parent') || '';
+    
+    if (mentionLabel === labelName && mentionParent === parent) {
+      const paramValue = mention.getAttribute(paramName);
+      if (paramValue && paramValue.trim()) {
+        suggestions.add(paramValue.trim());
+      }
+    }
+  });
+  
+  return Array.from(suggestions).sort();
+}
+
+// Function to create suggestion dropdown
+function createSuggestionDropdown(input, suggestions) {
+  // Remove existing dropdown
+  const existingDropdown = input.parentElement.querySelector('.suggestion-dropdown');
+  if (existingDropdown) {
+    existingDropdown.remove();
+  }
+  
+  if (suggestions.length === 0) return null;
+  
+  const dropdown = document.createElement('div');
+  dropdown.className = 'suggestion-dropdown';
+
+  
+  suggestions.forEach((suggestion, index) => {
+    const item = document.createElement('div');
+    item.className = 'suggestion-item';
+    item.textContent = suggestion;
+
+    
+    if (index === 0) {
+      item.classList.add('highlighted');
+    }
+    
+    item.onclick = () => {
+      input.value = suggestion;
+      dropdown.remove();
+      input.focus();
+    };
+    
+    dropdown.appendChild(item);
+  });
+  
+  return dropdown;
+}
+
+// Function to filter suggestions based on input
+function filterSuggestions(allSuggestions, inputValue) {
+  if (!inputValue) return allSuggestions;
+  
+  const filtered = allSuggestions.filter(suggestion => 
+    suggestion.toLowerCase().startsWith(inputValue.toLowerCase())
+  );
+  
+  return filtered;
+}
+
+// Function to handle keyboard navigation in suggestions
+function handleSuggestionKeydown(event, input, dropdown) {
+  if (!dropdown) return false;
+  
+  const items = dropdown.querySelectorAll('.suggestion-item');
+  const highlighted = dropdown.querySelector('.suggestion-item.highlighted');
+  let currentIndex = Array.from(items).indexOf(highlighted);
+  
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      if (highlighted) highlighted.classList.remove('highlighted');
+      
+      currentIndex = (currentIndex + 1) % items.length;
+      items[currentIndex].classList.add('highlighted');
+      return true;
+      
+    case 'ArrowUp':
+      event.preventDefault();
+      if (highlighted) highlighted.classList.remove('highlighted');
+      
+      currentIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
+      items[currentIndex].classList.add('highlighted');
+      return true;
+      
+    case 'Enter':
+      event.preventDefault();
+      if (highlighted) {
+        input.value = highlighted.textContent;
+        dropdown.remove();
+      }
+      return true;
+      
+    case 'Escape':
+      dropdown.remove();
+      return true;
+      
+    default:
+      return false;
+  }
 }
 
 
