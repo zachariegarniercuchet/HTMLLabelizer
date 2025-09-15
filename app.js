@@ -1169,17 +1169,21 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
       if (deleteBtn) {
         deleteBtn.onclick = (e) => {
           e.stopPropagation();
-          let fullText = '';
-          for (const child of labelElement.childNodes) {
-            if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains('delete-btn')) {
-              continue;
-            }
-            fullText += child.textContent;
-          }
-          const textNode = document.createTextNode(fullText.trim());
-
+          
+          // Extract content while preserving formatting
+          const contentToPreserve = extractLabelContentWithFormatting(labelElement);
+          
           if (labelElement.parentNode) {
-            labelElement.parentNode.replaceChild(textNode, labelElement);
+            // Insert the preserved content before the label
+            if (contentToPreserve.childNodes.length > 0) {
+              Array.from(contentToPreserve.childNodes).forEach(node => {
+                labelElement.parentNode.insertBefore(node, labelElement);
+              });
+            }
+            
+            // Remove the label element
+            labelElement.parentNode.removeChild(labelElement);
+            
           } else {
             elements.htmlContent.innerHTML = '';
           }
@@ -1209,9 +1213,27 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
         showParameterMenu(labelElement, e.clientX, e.clientY);
       };
     });
-  }
+}
 
-  function updateStats() {
+function extractLabelContentWithFormatting(labelElement) {
+    const contentFragment = document.createDocumentFragment();
+    
+    // Process each child node, excluding the delete button
+    Array.from(labelElement.childNodes).forEach(child => {
+        if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains('delete-btn')) {
+            return; // Skip delete button
+        }
+        
+        // Clone the node to preserve all formatting
+        const clonedNode = child.cloneNode(true);
+        contentFragment.appendChild(clonedNode);
+    });
+    
+    return contentFragment;
+}
+
+
+function updateStats() {
     const manualLabels = elements.htmlContent.querySelectorAll('manual_label');
     elements.totalMentions.textContent = manualLabels.length;
     
@@ -1225,7 +1247,7 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     }
     countLabelsRecursive(labels);
     elements.labelTypes.textContent = totalLabelTypes;
-  }
+}
 
   // ======= Selection and Labeling =======
   function showContextMenu(x, y) {
@@ -1256,6 +1278,7 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
       const selectedText = range.toString().trim();
       if (!selectedText) return;
 
+      // Create the label element
       const labelElement = document.createElement("manual_label");
 
       // Always set label name
@@ -1263,7 +1286,7 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
       
       // Set parent attribute
       if (labelPath.length > 1) {
-        labelElement.setAttribute("parent", labelPath[labelPath.length - 2]); // parent label
+        labelElement.setAttribute("parent", labelPath[labelPath.length - 2]);
       } else {
         labelElement.setAttribute("parent", "");
       }
@@ -1279,19 +1302,42 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
         }
 
         labelElement.setAttribute(paramName, initialValue);
-        });
+      });
       
       labelElement.style.backgroundColor = labelData.color;
       labelElement.style.color = getContrastColor(labelData.color);
-      labelElement.textContent = selectedText;
 
+      // Extract and preserve formatting
+      const fragment = range.extractContents();
+      const processedContent = preserveFormattingInLabel(fragment);
+      
+      // Add the processed content to the label
+      labelElement.appendChild(processedContent);
+
+      // Handle any remaining formatting that was split
+      const afterContent = handleSplitFormatting(range);
+      
+      // Insert the label
+      range.insertNode(labelElement);
+      
+      // Insert any remaining content after the label
+      if (afterContent && afterContent.childNodes.length > 0) {
+        let insertionPoint = labelElement.nextSibling;
+        while (afterContent.childNodes.length > 0) {
+          const node = afterContent.firstChild;
+          if (insertionPoint) {
+            labelElement.parentNode.insertBefore(node, insertionPoint);
+          } else {
+            labelElement.parentNode.appendChild(node);
+          }
+        }
+      }
+
+      // Add delete button
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "delete-btn";
       deleteBtn.textContent = "×";
       labelElement.appendChild(deleteBtn);
-
-      range.deleteContents();
-      range.insertNode(labelElement);
 
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = elements.htmlContent.innerHTML;
@@ -1312,7 +1358,78 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     }
 
     currentSelection = null;
-  }
+}
+
+function preserveFormattingInLabel(fragment) {
+    // Clone the fragment to avoid modifying the original
+    const processedFragment = document.createDocumentFragment();
+    
+    // Process each node in the fragment
+    Array.from(fragment.childNodes).forEach(node => {
+        processedFragment.appendChild(node.cloneNode(true));
+    });
+    
+    return processedFragment;
+}
+
+function handleSplitFormatting(range) {
+    const afterFragment = document.createDocumentFragment();
+    
+    // Get the end container and check if we're inside formatting elements
+    let container = range.endContainer;
+    let offset = range.endOffset;
+    
+    // If we're in a text node, check its parent elements for formatting
+    if (container.nodeType === Node.TEXT_NODE) {
+        const textNode = container;
+        const remainingText = textNode.textContent.slice(offset);
+        
+        if (remainingText) {
+            // Find all parent formatting elements
+            const formattingStack = [];
+            let parent = textNode.parentNode;
+            
+            while (parent && parent !== range.commonAncestorContainer) {
+                if (isFormattingElement(parent)) {
+                    formattingStack.push(parent.tagName.toLowerCase());
+                }
+                parent = parent.parentNode;
+            }
+            
+            if (formattingStack.length > 0) {
+                // Create nested formatting elements for the remaining text
+                let currentElement = document.createTextNode(remainingText);
+                
+                formattingStack.forEach(tagName => {
+                    const formattingElement = document.createElement(tagName);
+                    formattingElement.appendChild(currentElement);
+                    currentElement = formattingElement;
+                });
+                
+                afterFragment.appendChild(currentElement);
+                
+                // Remove the remaining text from the original text node
+                textNode.textContent = textNode.textContent.slice(0, offset);
+            }
+        }
+    }
+    
+    return afterFragment;
+}
+
+function isFormattingElement(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+    
+    const formattingTags = [
+        'i', 'em', 'italic',           // italic tags
+        'b', 'strong', 'bold',         // bold tags
+        'u', 'underline',              // underline tags
+        's', 'strike', 'del',          // strikethrough tags
+        'sup', 'sub'                   // superscript/subscript
+    ];
+    
+    return formattingTags.includes(element.tagName.toLowerCase());
+}
 
   // ======= Event Listeners =======
   
