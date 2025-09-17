@@ -829,3 +829,15 @@
   align-items: center;
   gap: 1rem;
 }
+
+
+
+
+#upload-link {
+  color: #007bff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+#upload-link:hover {
+  color: #0056b3;
+}

@@ -34,7 +34,8 @@
     totalMentions: document.getElementById('total-mentions'),
     labelTypes: document.getElementById('label-types'),
     sourceView: document.getElementById('source-view'),
-    viewToggle: document.getElementById('view-toggle')
+    viewToggle: document.getElementById('view-toggle'),
+    dropZone: document.getElementById('drop-zone')
   };
 
   
@@ -1627,6 +1628,53 @@ function isFormattingElement(element) {
     // ✅ Reset input so the same file can be uploaded again
     e.target.value = '';
   }
+  });
+
+  document.getElementById('upload-link').addEventListener('click', (e) => {
+    e.preventDefault(); // stop page jump
+    document.getElementById('html-file-input').click();
+  });
+
+  // ✅ Gestion drag & drop
+  ['dragenter', 'dragover'].forEach(eventName => {
+    elements.dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    elements.dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    });
+  });
+
+  elements.dropZone.addEventListener('drop', async (e) => {
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    // on déclenche la même logique que le fileInput
+    try {
+      currentHtml = await readFileAsText(file);
+      currentFileName = file.name;
+
+      sourceViewModified = false;
+      isSourceView = false;
+      elements.viewToggle.textContent = 'View Source';
+      elements.viewToggle.classList.remove('active');
+
+      extractExistingLabels(currentHtml);
+      renderHtmlContent();
+      elements.downloadBtn.disabled = false;
+      elements.viewToggle.disabled = false;
+
+    } catch (error) {
+      alert('Error reading HTML file');
+      console.error(error);
+    }
   });
 
   // Download
