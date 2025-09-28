@@ -13,6 +13,11 @@
   let searchTimeout;
   const MIN_SEARCH_LENGTH = 2; // Only search for strings MIN_SEARCH_LENGTH+ characters
   const SEARCH_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
+
+  // ======= Multi-Selection State Management =======
+  let multiSelectionMode = false;
+  let multiSelections = []; // Array to store multiple selections
+  let ctrlPressed = false;
   
 
   // ======= DOM Elements =======
@@ -813,7 +818,7 @@ function showParameterMenu(labelElement, x, y) {
   const labelData = getLabelByPath(path);
 
   if (!labelData || labelData.params.size === 0) {
-    alert("This label has no parameters to edit");
+    //alert("This label has no parameters to edit");
     return;
   }
 
@@ -959,14 +964,12 @@ function showParameterMenu(labelElement, x, y) {
     currentParamElement = null;
   }
 
-  function saveParameters() {
+  // ======= Enhanced Parameter Saving for Multi-Selection =======
+function saveParameters() {
   if (!currentParamElement) return;
 
-  // Determine if we're in HTML content or advanced content
-  const isInAdvancedContent = elements.advancedContent.contains(currentParamElement);
-  const isInHtmlContent = elements.htmlContent.contains(currentParamElement);
-
-  // Update parameters on the element
+  // Get parameter values from form
+  const paramValues = {};
   const elems = elements.paramForm.querySelectorAll('[data-param-name]');
   elems.forEach(el => {
     const paramName = el.dataset.paramName;
@@ -982,22 +985,34 @@ function showParameterMenu(labelElement, x, y) {
       paramValue = el.value ?? '';
     }
 
+    paramValues[paramName] = paramValue;
+  });
+
+  // Apply parameters to current element
+  Object.entries(paramValues).forEach(([paramName, paramValue]) => {
     currentParamElement.setAttribute(paramName, paramValue);
   });
 
-  // Update the appropriate storage based on context
+  // If we have multiple elements from multi-selection, apply to all
+  if (window.currentMultiLabelElements && window.currentMultiLabelElements.length > 1) {
+    window.currentMultiLabelElements.forEach(element => {
+      if (element !== currentParamElement) {
+        Object.entries(paramValues).forEach(([paramName, paramValue]) => {
+          element.setAttribute(paramName, paramValue);
+        });
+      }
+    });
+    
+    // Clear the reference
+    window.currentMultiLabelElements = null;
+  }
+
+  // Update storage based on context
+  const isInAdvancedContent = elements.advancedContent.contains(currentParamElement);
+  const isInHtmlContent = elements.htmlContent.contains(currentParamElement);
+
   if (isInHtmlContent) {
-    // Update currentHtml variable
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = elements.htmlContent.innerHTML;
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(currentHtml, 'text/html');
-    doc.body.innerHTML = tempDiv.innerHTML;
-    currentHtml = doc.documentElement.outerHTML;
-  } else if (isInAdvancedContent) {
-    // For advanced content, the DOM IS the storage
-    // No additional action needed since we already updated the element attributes
-    // The contenteditable div maintains the state automatically
+    updateCurrentHtmlFromDOM();
   }
 
   hideParameterMenu();
@@ -1425,9 +1440,10 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
 
         // If there was a selection, do NOT open parameter menu!
         const sel = window.getSelection();
-        if (!sel.isCollapsed) return;
+        if (!sel.isCollapsed || multiSelectionMode) return;
         
         e.stopPropagation();
+
         showParameterMenu(labelElement, e.clientX, e.clientY);
       };
     });
@@ -1590,8 +1606,216 @@ function getContainingManualLabel(node) {
   return null;
 }
 
-  // Fix 1: Modified applyLabelToSelection to preserve current selection AND validate selection
+
+
+// ======= Multi-Selection Functions =======
+function addToMultiSelection(range, container) {
+  // Validate each selection
+  const validation = isValidSelection(range);
+  if (!validation.valid) {
+    alert("Invalid Selection: " + validation.reason);
+    return false;
+  }
+
+  const selection = {
+    range: range.cloneRange(),
+    text: range.toString().trim(),
+    isAdvanced: elements.advancedContent.contains(container) || elements.advancedContent === container
+  };
+
+  multiSelections.push(selection);
+  
+  // Visual feedback - highlight the selection temporarily
+  highlightMultiSelection(range, multiSelections.length - 1);
+  
+  return true;
+}
+
+function highlightMultiSelection(range, index) {
+  try {
+    // Get range boundaries for overlay positioning
+    const rects = range.getClientRects();
+    if (rects.length === 0) return;
+
+    // Store range data for later use
+    const rangeData = {
+      range: range.cloneRange(),
+      rects: Array.from(rects),
+      text: range.toString(),
+      index: index
+    };
+
+    multiSelections[index].rangeData = rangeData;
+    
+    // Create overlay highlights for each rect
+    Array.from(rects).forEach((rect, rectIndex) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'multi-selection-overlay';
+      overlay.dataset.multiIndex = index;
+      overlay.dataset.rectIndex = rectIndex;
+      
+      // Get scroll offsets
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
+      overlay.style.cssText = `
+        position: absolute;
+        left: ${rect.left + scrollLeft}px;
+        top: ${rect.top + scrollTop}px;
+        width: ${rect.width}px;
+        height: ${rect.height}px;
+        background-color: rgba(0, 123, 255, 0.3);
+        border: 2px dashed #007bff;
+        pointer-events: none;
+        z-index: 1000;
+        border-radius: 2px;
+      `;
+      
+      // Add number indicator for first rect only
+      if (rectIndex === 0) {
+        const indicator = document.createElement('span');
+        indicator.style.cssText = `
+          position: absolute;
+          top: -20px;
+          left: 0;
+          background: #007bff;
+          color: white;
+          font-size: 10px;
+          padding: 2px 6px;
+          border-radius: 2px;
+          font-weight: bold;
+          min-width: 16px;
+          text-align: center;
+          line-height: 1;
+        `;
+        indicator.textContent = (index + 1).toString();
+        overlay.appendChild(indicator);
+      }
+      
+      document.body.appendChild(overlay);
+    });
+    
+  } catch (e) {
+    console.warn('Could not highlight multi-selection:', e);
+  }
+}
+
+function clearMultiSelectionHighlights() {
+  // Remove all overlay elements
+  const overlays = document.querySelectorAll('.multi-selection-overlay');
+  overlays.forEach(overlay => overlay.remove());
+}
+
+// Update overlays on scroll/resize
+function updateMultiSelectionOverlays() {
+  const overlays = document.querySelectorAll('.multi-selection-overlay');
+  if (overlays.length === 0) return;
+
+  // Clear existing overlays
+  overlays.forEach(overlay => overlay.remove());
+  
+  // Recreate overlays with updated positions
+  multiSelections.forEach((selection, index) => {
+    if (selection.rangeData) {
+      try {
+        // Get fresh rects in case content moved
+        const freshRects = selection.rangeData.range.getClientRects();
+        if (freshRects.length > 0) {
+          highlightMultiSelection(selection.rangeData.range, index);
+        }
+      } catch (e) {
+        console.warn('Could not update overlay for selection', index, e);
+      }
+    }
+  });
+}
+
+
+function applyLabelToMultiSelections(labelPath, labelData) {
+  if (multiSelections.length === 0) return;
+
+  hideContextMenu();
+  
+  let appliedElements = [];
+  let lastAppliedElement = null;
+
+  console.log(`Processing ${multiSelections.length} multi-selections`);
+
+  // Process each stored selection using the original ranges
+  multiSelections.forEach((selection, index) => {
+    try {
+      console.log(`Processing selection ${index}: "${selection.text.substring(0, 50)}..."`);
+      
+      const range = selection.range;
+      
+      // Validate the range is still valid
+      if (!range || !range.startContainer || !range.endContainer) {
+        console.warn(`Selection ${index} has invalid range, skipping`);
+        return;
+      }
+
+      let labelElement = null;
+      
+      if (selection.isAdvanced) {
+        labelElement = applyLabelToAdvancedContent(range, labelPath, labelData);
+      } else {
+        labelElement = applyLabelToHtmlContent(range, labelPath, labelData);
+      }
+      
+      if (labelElement) {
+        appliedElements.push(labelElement);
+        lastAppliedElement = labelElement;
+        console.log(`Successfully applied label to selection ${index}`);
+      } else {
+        console.warn(`Failed to create label element for selection ${index}`);
+      }
+      
+    } catch (error) {
+      console.error(`Error applying label to selection ${index}:`, error);
+    }
+  });
+
+  // Clear multi-selection state and overlays
+  clearMultiSelectionHighlights();
+  multiSelections = [];
+  multiSelectionMode = false;
+
+  // Update HTML content if we modified the main content area
+  if (appliedElements.some(el => elements.htmlContent.contains(el))) {
+    updateCurrentHtmlFromDOM();
+  }
+
+  // Attach event listeners to new labels
+  if (appliedElements.some(el => elements.htmlContent.contains(el))) {
+    attachLabelEventListeners();
+  }
+  if (appliedElements.some(el => elements.advancedContent.contains(el))) {
+    attachAdvancedLabelEventListeners();
+  }
+
+  // Show parameter menu for the last applied element (they all have the same parameters)
+  if (lastAppliedElement && appliedElements.length > 0) {
+    // Store reference to all applied elements for parameter synchronization
+    window.currentMultiLabelElements = appliedElements;
+    
+    const x = window.lastClickX ?? window.innerWidth / 2;
+    const y = window.lastClickY ?? window.innerHeight / 2;
+    showParameterMenu(lastAppliedElement, x, y);
+  }
+
+  updateStats();
+  console.log(`Applied label to ${appliedElements.length} selections`);
+}
+
+// ======= Selection Functions =======
 function applyLabelToSelection(labelPath, labelData) {
+  if (multiSelections.length > 0) {
+    // Apply to multi-selections
+    applyLabelToMultiSelections(labelPath, labelData);
+    return;
+  }
+
+  // Original single selection logic
   if (!currentSelection || !currentSelection.range) return;
 
   hideContextMenu();
@@ -1601,37 +1825,29 @@ function applyLabelToSelection(labelPath, labelData) {
     const selectedText = range.toString().trim();
     if (!selectedText) return;
 
-    // VALIDATE SELECTION BEFORE APPLYING LABEL
     const validation = isValidSelection(range);
     if (!validation.valid) {
       alert("Invalid Selection: " + validation.reason);
       return;
     }
 
-    // Store current selection info BEFORE applying label
     const previousMatchIndex = currentSelection.matchIndex;
     const wasAdvanced = currentSelection.isAdvanced;
 
     let labelElement = null;
 
     if (currentSelection.isAdvanced) {
-      // Apply label in advanced content
       labelElement = applyLabelToAdvancedContent(range, labelPath, labelData);
-
-      // After applying to advanced content, restore HTML selection if there were matches
       if (window.currentSearchMatches && window.currentSearchMatches.length > 0) {
         setTimeout(() => {
           restoreOrFindNextSelection(previousMatchIndex);
         }, 10);
       }
     } else {
-      // Handle HTML content labeling
       labelElement = applyLabelToHtmlContent(range, labelPath, labelData);
     }
 
-    // 👉 Immediately open the parameter menu for the new label
     if (labelElement) {
-      // Use mouse position if available, otherwise center screen
       const x = window.lastClickX ?? window.innerWidth / 2;
       const y = window.lastClickY ?? window.innerHeight / 2;
       showParameterMenu(labelElement, x, y);
@@ -1759,6 +1975,18 @@ function attachAdvancedLabelEventListeners() {
       if (!sel.isCollapsed) return;
       
       e.stopPropagation();
+      const labelName = labelElement.getAttribute("labelName");
+      const parent = labelElement.getAttribute("parent") || "";
+
+      if (!labelName) return;
+
+      const path = parent ? [parent, labelName] : [labelName];
+      const labelData = getLabelByPath(path);
+
+      if (!labelData || labelData.params.size === 0) {
+        //alert("This label has no parameters to edit");
+        return;
+      }
       showParameterMenu(labelElement, e.clientX, e.clientY);
     };
   });
@@ -1891,68 +2119,6 @@ function preserveFormattingInLabel(fragment) {
     });
     
     return processedFragment;
-}
-
-function handleSplitFormatting(range) {
-    const afterFragment = document.createDocumentFragment();
-    
-    // Get the end container and check if we're inside formatting elements
-    let container = range.endContainer;
-    let offset = range.endOffset;
-    
-    // If we're in a text node, check its parent elements for formatting
-    if (container.nodeType === Node.TEXT_NODE) {
-        const textNode = container;
-        const remainingText = textNode.textContent.slice(offset);
-        
-        if (remainingText) {
-            // Find all parent formatting elements
-            const formattingStack = [];
-            let parent = textNode.parentNode;
-            
-            while (parent && parent !== range.commonAncestorContainer) {
-                if (isFormattingElement(parent)) {
-                    formattingStack.push(parent.tagName.toLowerCase());
-                }
-                parent = parent.parentNode;
-            }
-            
-            if (formattingStack.length > 0) {
-                // Create nested formatting elements for the remaining text
-                let currentElement = document.createTextNode(remainingText);
-                
-                formattingStack.forEach(tagName => {
-                    const formattingElement = document.createElement(tagName);
-                    formattingElement.appendChild(currentElement);
-                    currentElement = formattingElement;
-                });
-                
-                afterFragment.appendChild(currentElement);
-                
-                // Remove the remaining text from the original text node
-                textNode.textContent = textNode.textContent.slice(0, offset);
-            }
-        }
-    }
-    
-    return afterFragment;
-}
-
-
-
-function isFormattingElement(element) {
-  if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-  
-  const formattingTags = [
-    'i', 'em', 'italic',           // italic tags
-    'b', 'strong', 'bold',         // bold tags
-    'u', 'underline',              // underline tags
-    's', 'strike', 'del',          // strikethrough tags
-    'sup', 'sub',                  // superscript/subscript
-    'span'                         // span for styling
-  ];
-  
-  return formattingTags.includes(element.tagName.toLowerCase());
 }
 
 
@@ -2634,7 +2800,7 @@ function clearSearchHighlights() {
     elements.dropZone.addEventListener(eventName, (e) => {
       e.preventDefault();
       e.stopPropagation();
-      dropZone.classList.add('dragover');
+      elements.dropZone.classList.add('dragover');
     });
   });
 
@@ -2642,7 +2808,7 @@ function clearSearchHighlights() {
     elements.dropZone.addEventListener(eventName, (e) => {
       e.preventDefault();
       e.stopPropagation();
-      dropZone.classList.remove('dragover');
+      elements.dropZone.classList.remove('dragover');
     });
   });
 
@@ -2775,7 +2941,7 @@ function clearSearchHighlights() {
   elements.saveParams.addEventListener('click', saveParameters);
   elements.cancelParams.addEventListener('click', hideParameterMenu);
 
-  // Text selection handling
+// ======= Enhanced Text Selection Handling =======
 document.addEventListener('mouseup', (e) => {
   if (elements.contextMenu.contains(e.target) || elements.paramMenu.contains(e.target)) return;
   
@@ -2785,32 +2951,39 @@ document.addEventListener('mouseup', (e) => {
     const range = selection.getRangeAt(0);
     const container = range.commonAncestorContainer;
     
-    // Check if selection is in HTML content
-    if (elements.htmlContent.contains(container) || elements.htmlContent === container) {
-      currentSelection = {
-        text: selection.toString().trim(),
-        range: range.cloneRange()
-      };
-      
-      showContextMenu(e.clientX, e.clientY);
-      return;
-    }
+    // Check if selection is in HTML content or advanced content
+    const isInHtmlContent = elements.htmlContent.contains(container) || elements.htmlContent === container;
+    const isInAdvancedContent = elements.advancedContent.contains(container) || elements.advancedContent === container;
     
-    // Check if selection is in advanced content
-    if (elements.advancedContent.contains(container) || elements.advancedContent === container) {
-      currentSelection = {
-        text: selection.toString().trim(),
-        range: range.cloneRange(),
-        isAdvanced: true  // Flag to identify advanced content
-      };
-      
-      showContextMenu(e.clientX, e.clientY);
-      return;
+    if (isInHtmlContent || isInAdvancedContent) {
+      if (multiSelectionMode && ctrlPressed) {
+        // Add to multi-selection
+        if (addToMultiSelection(range, container)) {
+          console.log(`Added selection ${multiSelections.length}: "${range.toString().trim()}"`);
+        }
+        // Clear the visual selection but keep our stored ranges
+        selection.removeAllRanges();
+        return;
+      } else if (!multiSelectionMode) {
+        // Single selection mode
+        console.log('Single selection made:', selection.toString().trim());
+        currentSelection = {
+          text: selection.toString().trim(),
+          range: range.cloneRange(),
+          isAdvanced: isInAdvancedContent
+        };
+        
+        showContextMenu(e.clientX, e.clientY);
+        return;
+      }
     }
   }
   
-  hideContextMenu();
-  hideParameterMenu();
+  // If we reach here and we're not in multi-selection mode, hide menus
+  if (!multiSelectionMode) {
+    hideContextMenu();
+    hideParameterMenu();
+  }
 });
 
   // Hide menus when clicking elsewhere
@@ -2821,6 +2994,11 @@ document.addEventListener('mouseup', (e) => {
     if (!elements.paramMenu.contains(e.target)) {
       hideParameterMenu();
     }
+    if (!ctrlPressed && multiSelectionMode && !elements.contextMenu.contains(e.target)) {
+      clearMultiSelectionHighlights();
+      multiSelections = [];
+      multiSelectionMode = false;
+    }
   });
 
   // Hide menus on escape
@@ -2829,15 +3007,6 @@ document.addEventListener('mouseup', (e) => {
       hideContextMenu();
       hideParameterMenu();
     }
-  });
-
-  // Prevent menus from closing when clicking inside
-  elements.contextMenu.addEventListener('click', (e) => {
-    e.stopPropagation();
-  });
-
-  elements.paramMenu.addEventListener('click', (e) => {
-    e.stopPropagation();
   });
 
   // Source view input tracking
@@ -2870,10 +3039,46 @@ elements.sourceView.addEventListener('keydown', (e) => {
 });
 
 
-//const clearAdvancedBtn = document.createElement('button');
-//clearAdvancedBtn.textContent = 'Clear Labels';
-//clearAdvancedBtn.id = 'clear-advanced-labels';
-//clearAdvancedBtn.onclick = clearAdvancedLabels;
+// ======= Keyboard Event Handlers =======
+// Add these event listeners to handle Ctrl key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Control' || e.key === 'Meta') {
+    if (!ctrlPressed) {
+      ctrlPressed = true;
+      multiSelectionMode = true;
+      document.body.classList.add('multi-selection-mode');
+      
+    }
+  }
+  
+  // Existing escape key handling
+  if (e.key === 'Escape') {
+    hideContextMenu();
+    hideParameterMenu();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Control' || e.key === 'Meta') {
+    ctrlPressed = false;
+    document.body.classList.remove('multi-selection-mode');
+    
+    // If we have selections and we're releasing Ctrl, show context menu
+    if (multiSelectionMode && multiSelections.length > 0) {
+      // Use the last click position or center of screen
+      const x = window.lastClickX ?? window.innerWidth / 2;
+      const y = window.lastClickY ?? window.innerHeight / 2;
+      showContextMenu(x, y);
+    } else if (multiSelections.length === 0) {
+      // No selections made, exit multi-selection mode
+      multiSelectionMode = false;
+    }
+  }
+});
+
+// Keep overlays positioned correctly on scroll/resize
+window.addEventListener('scroll', updateMultiSelectionOverlays);
+window.addEventListener('resize', updateMultiSelectionOverlays);
 
 
 elements.advancedContent.addEventListener('input', () => {
