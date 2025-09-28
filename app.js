@@ -1612,29 +1612,37 @@ function applyLabelToSelection(labelPath, labelData) {
     const previousMatchIndex = currentSelection.matchIndex;
     const wasAdvanced = currentSelection.isAdvanced;
 
+    let labelElement = null;
+
     if (currentSelection.isAdvanced) {
       // Apply label in advanced content
-      applyLabelToAdvancedContent(range, labelPath, labelData);
-      
+      labelElement = applyLabelToAdvancedContent(range, labelPath, labelData);
+
       // After applying to advanced content, restore HTML selection if there were matches
       if (window.currentSearchMatches && window.currentSearchMatches.length > 0) {
-        // Try to restore the previous selection or find next available
         setTimeout(() => {
           restoreOrFindNextSelection(previousMatchIndex);
         }, 10);
       }
     } else {
-      // Handle HTML content labeling (existing code)
-      applyLabelToHtmlContent(range, labelPath, labelData);
+      // Handle HTML content labeling
+      labelElement = applyLabelToHtmlContent(range, labelPath, labelData);
+    }
+
+    // 👉 Immediately open the parameter menu for the new label
+    if (labelElement) {
+      // Use mouse position if available, otherwise center screen
+      const x = window.lastClickX ?? window.innerWidth / 2;
+      const y = window.lastClickY ?? window.innerHeight / 2;
+      showParameterMenu(labelElement, x, y);
     }
 
   } catch (error) {
     console.error("Error applying label:", error);
     alert("Error applying label. Please try selecting text again.");
   }
-
-  // Don't clear currentSelection here - let it be handled by specific functions
 }
+
 
 function restoreOrFindNextSelection(previousMatchIndex) {
   if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
@@ -1716,7 +1724,7 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   attachAdvancedLabelEventListeners();
   updateStats();
 
-  // Don't clear currentSelection here - it will be handled by the caller
+  return labelElement;
 }
 
 function attachAdvancedLabelEventListeners() {
@@ -1825,6 +1833,7 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   window.getSelection().removeAllRanges();
   attachLabelEventListeners();
   updateStats();
+  return labelElement;
 }
 
 function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
@@ -3004,6 +3013,13 @@ elements.clearAdvancedLabels.addEventListener('click', () => {
   elements.advancedContent.innerHTML = '';
   clearSearchHighlights();
   updateStats();
+});
+
+
+// When a click occurs, store the coordinates
+window.addEventListener('click', (event) => {
+  window.lastClickX = event.clientX;
+  window.lastClickY = event.clientY;
 });
 
   // ======= Initialize =======
