@@ -558,34 +558,57 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
   saveBtn.textContent = "Save";
   saveBtn.className = "save-btn green";
 
-  saveBtn.onclick = () => {
-    const paramName = nameInput.value.trim();
-    if (!paramName) return;
+  const validNameRegex = /^[A-Za-z0-9_]+$/;
 
-    const paramType = typeSelect.value;
-    let paramValue;
+saveBtn.onclick = () => {
+  const paramName = nameInput.value.trim();
+  if (!paramName) {
+    alert("Parameter name cannot be empty.");
+    return;
+  }
 
-    if (paramType === "dropdown") {
-      const items = Array.from(valuesList.querySelectorAll("input"))
-        .map(i => i.value.trim())
-        .filter(v => v);
+  // Check param name validity
+  if (!validNameRegex.test(paramName)) {
+    alert("Invalid parameter name. Use only letters, numbers, and underscores (no spaces or special characters).");
+    return;
+  }
 
-      const selectEl = defaultValueContainer.querySelector("select");
-      paramValue = { type: "dropdown", options: items, default: items.length > 0 ? items[0] : "" };
-    } else if (paramType === "checkbox") {
-      const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
-      paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
-    } else {
-      const inputEl = defaultValueContainer.querySelector("input[type='text']");
-      paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
+  const paramType = typeSelect.value;
+  let paramValue;
+
+  if (paramType === "dropdown") {
+    const items = Array.from(valuesList.querySelectorAll("input"))
+      .map(i => i.value.trim())
+      .filter(v => v);
+
+    // Check each option
+    for (const item of items) {
+      if (!validNameRegex.test(item)) {
+        alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
+        return;
+      }
     }
 
-    addParameter(labelPath, paramName, paramValue);
-    inlineEditor.remove();
-    const nodeId = labelPath.join(".");
-    expandedNodes.add(nodeId);
-    renderTree();
-  };
+    paramValue = {
+      type: "dropdown",
+      options: items,
+      default: items.length > 0 ? items[0] : ""
+    };
+  } else if (paramType === "checkbox") {
+    const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
+    paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
+  } else {
+    const inputEl = defaultValueContainer.querySelector("input[type='text']");
+    paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
+  }
+
+  // If all checks passed → save
+  addParameter(labelPath, paramName, paramValue);
+  inlineEditor.remove();
+  const nodeId = labelPath.join(".");
+  expandedNodes.add(nodeId);
+  renderTree();
+};
 
   inlineEditor.appendChild(nameInput);
   inlineEditor.appendChild(typeSelect);
@@ -709,37 +732,57 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
   saveBtn.textContent = "Save";
   saveBtn.className = "save-btn green";
 
-  saveBtn.onclick = () => {
-    const newParamName = nameInput.value.trim();
-    if (!newParamName) return;
+  const validNameRegex = /^[A-Za-z0-9_]+$/;
 
-    const newType = typeSelect.value;
-    let newParamValue;
+saveBtn.onclick = () => {
+  const paramName = nameInput.value.trim();
+  if (!paramName) {
+    alert("Parameter name cannot be empty.");
+    return;
+  }
 
-    if (newType === "dropdown") {
-      const items = Array.from(valuesList.querySelectorAll("input"))
-        .map(i => i.value.trim())
-        .filter(v => v);
-      const selectEl = defaultValueContainer.querySelector("select");
-      newParamValue = { type: "dropdown", options: items, default: items.length > 0 ? items[0] : "" };
-    } else if (newType === "checkbox") {
-      const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
-      newParamValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
-    } else {
-      const inputEl = defaultValueContainer.querySelector("input[type='text']");
-      newParamValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
-    }
+  // Check param name validity
+  if (!validNameRegex.test(paramName)) {
+    alert("Invalid parameter name. Use only letters, numbers, and underscores (no spaces or special characters).");
+    return;
+  }
 
-    const label = getLabelByPath(labelPath);
-    if (label) {
-      if (newParamName !== oldParamName) {
-        label.params.delete(oldParamName);
+  const paramType = typeSelect.value;
+  let paramValue;
+
+  if (paramType === "dropdown") {
+    const items = Array.from(valuesList.querySelectorAll("input"))
+      .map(i => i.value.trim())
+      .filter(v => v);
+
+    // Check each option
+    for (const item of items) {
+      if (!validNameRegex.test(item)) {
+        alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
+        return;
       }
-      label.params.set(newParamName, newParamValue);
-      inlineEditor.remove();
-      refreshTreeUI();
     }
-  };
+
+    paramValue = {
+      type: "dropdown",
+      options: items,
+      default: items.length > 0 ? items[0] : ""
+    };
+  } else if (paramType === "checkbox") {
+    const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
+    paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
+  } else {
+    const inputEl = defaultValueContainer.querySelector("input[type='text']");
+    paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
+  }
+
+  // If all checks passed → save
+  addParameter(labelPath, paramName, paramValue);
+  inlineEditor.remove();
+  const nodeId = labelPath.join(".");
+  expandedNodes.add(nodeId);
+  renderTree();
+};
 
   inlineEditor.appendChild(nameInput);
   inlineEditor.appendChild(typeSelect);
