@@ -4,13 +4,15 @@
   let currentFileName = '';
   let isSourceView = false;
   let sourceViewModified = false;
-  let htmlContent = null;
   const labels = new Map(); // name -> {color, type, sublabels, params}
   let currentSelection = null;
   let expandedNodes = new Set(); // Track expanded tree nodes
   let selectedNode = null; // Track selected tree node
-  let editingNode = null; // Track node being edited
   let currentParamElement = null; // Track element being edited for parameters
+
+  let searchTimeout;
+  const MIN_SEARCH_LENGTH = 2; // Only search for strings MIN_SEARCH_LENGTH+ characters
+  const SEARCH_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
   
 
   // ======= DOM Elements =======
@@ -35,7 +37,14 @@
     labelTypes: document.getElementById('label-types'),
     sourceView: document.getElementById('source-view'),
     viewToggle: document.getElementById('view-toggle'),
-    dropZone: document.getElementById('drop-zone')
+    dropZone: document.getElementById('drop-zone'),
+    advancedLabelInput: document.getElementById('advanced-label-input'),
+    advancedContent: document.getElementById('advanced-content'),
+    clearAdvancedLabels: document.getElementById('clear-advanced-labels'),
+    applyAdvanced: document.getElementById('apply-advanced'),
+    applyAllAdvanced: document.getElementById('apply-all-advanced'),
+    navigatePrevious: document.getElementById('navigate-previous'),
+    navigateNext: document.getElementById('navigate-next')
   };
 
   
@@ -910,44 +919,43 @@ function showParameterMenu(labelElement, x, y) {
   function saveParameters() {
   if (!currentParamElement) return;
 
-  // Grab every element we created in the param form (inputs and selects),
-  // they all have data-param-name set in showParameterMenu()
-  const elems = elements.paramForm.querySelectorAll('[data-param-name]');
+  // Determine if we're in HTML content or advanced content
+  const isInAdvancedContent = elements.advancedContent.contains(currentParamElement);
+  const isInHtmlContent = elements.htmlContent.contains(currentParamElement);
 
+  // Update parameters on the element
+  const elems = elements.paramForm.querySelectorAll('[data-param-name]');
   elems.forEach(el => {
     const paramName = el.dataset.paramName;
     let paramValue = '';
 
-    // checkbox (input[type="checkbox"])
     if (el.tagName.toLowerCase() === 'input' && el.type === 'checkbox') {
       paramValue = el.checked ? 'true' : 'false';
-    }
-    // select (dropdown)
-    else if (el.tagName.toLowerCase() === 'select') {
+    } else if (el.tagName.toLowerCase() === 'select') {
       paramValue = el.value ?? '';
-    }
-    // other inputs (text, number, etc.)
-    else if (el.tagName.toLowerCase() === 'input') {
+    } else if (el.tagName.toLowerCase() === 'input') {
       paramValue = el.value ?? '';
-    }
-    // fallback
-    else {
+    } else {
       paramValue = el.value ?? '';
     }
 
-    // Store the actual value for this mention as an attribute (string)
-    // (preserving case of paramName)
     currentParamElement.setAttribute(paramName, paramValue);
   });
 
-  // Rebuild currentHtml from the editable HTML content (keeps your existing approach)
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = elements.htmlContent.innerHTML;
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(currentHtml, 'text/html');
-  doc.body.innerHTML = tempDiv.innerHTML;
-  currentHtml = doc.documentElement.outerHTML;
+  // Update the appropriate storage based on context
+  if (isInHtmlContent) {
+    // Update currentHtml variable
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = elements.htmlContent.innerHTML;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(currentHtml, 'text/html');
+    doc.body.innerHTML = tempDiv.innerHTML;
+    currentHtml = doc.documentElement.outerHTML;
+  } else if (isInAdvancedContent) {
+    // For advanced content, the DOM IS the storage
+    // No additional action needed since we already updated the element attributes
+    // The contenteditable div maintains the state automatically
+  }
 
   hideParameterMenu();
   updateStats();
@@ -1435,96 +1443,390 @@ function updateStats() {
     elements.contextMenu.classList.add('hidden');
   }
 
-  function applyLabelToSelection(labelPath, labelData) {
-    if (!currentSelection || !currentSelection.range) return;
-
-    hideContextMenu();
-
-    try {
-      const range = currentSelection.range;
-      const selectedText = range.toString().trim();
-      if (!selectedText) return;
-
-      // Create the label element
-      const labelElement = document.createElement("manual_label");
-
-      // Always set label name
-      labelElement.setAttribute("labelName", labelPath[labelPath.length - 1]);
-      
-      // Set parent attribute
-      if (labelPath.length > 1) {
-        labelElement.setAttribute("parent", labelPath[labelPath.length - 2]);
-      } else {
-        labelElement.setAttribute("parent", "");
-      }
-
-      // Apply parameters as attributes (preserving case)
-      labelData.params.forEach((paramDef, paramName) => {
-        let initialValue = "";
-
-        if (typeof paramDef === "object" && paramDef.type) {
-            initialValue = paramDef.default ?? "";
-        } else {
-            initialValue = paramDef;
+  // Validation function to check if selection crosses manual_label boundaries
+function isValidSelection(range) {
+  try {
+    const startContainer = range.startContainer;
+    const endContainer = range.endContainer;
+    
+    // Get all nodes within the range
+    const walker = document.createTreeWalker(
+      range.commonAncestorContainer,
+      NodeFilter.SHOW_ALL,
+      {
+        acceptNode: function(node) {
+          if (range.intersectsNode(node)) {
+            return NodeFilter.FILTER_ACCEPT;
+          }
+          return NodeFilter.FILTER_SKIP;
         }
-
-        labelElement.setAttribute(paramName, initialValue);
-      });
-      
-      labelElement.style.backgroundColor = labelData.color;
-      labelElement.style.color = getContrastColor(labelData.color);
-
-      // Extract and preserve formatting
-      const fragment = range.extractContents();
-      const processedContent = preserveFormattingInLabel(fragment);
-      
-      // Add the processed content to the label
-      labelElement.appendChild(processedContent);
-
-      // Handle any remaining formatting that was split
-      const afterContent = handleSplitFormatting(range);
-      
-      // Insert the label
-      range.insertNode(labelElement);
-      
-      // Insert any remaining content after the label
-      if (afterContent && afterContent.childNodes.length > 0) {
-        let insertionPoint = labelElement.nextSibling;
-        while (afterContent.childNodes.length > 0) {
-          const node = afterContent.firstChild;
-          if (insertionPoint) {
-            labelElement.parentNode.insertBefore(node, insertionPoint);
-          } else {
-            labelElement.parentNode.appendChild(node);
+      }
+    );
+    
+    const nodesInRange = [];
+    let node;
+    while (node = walker.nextNode()) {
+      nodesInRange.push(node);
+    }
+    
+    // Check for manual_label boundaries
+    for (let node of nodesInRange) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        // Check if we're crossing a manual_label boundary
+        if (node.tagName === 'MANUAL_LABEL') {
+          // If the range starts or ends inside this manual_label, but not completely contained
+          const rangeStartsInside = node.contains(startContainer) || node === startContainer;
+          const rangeEndsInside = node.contains(endContainer) || node === endContainer;
+          const rangeCompletelyContained = node.contains(startContainer) && node.contains(endContainer);
+          
+          if ((rangeStartsInside || rangeEndsInside) && !rangeCompletelyContained) {
+            return {
+              valid: false,
+              reason: "Selection cannot cross manual_label boundaries. Please select text that is completely inside or outside existing labels."
+            };
           }
         }
+        
+        // Check for delete buttons
+        if (node.classList && node.classList.contains('delete-btn')) {
+          return {
+            valid: false,
+            reason: "Selection cannot include delete buttons (×). Please select only the text content."
+          };
+        }
       }
+    }
+    
+    // Additional check: ensure we're not selecting across multiple manual_label siblings
+    const startLabel = getContainingManualLabel(startContainer);
+    const endLabel = getContainingManualLabel(endContainer);
+    
+    if (startLabel && endLabel && startLabel !== endLabel) {
+      return {
+        valid: false,
+        reason: "Selection cannot span across multiple labels. Please select text within a single label or in unlabeled areas."
+      };
+    }
+    
+    // Check if selection contains partial manual_label tags
+    const rangeContents = range.cloneContents();
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(rangeContents);
+    
+    // Look for opening tags without closing tags or vice versa
+    const openTags = (tempDiv.innerHTML.match(/<manual_label[^>]*>/g) || []).length;
+    const closeTags = (tempDiv.innerHTML.match(/<\/manual_label>/g) || []).length;
+    
+    if (openTags !== closeTags) {
+      return {
+        valid: false,
+        reason: "Selection creates malformed HTML by partially selecting label tags. Please select complete elements or text only."
+      };
+    }
+    
+    return { valid: true };
+    
+  } catch (error) {
+    console.error("Error validating selection:", error);
+    return {
+      valid: false,
+      reason: "Error validating selection. Please try selecting again."
+    };
+  }
+}
 
-      // Add delete button
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "delete-btn";
-      deleteBtn.textContent = "×";
-      labelElement.appendChild(deleteBtn);
+// Helper function to find containing manual_label
+function getContainingManualLabel(node) {
+  let current = node;
+  while (current && current !== elements.htmlContent && current !== elements.advancedContent) {
+    if (current.nodeType === Node.ELEMENT_NODE && current.tagName === 'MANUAL_LABEL') {
+      return current;
+    }
+    current = current.parentNode;
+  }
+  return null;
+}
 
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = elements.htmlContent.innerHTML;
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(currentHtml, "text/html");
-      doc.body.innerHTML = tempDiv.innerHTML;
-      currentHtml = doc.documentElement.outerHTML;
+  // Fix 1: Modified applyLabelToSelection to preserve current selection AND validate selection
+function applyLabelToSelection(labelPath, labelData) {
+  if (!currentSelection || !currentSelection.range) return;
 
-      window.getSelection().removeAllRanges();
-      
-      // Reattach event listeners
-      attachLabelEventListeners();
-      updateStats();
+  hideContextMenu();
 
-    } catch (error) {
-      console.error("Error applying label:", error);
-      alert("Error applying label. Please try selecting text again.");
+  try {
+    const range = currentSelection.range;
+    const selectedText = range.toString().trim();
+    if (!selectedText) return;
+
+    // VALIDATE SELECTION BEFORE APPLYING LABEL
+    const validation = isValidSelection(range);
+    if (!validation.valid) {
+      alert("Invalid Selection: " + validation.reason);
+      return;
     }
 
+    // Store current selection info BEFORE applying label
+    const previousMatchIndex = currentSelection.matchIndex;
+    const wasAdvanced = currentSelection.isAdvanced;
+
+    if (currentSelection.isAdvanced) {
+      // Apply label in advanced content
+      applyLabelToAdvancedContent(range, labelPath, labelData);
+      
+      // After applying to advanced content, restore HTML selection if there were matches
+      if (window.currentSearchMatches && window.currentSearchMatches.length > 0) {
+        // Try to restore the previous selection or find next available
+        setTimeout(() => {
+          restoreOrFindNextSelection(previousMatchIndex);
+        }, 10);
+      }
+    } else {
+      // Handle HTML content labeling (existing code)
+      applyLabelToHtmlContent(range, labelPath, labelData);
+    }
+
+  } catch (error) {
+    console.error("Error applying label:", error);
+    alert("Error applying label. Please try selecting text again.");
+  }
+
+  // Don't clear currentSelection here - let it be handled by specific functions
+}
+
+function restoreOrFindNextSelection(previousMatchIndex) {
+  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
     currentSelection = null;
+    return;
+  }
+
+  // Try to find a valid highlight at or after the previous position
+  let targetIndex = previousMatchIndex || 0;
+  let attempts = 0;
+  
+  while (attempts < window.currentSearchMatches.length) {
+    const highlight = elements.htmlContent.querySelector(`[data-match-index="${targetIndex}"]`);
+    if (highlight) {
+      setCurrentSelection(window.currentSearchMatches[targetIndex], targetIndex);
+      return;
+    }
+    targetIndex = (targetIndex + 1) % window.currentSearchMatches.length;
+    attempts++;
+  }
+  
+  // If no highlights found, clear selection
+  currentSelection = null;
+}
+
+function applyLabelToAdvancedContent(range, labelPath, labelData) {
+  const selectedText = range.toString().trim();
+  if (!selectedText) return;
+
+  // Store current match info before applying label
+  const currentMatchIndex = currentSelection?.matchIndex;
+
+  // Create the label element (same as HTML content)
+  const labelElement = document.createElement("manual_label");
+
+  // Set attributes
+  labelElement.setAttribute("labelName", labelPath[labelPath.length - 1]);
+  
+  if (labelPath.length > 1) {
+    labelElement.setAttribute("parent", labelPath[labelPath.length - 2]);
+  } else {
+    labelElement.setAttribute("parent", "");
+  }
+
+  // Apply parameters as attributes
+  labelData.params.forEach((paramDef, paramName) => {
+    let initialValue = "";
+    if (typeof paramDef === "object" && paramDef.type) {
+        initialValue = paramDef.default ?? "";
+    } else {
+        initialValue = paramDef;
+    }
+    labelElement.setAttribute(paramName, initialValue);
+  });
+  
+  labelElement.style.backgroundColor = labelData.color;
+  labelElement.style.color = getContrastColor(labelData.color);
+
+  // Extract and preserve formatting
+  const fragment = range.extractContents();
+  const processedContent = preserveFormattingInLabel(fragment);
+  
+  // Add the processed content to the label
+  labelElement.appendChild(processedContent);
+
+  // Add delete button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "×";
+  labelElement.appendChild(deleteBtn);
+
+  // Insert the label
+  range.insertNode(labelElement);
+
+  // Clear selection
+  window.getSelection().removeAllRanges();
+  
+  // Attach event listeners for advanced content
+  attachAdvancedLabelEventListeners();
+  updateStats();
+
+  // Don't clear currentSelection here - it will be handled by the caller
+}
+
+function attachAdvancedLabelEventListeners() {
+  const labelElements = elements.advancedContent.querySelectorAll('manual_label');
+  labelElements.forEach(labelElement => {
+    const deleteBtn = labelElement.querySelector('.delete-btn');
+    if (deleteBtn) {
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        
+        // Extract content while preserving formatting
+        const contentToPreserve = extractLabelContentWithFormatting(labelElement);
+        
+        if (labelElement.parentNode) {
+          if (contentToPreserve.childNodes.length > 0) {
+            Array.from(contentToPreserve.childNodes).forEach(node => {
+              labelElement.parentNode.insertBefore(node, labelElement);
+            });
+          }
+          labelElement.parentNode.removeChild(labelElement);
+        }
+
+        attachAdvancedLabelEventListeners();
+        updateStats();
+      };
+    }
+
+    // Click to edit parameters
+    labelElement.onclick = (e) => {
+      if (e.target.classList.contains('delete-btn')) return;
+      const sel = window.getSelection();
+      if (!sel.isCollapsed) return;
+      
+      e.stopPropagation();
+      showParameterMenu(labelElement, e.clientX, e.clientY);
+    };
+  });
+}
+
+
+
+function applyLabelToHtmlContent(range, labelPath, labelData) {
+  const selectedText = range.toString().trim();
+  if (!selectedText) return;
+
+  // CHECK IF WE'RE APPLYING TO A HIGHLIGHTED ELEMENT
+  const startContainer = range.startContainer;
+  const endContainer = range.endContainer;
+  
+  // Find if the selection is within a highlight span
+  let highlightSpan = null;
+  if (startContainer.nodeType === Node.TEXT_NODE) {
+    let parent = startContainer.parentNode;
+    while (parent && parent !== elements.htmlContent) {
+      if (parent.classList && parent.classList.contains('search-highlight')) {
+        highlightSpan = parent;
+        break;
+      }
+      parent = parent.parentNode;
+    }
+  }
+
+  // If we're in a highlight span, we need special handling
+  if (highlightSpan) {
+    applyLabelToHighlightedText(highlightSpan, labelPath, labelData);
+    return;
+  }
+
+  // Original labeling logic for non-highlighted text
+  const labelElement = document.createElement("manual_label");
+  labelElement.setAttribute("labelName", labelPath[labelPath.length - 1]);
+  
+  if (labelPath.length > 1) {
+    labelElement.setAttribute("parent", labelPath[labelPath.length - 2]);
+  } else {
+    labelElement.setAttribute("parent", "");
+  }
+
+  labelData.params.forEach((paramDef, paramName) => {
+    let initialValue = "";
+    if (typeof paramDef === "object" && paramDef.type) {
+      initialValue = paramDef.default ?? "";
+    } else {
+      initialValue = paramDef;
+    }
+    labelElement.setAttribute(paramName, initialValue);
+  });
+  
+  labelElement.style.backgroundColor = labelData.color;
+  labelElement.style.color = getContrastColor(labelData.color);
+
+  const fragment = range.extractContents();
+  const processedContent = preserveFormattingInLabel(fragment);
+  labelElement.appendChild(processedContent);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "×";
+  labelElement.appendChild(deleteBtn);
+
+  range.insertNode(labelElement);
+
+  // Update currentHtml
+  updateCurrentHtmlFromDOM();
+
+  window.getSelection().removeAllRanges();
+  attachLabelEventListeners();
+  updateStats();
+}
+
+function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
+  // Create the label element
+  const labelElement = document.createElement("manual_label");
+  labelElement.setAttribute("labelName", labelPath[labelPath.length - 1]);
+  
+  if (labelPath.length > 1) {
+    labelElement.setAttribute("parent", labelPath[labelPath.length - 2]);
+  } else {
+    labelElement.setAttribute("parent", "");
+  }
+
+  labelData.params.forEach((paramDef, paramName) => {
+    let initialValue = "";
+    if (typeof paramDef === "object" && paramDef.type) {
+      initialValue = paramDef.default ?? "";
+    } else {
+      initialValue = paramDef;
+    }
+    labelElement.setAttribute(paramName, initialValue);
+  });
+  
+  labelElement.style.backgroundColor = labelData.color;
+  labelElement.style.color = getContrastColor(labelData.color);
+
+  // Extract content from highlight span (excluding the highlight styling)
+  const textContent = highlightSpan.textContent;
+  labelElement.textContent = textContent;
+
+  // Add delete button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "×";
+  labelElement.appendChild(deleteBtn);
+
+  // Replace the highlight span with the label element
+  highlightSpan.parentNode.replaceChild(labelElement, highlightSpan);
+
+  // Update currentHtml
+  updateCurrentHtmlFromDOM();
+
+  window.getSelection().removeAllRanges();
+  attachLabelEventListeners();
+  updateStats();
 }
 
 function preserveFormattingInLabel(fragment) {
@@ -1584,18 +1886,658 @@ function handleSplitFormatting(range) {
     return afterFragment;
 }
 
+
+
 function isFormattingElement(element) {
-    if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+  
+  const formattingTags = [
+    'i', 'em', 'italic',           // italic tags
+    'b', 'strong', 'bold',         // bold tags
+    'u', 'underline',              // underline tags
+    's', 'strike', 'del',          // strikethrough tags
+    'sup', 'sub',                  // superscript/subscript
+    'span'                         // span for styling
+  ];
+  
+  return formattingTags.includes(element.tagName.toLowerCase());
+}
+
+
+  // ======= Advanced Labeling =================================================
+function applyAdvancedLabels() {
+  if (!currentSelection || !currentSelection.range) {
+    alert("No current selection. Please navigate to a match first.");
+    return;
+  }
+
+  const advancedLabels = elements.advancedContent.querySelectorAll("manual_label");
+  if (advancedLabels.length === 0) {
+    alert("No labels defined in advanced content");
+    return;
+  }
+
+  // Store the current match info BEFORE applying labels
+  const currentMatchIndex = currentSelection.matchIndex;
+  const searchText = getCleanAdvancedText(); // Get the clean text from advanced content
+
+  try {
+    // Get the selected text from the current selection
+    const selectedText = currentSelection.range.toString();
     
-    const formattingTags = [
-        'i', 'em', 'italic',           // italic tags
-        'b', 'strong', 'bold',         // bold tags
-        'u', 'underline',              // underline tags
-        's', 'strike', 'del',          // strikethrough tags
-        'sup', 'sub'                   // superscript/subscript
-    ];
+    // Get the clean advanced content text (what the user typed)
+    const advancedText = getCleanAdvancedText();
     
-    return formattingTags.includes(element.tagName.toLowerCase());
+    // NEW VALIDATION: Check if ALL text is labeled by exactly ONE root label
+    if (!isFullyLabeled()) {
+      alert("Please ensure all text is covered by exactly ONE main label in the advanced content. You cannot have multiple separate labels at the root level - all text must be within a single parent label (which can contain nested labels).");
+      return;
+    }
+    
+    // Verify that the selected text matches the advanced text
+    if (normalizeText(selectedText) !== normalizeText(advancedText)) {
+      alert(`Selected text "${selectedText}" doesn't match advanced content "${advancedText}"`);
+      return;
+    }
+
+    // Create the exact label structure by cloning and adapting the advanced content
+    const labelStructure = cloneAdvancedStructure();
+    
+    // Apply the structure to the current selection
+    replaceSelectionWithStructure(currentSelection.range, labelStructure);
+
+    // Update currentHtml
+    updateCurrentHtmlFromDOM();
+    
+    // Clear current selection
+    currentSelection = null;
+
+    // Re-search with the ORIGINAL search text to find next match
+    setTimeout(() => {
+      if (searchText && searchText.length >= MIN_SEARCH_LENGTH) {
+        const matches = searchInHtmlContent(searchText);
+        
+        if (matches.length > 0) {
+          const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
+            .map(h => ({
+              element: h,
+              index: parseInt(h.dataset.matchIndex)
+            }))
+            .filter(h => !isNaN(h.index))
+            .sort((a, b) => a.index - b.index);
+
+          if (availableHighlights.length > 0) {
+            let targetHighlight = availableHighlights.find(h => h.index >= currentMatchIndex);
+            
+            if (!targetHighlight) {
+              targetHighlight = availableHighlights[0];
+            }
+            
+            setCurrentSelection(matches[targetHighlight.index], targetHighlight.index);
+          }
+        }
+      }
+    }, 10);
+
+    window.getSelection().removeAllRanges();
+    attachLabelEventListeners();
+    updateStats();
+
+    console.log("Labels applied successfully");
+    
+  } catch (e) {
+    console.error("Could not apply labels:", e);
+    alert("Could not apply labels: " + e.message);
+  }
+}
+
+function isFullyLabeled() {
+  // Get all root-level labels (not nested inside other labels)
+  const rootLabels = getRootLabels();
+  
+  // Must have exactly one root label
+  if (rootLabels.length !== 1) {
+    return false;
+  }
+  
+  // Get all text content from advanced input
+  const fullText = getCleanAdvancedText();
+  
+  // Get text from the single root label
+  const rootLabelText = getRootLabelText(rootLabels[0]);
+  
+  // Normalize both texts and compare
+  return normalizeText(fullText) === normalizeText(rootLabelText);
+}
+
+function getRootLabels() {
+  // Get all manual_label elements that are not nested inside other labels
+  const allLabels = elements.advancedContent.querySelectorAll('manual_label');
+  const rootLabels = [];
+  
+  allLabels.forEach(label => {
+    let isNested = false;
+    let parent = label.parentElement;
+    while (parent && parent !== elements.advancedContent) {
+      if (parent.tagName === 'MANUAL_LABEL') {
+        isNested = true;
+        break;
+      }
+      parent = parent.parentElement;
+    }
+    
+    if (!isNested) {
+      rootLabels.push(label);
+    }
+  });
+  
+  return rootLabels;
+}
+
+function getRootLabelText(rootLabel) {
+  // Clone the root label to avoid modifying the original
+  const clone = rootLabel.cloneNode(true);
+  
+  // Remove delete buttons
+  const deleteButtons = clone.querySelectorAll('.delete-btn');
+  deleteButtons.forEach(btn => btn.remove());
+  
+  return clone.textContent;
+}
+
+function getCleanAdvancedText() {
+  const clone = elements.advancedContent.cloneNode(true);
+  const deleteButtons = clone.querySelectorAll('.delete-btn');
+  deleteButtons.forEach(btn => btn.remove());
+  return clone.textContent.trim();
+}
+
+function normalizeText(text) {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function cloneAdvancedStructure() {
+  // Clone the entire advanced content structure
+  const clone = elements.advancedContent.cloneNode(true);
+  
+  // Remove delete buttons from the clone
+  const deleteButtons = clone.querySelectorAll('.delete-btn');
+  deleteButtons.forEach(btn => btn.remove());
+  
+  // Process all manual_label elements to ensure they have proper attributes and styling
+  const labels = clone.querySelectorAll('manual_label');
+  labels.forEach(label => {
+    const labelName = label.getAttribute('labelName');
+    const parent = label.getAttribute('parent') || '';
+    const path = parent ? [parent, labelName] : [labelName];
+    const labelData = getLabelByPath(path);
+    
+    if (labelData) {
+      // Apply styling
+      label.style.backgroundColor = labelData.color;
+      label.style.color = getContrastColor(labelData.color);
+      
+      // Ensure all parameters are set correctly
+      labelData.params.forEach((paramDef, paramName) => {
+        if (!label.hasAttribute(paramName)) {
+          let defaultValue = "";
+          if (typeof paramDef === "object" && paramDef.type) {
+            defaultValue = paramDef.default ?? "";
+          } else {
+            defaultValue = paramDef;
+          }
+          label.setAttribute(paramName, defaultValue);
+        }
+      });
+    }
+  });
+  
+  return clone;
+}
+
+function replaceSelectionWithStructure(range, structure) {
+  // Remove the selected content
+  range.deleteContents();
+  
+  // Create a document fragment to hold the new structure
+  const fragment = document.createDocumentFragment();
+  
+  // Move all children from the cloned structure to the fragment
+  while (structure.firstChild) {
+    const child = structure.firstChild;
+    
+    // If it's a manual_label, add delete button
+    if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'MANUAL_LABEL') {
+      addDeleteButtonToLabel(child);
+    }
+    
+    fragment.appendChild(child);
+  }
+  
+  // Insert the fragment at the range position
+  range.insertNode(fragment);
+}
+
+function addDeleteButtonToLabel(labelElement) {
+  // Check if delete button already exists
+  if (labelElement.querySelector('.delete-btn')) {
+    return;
+  }
+  
+  // Create and add delete button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "×";
+  labelElement.appendChild(deleteBtn);
+  
+  // Also add delete buttons to any nested labels
+  const nestedLabels = labelElement.querySelectorAll('manual_label');
+  nestedLabels.forEach(nestedLabel => {
+    if (!nestedLabel.querySelector('.delete-btn')) {
+      const nestedDeleteBtn = document.createElement("button");
+      nestedDeleteBtn.className = "delete-btn";
+      nestedDeleteBtn.textContent = "×";
+      nestedLabel.appendChild(nestedDeleteBtn);
+    }
+  });
+}
+
+  // ======= Search function for advanced labels =======
+  
+function searchInHtmlContent(searchText) {
+  if (!currentHtml || !searchText) {
+    clearSearchHighlights();
+    currentSelection = null;
+    return [];
+  }
+  
+  // Store current selection info before clearing highlights
+  const previousMatchIndex = currentSelection?.matchIndex ?? 0;
+  
+  // Clear highlights BEFORE searching
+  clearSearchHighlights();
+  
+  // Update currentHtml to reflect current DOM state (including new labels)
+  updateCurrentHtmlFromDOM();
+  
+  // Find matches using the improved algorithm
+  const matches = findTextMatches(elements.htmlContent, searchText);
+  console.log(`Found ${matches.length} matches for "${searchText}"`);
+  
+  // Highlight matches
+  highlightMatches(matches);
+  
+  // Try to find the first available highlight for navigation
+  if (matches.length > 0) {
+    // Get all current highlights in document order
+    const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
+      .map(h => ({
+        element: h,
+        index: parseInt(h.dataset.matchIndex)
+      }))
+      .filter(h => !isNaN(h.index))
+      .sort((a, b) => a.index - b.index); // Sort by match index (document order)
+    
+    if (availableHighlights.length > 0) {
+      // Try to find a highlight at or after the previous position
+      let targetHighlight = availableHighlights.find(h => h.index >= previousMatchIndex);
+      
+      // If no match found after previous position, use the first available
+      if (!targetHighlight) {
+        targetHighlight = availableHighlights[0];
+      }
+      
+      setCurrentSelection(matches[targetHighlight.index], targetHighlight.index);
+    }
+  } else {
+    currentSelection = null;
+  }
+  
+  return matches;
+}
+
+function updateCurrentHtmlFromDOM() {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = elements.htmlContent.innerHTML;
+  
+  // Remove delete buttons for clean HTML
+  const deleteButtons = tempDiv.querySelectorAll('.delete-btn');
+  deleteButtons.forEach(btn => btn.remove());
+  
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(currentHtml, 'text/html');
+  doc.body.innerHTML = tempDiv.innerHTML;
+  currentHtml = doc.documentElement.outerHTML;
+}
+
+function setCurrentSelection(match, matchIndex) {
+  try {
+    const highlightedElement = elements.htmlContent.querySelector(`[data-match-index="${matchIndex}"]`);
+    
+    if (!highlightedElement) {
+      console.error('Could not find highlighted element for match index:', matchIndex);
+      // Try to find any available highlight
+      const anyHighlight = elements.htmlContent.querySelector('.search-highlight');
+      if (anyHighlight) {
+        const anyIndex = parseInt(anyHighlight.dataset.matchIndex) || 0;
+        setCurrentSelection(window.currentSearchMatches[anyIndex], anyIndex);
+        return;
+      }
+      currentSelection = null;
+      return;
+    }
+    
+    // Create range that selects the text content
+    const range = document.createRange();
+    
+    if (highlightedElement.childNodes.length === 1 && 
+        highlightedElement.firstChild.nodeType === Node.TEXT_NODE) {
+      range.selectNodeContents(highlightedElement);
+    } else {
+      range.selectNode(highlightedElement);
+    }
+    
+    currentSelection = {
+      range: range,
+      isAdvanced: false,
+      matchIndex: matchIndex,
+      text: highlightedElement.textContent,
+      highlightElement: highlightedElement
+    };
+    
+    updateCurrentSelectionHighlight(matchIndex);
+    
+    console.log(`Current selection set to match ${matchIndex}: "${currentSelection.text}"`);
+  } catch (error) {
+    console.error('Error setting current selection:', error);
+    currentSelection = null;
+  }
+}
+
+function updateCurrentSelectionHighlight(currentIndex) {
+  // Remove current selection styling from all highlights
+  const allHighlights = elements.htmlContent.querySelectorAll('.search-highlight');
+  allHighlights.forEach(highlight => {
+    highlight.classList.remove('current-selection');
+    highlight.style.backgroundColor = '#ffff00';
+    highlight.style.border = 'none';
+  });
+  
+  // Add current selection styling to the current match
+  const currentHighlight = elements.htmlContent.querySelector(`[data-match-index="${currentIndex}"]`);
+  if (currentHighlight) {
+    currentHighlight.classList.add('current-selection');
+    currentHighlight.style.backgroundColor = '#ff6b35';
+    currentHighlight.style.border = '2px solid #ff4500';
+    currentHighlight.style.boxShadow = '0 0 4px rgba(255, 69, 0, 0.5)';
+    
+    // Scroll the current selection into view
+    currentHighlight.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest'
+    });
+  }
+}
+
+
+
+function findTextMatches(element, searchText) {
+  const matches = [];
+  const walker = document.createTreeWalker(
+    element,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: function(node) {
+        // Skip text inside manual_label tags, delete buttons, and search highlights
+        let parent = node.parentNode;
+        while (parent && parent !== element) {
+          if (parent.tagName === 'MANUAL_LABEL' || 
+              parent.classList?.contains('delete-btn') ||
+              parent.classList?.contains('search-highlight')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          parent = parent.parentNode;
+        }
+        
+        // Also skip if the text is already fully contained within a manual_label
+        // This prevents re-labeling already labeled text
+        let checkParent = node.parentNode;
+        while (checkParent && checkParent !== element) {
+          if (checkParent.tagName === 'MANUAL_LABEL') {
+            return NodeFilter.FILTER_REJECT;
+          }
+          checkParent = checkParent.parentNode;
+        }
+        
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+
+  // Normalize the search text
+  const normalizedSearch = searchText.replace(/\s+/g, ' ').trim().toLowerCase();
+
+  let textNode;
+  while (textNode = walker.nextNode()) {
+    const text = textNode.textContent;
+    const normalizedText = text.replace(/\s+/g, ' ').toLowerCase();
+    
+    let index = 0;
+    while ((index = normalizedText.indexOf(normalizedSearch, index)) !== -1) {
+      const originalStart = mapNormalizedToOriginalPosition(text, index);
+      const originalEnd = mapNormalizedToOriginalPosition(text, index + normalizedSearch.length);
+      
+      if (originalStart >= 0 && originalEnd <= text.length && originalStart < originalEnd) {
+        matches.push({
+          node: textNode,
+          startOffset: originalStart,
+          endOffset: originalEnd,
+          text: text.substring(originalStart, originalEnd)
+        });
+      }
+      index += normalizedSearch.length;
+    }
+  }
+  
+  return matches;
+}
+
+function mapNormalizedToOriginalPosition(originalText, normalizedPosition) {
+  let originalPos = 0;
+  let normalizedPos = 0;
+  
+  while (originalPos < originalText.length && normalizedPos < normalizedPosition) {
+    const char = originalText[originalPos];
+    
+    if (/\s/.test(char)) {
+      // This is whitespace - in normalized version, multiple whitespace becomes single space
+      // Skip consecutive whitespace in original
+      while (originalPos < originalText.length && /\s/.test(originalText[originalPos])) {
+        originalPos++;
+      }
+      normalizedPos++; // One space in normalized version
+    } else {
+      // Regular character
+      originalPos++;
+      normalizedPos++;
+    }
+  }
+  
+  return originalPos;
+}
+
+function highlightMatches(matches) {
+  if (matches.length === 0) return;
+  
+  // Process matches in reverse order to maintain text positions
+  // but keep original indices for proper navigation
+  const indexedMatches = matches.map((match, originalIndex) => ({
+    ...match,
+    originalIndex
+  }));
+  
+  const sortedMatches = [...indexedMatches].sort((a, b) => {
+    const nodeComparison = a.node.compareDocumentPosition(b.node);
+    if (nodeComparison & Node.DOCUMENT_POSITION_FOLLOWING) {
+      return -1;
+    } else if (nodeComparison & Node.DOCUMENT_POSITION_PRECEDING) {
+      return 1;
+    } else {
+      return b.startOffset - a.startOffset;
+    }
+  });
+  
+  sortedMatches.forEach((match) => {
+    try {
+      if (!match.node.parentNode || 
+          match.startOffset >= match.node.textContent.length ||
+          match.endOffset > match.node.textContent.length) {
+        console.warn('Skipping invalid match:', match);
+        return;
+      }
+      
+      const range = document.createRange();
+      range.setStart(match.node, match.startOffset);
+      range.setEnd(match.node, match.endOffset);
+      
+      const highlight = document.createElement('span');
+      highlight.className = 'search-highlight';
+      highlight.style.backgroundColor = '#ffff00';
+      highlight.style.color = '#000';
+      highlight.style.padding = '1px 2px';
+      highlight.style.borderRadius = '2px';
+      // Use original index for proper navigation order
+      highlight.dataset.matchIndex = match.originalIndex;
+      
+      range.surroundContents(highlight);
+      
+    } catch (e) {
+      console.warn('Could not highlight match:', e, match);
+    }
+  });
+  
+  // Store matches for navigation (keep original order)
+  window.currentSearchMatches = matches;
+}
+
+// Simple clear function
+function clearSearchHighlights() {
+  const highlights = elements.htmlContent.querySelectorAll('.search-highlight');
+  highlights.forEach(highlight => {
+    // Check if highlight contains a manual_label
+    const manualLabel = highlight.querySelector('manual_label');
+    
+    if (manualLabel) {
+      // If highlight contains a label, replace highlight with the label
+      highlight.parentNode.replaceChild(manualLabel, highlight);
+    } else {
+      // Replace highlight with its content
+      const parent = highlight.parentNode;
+      const content = highlight.innerHTML;
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+      
+      // Insert all content before the highlight
+      while (tempDiv.firstChild) {
+        parent.insertBefore(tempDiv.firstChild, highlight);
+      }
+      
+      // Remove the highlight
+      parent.removeChild(highlight);
+    }
+  });
+  
+  // Clean up empty tags like <i></i>
+  const emptyTags = elements.htmlContent.querySelectorAll('i:empty, b:empty, em:empty, strong:empty, u:empty, s:empty, del:empty, sup:empty, sub:empty');
+  emptyTags.forEach(tag => tag.remove());
+  
+  window.currentSearchMatches = [];
+  currentSelection = null;
+}
+
+function navigateToNextMatch() {
+  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
+    alert('No matches found to navigate to');
+    return;
+  }
+  
+  const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
+    .map(h => ({
+      element: h,
+      index: parseInt(h.dataset.matchIndex)
+    }))
+    .filter(h => !isNaN(h.index))
+    .sort((a, b) => a.index - b.index);
+  
+  if (availableHighlights.length === 0) {
+    alert('No more matches to navigate to');
+    currentSelection = null;
+    return;
+  }
+  
+  const currentIndex = currentSelection?.matchIndex ?? -1;
+  let nextHighlight = availableHighlights.find(h => h.index > currentIndex);
+  
+  if (!nextHighlight) {
+    nextHighlight = availableHighlights[0];
+  }
+  
+  setCurrentSelection(window.currentSearchMatches[nextHighlight.index], nextHighlight.index);
+}
+
+function navigateToPreviousMatch() {
+  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
+    alert('No matches found to navigate to');
+    return;
+  }
+  
+  const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
+    .map(h => ({
+      element: h,
+      index: parseInt(h.dataset.matchIndex)
+    }))
+    .filter(h => !isNaN(h.index))
+    .sort((a, b) => a.index - b.index);
+  
+  if (availableHighlights.length === 0) {
+    alert('No more matches to navigate to');
+    currentSelection = null;
+    return;
+  }
+  
+  const currentIndex = currentSelection?.matchIndex ?? Number.MAX_SAFE_INTEGER;
+  const reverseHighlights = [...availableHighlights].reverse();
+  let prevHighlight = reverseHighlights.find(h => h.index < currentIndex);
+  
+  if (!prevHighlight) {
+    prevHighlight = availableHighlights[availableHighlights.length - 1];
+  }
+  
+  setCurrentSelection(window.currentSearchMatches[prevHighlight.index], prevHighlight.index);
+}
+
+// Update the clear function to also clear current selection
+function clearSearchHighlights() {
+  const highlights = elements.htmlContent.querySelectorAll('.search-highlight');
+  highlights.forEach(highlight => {
+    // Check if highlight contains a manual_label
+    const manualLabel = highlight.querySelector('manual_label');
+    
+    if (manualLabel) {
+      // If highlight contains a label, replace highlight with the label
+      highlight.parentNode.replaceChild(manualLabel, highlight);
+    } else {
+      // If highlight only contains text, replace with text node
+      const parent = highlight.parentNode;
+      const textNode = document.createTextNode(highlight.textContent);
+      parent.replaceChild(textNode, highlight);
+      parent.normalize();
+    }
+  });
+  
+  window.currentSearchMatches = [];
+  currentSelection = null;
 }
 
   // ======= Event Listeners =======
@@ -1782,30 +2724,42 @@ function isFormattingElement(element) {
   elements.cancelParams.addEventListener('click', hideParameterMenu);
 
   // Text selection handling
-  document.addEventListener('mouseup', (e) => {
-    if (elements.contextMenu.contains(e.target) || elements.paramMenu.contains(e.target)) return;
+document.addEventListener('mouseup', (e) => {
+  if (elements.contextMenu.contains(e.target) || elements.paramMenu.contains(e.target)) return;
+  
+  const selection = window.getSelection();
+  
+  if (!selection.isCollapsed && selection.toString().trim()) {
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
     
-    const selection = window.getSelection();
-    
-    if (!selection.isCollapsed && selection.toString().trim()) {
-      const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      const htmlContentElement = elements.htmlContent;
+    // Check if selection is in HTML content
+    if (elements.htmlContent.contains(container) || elements.htmlContent === container) {
+      currentSelection = {
+        text: selection.toString().trim(),
+        range: range.cloneRange()
+      };
       
-      if (htmlContentElement.contains(container) || htmlContentElement === container) {
-        currentSelection = {
-          text: selection.toString().trim(),
-          range: range.cloneRange()
-        };
-        
-        showContextMenu(e.clientX, e.clientY);
-        return;
-      }
+      showContextMenu(e.clientX, e.clientY);
+      return;
     }
     
-    hideContextMenu();
-    hideParameterMenu();
-  });
+    // Check if selection is in advanced content
+    if (elements.advancedContent.contains(container) || elements.advancedContent === container) {
+      currentSelection = {
+        text: selection.toString().trim(),
+        range: range.cloneRange(),
+        isAdvanced: true  // Flag to identify advanced content
+      };
+      
+      showContextMenu(e.clientX, e.clientY);
+      return;
+    }
+  }
+  
+  hideContextMenu();
+  hideParameterMenu();
+});
 
   // Hide menus when clicking elsewhere
   document.addEventListener('mousedown', (e) => {
@@ -1861,6 +2815,152 @@ elements.sourceView.addEventListener('keydown', (e) => {
       }
     }
   }
+});
+
+
+//const clearAdvancedBtn = document.createElement('button');
+//clearAdvancedBtn.textContent = 'Clear Labels';
+//clearAdvancedBtn.id = 'clear-advanced-labels';
+//clearAdvancedBtn.onclick = clearAdvancedLabels;
+
+
+elements.advancedContent.addEventListener('input', () => {
+  const searchText = elements.advancedContent.textContent.trim().replace(/×.*$/, '');
+  
+  // Clear existing timeout
+  clearTimeout(searchTimeout);
+  
+  // If search text is too short, clear highlights and return
+  if (searchText.length < MIN_SEARCH_LENGTH) {
+    clearSearchHighlights();
+    return;
+  }
+  
+  // Set new timeout for debounced search
+  searchTimeout = setTimeout(() => {
+    if (searchText && currentHtml) {
+      console.log('Searching for:', searchText);
+      searchInHtmlContent(searchText);
+    } else {
+      clearSearchHighlights();
+    }
+  }, SEARCH_DEBOUNCE_MS);
+});
+
+
+elements.applyAdvanced.addEventListener('click', () => {
+  applyAdvancedLabels();
+});
+
+elements.navigatePrevious.addEventListener('click', () => {
+  navigateToPreviousMatch();
+});
+elements.navigateNext.addEventListener('click', () => {
+  navigateToNextMatch();
+});
+
+elements.applyAllAdvanced.addEventListener('click', () => {
+  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
+    alert('No matches found');
+    return;
+  }
+  
+  const advancedLabels = elements.advancedContent.querySelectorAll('manual_label');
+  if (advancedLabels.length === 0) {
+    alert('No labels defined in advanced content');
+    return;
+  }
+  
+  // NEW VALIDATION: Check if ALL text is labeled by exactly ONE root label
+  if (!isFullyLabeled()) {
+    alert("Please ensure all text is covered by exactly ONE main label in the advanced content. You cannot have multiple separate labels at the root level - all text must be within a single parent label (which can contain nested labels).");
+    return;
+  }
+  
+  // Store the search text for re-searching at the end
+  const searchText = getCleanAdvancedText();
+  
+  // Get all current highlights
+  const highlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'));
+  let totalApplied = 0;
+  let skipped = 0;
+  
+  highlights.forEach(highlight => {
+    try {
+      // Set current selection to this highlight
+      const matchIndex = parseInt(highlight.dataset.matchIndex) || 0;
+      const range = document.createRange();
+      range.selectNodeContents(highlight);
+      
+      // Verify the highlighted text matches the advanced content
+      const highlightedText = highlight.textContent;
+      const advancedText = getCleanAdvancedText();
+      
+      if (normalizeText(highlightedText) !== normalizeText(advancedText)) {
+        console.warn(`Skipping highlight ${matchIndex}: text mismatch`);
+        skipped++;
+        return;
+      }
+      
+      currentSelection = {
+        range: range,
+        isAdvanced: false,
+        matchIndex: matchIndex,
+        text: highlightedText,
+        highlightElement: highlight
+      };
+      
+      // Create the label structure and apply it
+      const labelStructure = cloneAdvancedStructure();
+      replaceSelectionWithStructure(range, labelStructure);
+      
+      totalApplied++;
+      
+    } catch (e) {
+      console.warn('Could not apply label to highlight:', e);
+      skipped++;
+    }
+  });
+  
+  // Update currentHtml after all applications
+  updateCurrentHtmlFromDOM();
+  
+  // Clear current selection
+  currentSelection = null;
+  
+  // Show results
+  let message = `Applied labels to ${totalApplied} matches`;
+  if (skipped > 0) {
+    message += ` (${skipped} skipped due to text mismatches)`;
+  }
+  alert(message);
+  
+  // Re-search to update highlights
+  setTimeout(() => {
+    if (searchText && searchText.length >= MIN_SEARCH_LENGTH) {
+      searchInHtmlContent(searchText);
+    } else {
+      clearSearchHighlights();
+    }
+    
+    // Refresh event listeners and stats
+    attachLabelEventListeners();
+    updateStats();
+  }, 10);
+});
+
+// Clear advanced content
+elements.clearAdvancedLabels.addEventListener('click', () => {
+  elements.advancedContent.innerHTML = '';
+  clearSearchHighlights();
+  updateStats();
+});
+
+// Clear advanced content
+elements.clearAdvancedLabels.addEventListener('click', () => {
+  elements.advancedContent.innerHTML = '';
+  clearSearchHighlights();
+  updateStats();
 });
 
   // ======= Initialize =======

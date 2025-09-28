@@ -38,7 +38,7 @@
           <div class="html-content" id="html-content">
             <div class="empty-state drop-zone" id="drop-zone">
               <h3>No HTML loaded</h3>
-              <p><a href="#" id="upload-link">Upload an HTML File</a> to start labeling</p>
+              <p><a href="#" id="upload-link">Upload an HTML File</a> or drag & drop here to start labeling</p>
             </div>
           </div>
           <textarea class="source-view" id="source-view" placeholder="HTML source will appear here..."></textarea>
@@ -64,6 +64,30 @@
           
           <div class="label-tree" id="label-tree">
             <!-- Tree will be populated here -->
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="title">
+            <div class="advanced-header-controls">
+              <h2>Advanced Labelization</h2>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="advanced-wrapper">
+            <div class="advanced-content" id="advanced-content" contenteditable="true"></div>
+            <div class="advanced-nav-buttons">
+              <button id="navigate-previous" class="nav-btn" title="Previous">▲</button>
+              <button id="navigate-next" class="nav-btn" title="Next">▼</button>
+            </div>
+          </div>
+          <div class="advanced-button-row">
+            <button id="apply-advanced" class="apply-btn">Apply</button>
+            <button id="apply-all-advanced" class="apply-all-btn">Apply All</button>
+            <button id="clear-advanced-labels" class="clear-btn">Clear</button>
           </div>
         </div>
       </div>
@@ -110,6 +134,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js"></script> <!-- <script src="app.js"></script>   |    <script type="module" src="js/core/app.js"></script>-->
 </body>
 </html>
