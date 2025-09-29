@@ -70,7 +70,7 @@
       flex-wrap: wrap;
     }
 
-    button, .file-input label {
+    button, .file-input {
     border: 1px solid var(--hover);
     background: #152043;
     color: var(--text);
@@ -81,7 +81,7 @@
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s ease;
-    display: inline-block; /* makes label behave like button */
+    display: inline-block;
   }
 
   button:hover, .file-input label:hover {
@@ -224,64 +224,64 @@
     }
 
     /* Advanced Option */
-.advanced-content {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--hover);
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  width: 100%;
-  resize: vertical;
-  min-height: 25px;
-  font-family: inherit;
-  line-height: 1.5;
-}
+    .advanced-content {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--hover);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+      resize: vertical;
+      min-height: 25px;
+      font-family: inherit;
+      line-height: 1.5;
+    }
 
-.advanced-content:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
-}
+    .advanced-content:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
+    }
 
-.advanced-content:empty:before {
-  content: attr(placeholder);
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-
-/* Wrap editor + nav buttons side by side */
-.advanced-wrapper {
-  display: flex;
-  align-items: center;  /* align tops together */
-  gap: 5px;                /* small spacing between content and arrows */
-}
-
-/* Navigation buttons: stacked vertically */
-.advanced-nav-buttons {
-  display: flex;
-  flex-direction: row;  /* stack ↑ and ↓ */
-  align-items: center;
-  justify-content: center;
-}
+    .advanced-content:empty:before {
+      content: attr(placeholder);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
 
 
-.nav-btn {
-  background: transparent;
-  border: none;        /* no border */
-  padding: 3px;        /* smaller padding */
-  font-size: 20px;     /* a bit larger to make arrows visible */
-  line-height: 1;
-  color: rgba(254, 255, 255, 0.5);;
-  cursor: pointer;
-  transition: color 0.2s;
+    /* Wrap editor + nav buttons side by side */
+    .advanced-wrapper {
+      display: flex;
+      align-items: center;  /* align tops together */
+      gap: 5px;                /* small spacing between content and arrows */
+    }
 
-}
+    /* Navigation buttons: stacked vertically */
+    .advanced-nav-buttons {
+      display: flex;
+      flex-direction: row;  /* stack ↑ and ↓ */
+      align-items: center;
+      justify-content: center;
+    }
 
-.nav-btn:hover {
-  color: var(--accent);   /* highlight only arrow on hover */
-}
+
+    .nav-btn {
+      background: transparent;
+      border: none;        /* no border */
+      padding: 3px;        /* smaller padding */
+      font-size: 20px;     /* a bit larger to make arrows visible */
+      line-height: 1;
+      color: rgba(254, 255, 255, 0.5);;
+      cursor: pointer;
+      transition: color 0.2s;
+
+    }
+
+    .nav-btn:hover {
+      color: var(--accent);   /* highlight only arrow on hover */
+    }
 
     /* Tree Structure */
     .label-tree {
@@ -300,7 +300,7 @@
       padding: 8px 12px;
       border-radius: 8px;
       cursor: pointer;
-      transition: background-color 0.2s ease;
+      /*transition: background-color 0.2s ease;*/
       position: relative;
       min-height: 36px;
     }
@@ -309,10 +309,10 @@
       background-color: var(--hover);
     }
 
-    .tree-item.selected {
+    /*.tree-item.selected {
       background-color: var(--accent);
       color: white;
-    }
+    }*/
 
     .tree-item.level-0 { padding-left: 12px; }
     .tree-item.level-1 { padding-left: 32px; }
@@ -391,7 +391,7 @@
       display: flex;
       gap: 6px;
       opacity: 0;
-      transition: opacity 0.2s ease;
+      /*transition: opacity 0.2s ease;*/
     }
 
     .tree-item:hover .tree-actions {
@@ -469,6 +469,84 @@
     .tree-children.expanded {
       max-height: 1000px;
     }
+
+    /* Gold parameter styling (Group ID) */
+    .tree-item.param-gold {
+      color: #FFD700;
+      font-weight: 600;
+    }
+    .tree-icon.param-regular::before { /* This doesn't work */
+      content: '◦';
+      color: var(#FFD700);
+      font-size: 12px;
+    }
+
+/* Silver parameter styling (Group Attributes) */
+.tree-item.param-silver {
+  color: #C0C0C0;
+  font-weight: 500;
+}
+
+.tree-icon.param-regular::before { /* This doesn't work */
+      content: '◦';
+      color: var(#C0C0C0);
+      font-size: 12px;
+    }
+
+.tree-icon.param-regular::before { /* This doesn't work */
+  content: '◦';
+  color: var(--accent);
+  font-size: 12px;
+}
+
+/* Group section styling in forms */
+.group-section.gold-section {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05));
+  border: 1px solid #FFD700;
+  border-radius: 6px;
+  padding: 6px;
+  margin: 4px 0;
+}
+
+.group-section.gold-section label {
+  color: #B8860B;
+  font-weight: 600;
+}
+
+.group-section.silver-section {
+  background: linear-gradient(90deg, rgba(192, 192, 192, 0.1), rgba(192, 192, 192, 0.05));
+  border: 1px solid #C0C0C0;
+  border-radius: 6px;
+  padding: 6px;
+  margin: 4x 0;
+}
+
+.group-section.silver-section label {
+  color: #708090;
+  font-weight: 500;
+}
+
+.group-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-section.hidden {
+  display: none;
+}
+
+.group-section input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.group-section label {
+  font-size: 13px;
+  margin: 0;
+  cursor: pointer;
+}
 
     /* Context Menu */
     .context-menu {
@@ -615,35 +693,95 @@
     }
 
     .param-row select {
-  flex: 1;
-  background: var(--bg);
+      flex: 1;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--hover);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .param-row select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
+    }
+
+    /* Checkbox styling */
+    .param-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent); /* modern browsers */
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .param-row input[type="checkbox"]:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.3);
+    }
+
+
+    /* Groups section styling - tree-like structure */
+.groups-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid var(--border);
+}
+
+.groups-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text);
-  border: 1px solid var(--hover);
-  padding: 8px 10px;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.groups-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.no-groups {
+  padding: 16px;
+  text-align: center;
+  color: var(--sub);
   font-size: 13px;
-  cursor: pointer;
+  font-style: italic;
 }
 
-.param-row select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
+/* Group items use tree styling - no additional styling needed */
+
+.group-attribute-item {
+  /* Silver attribute styling for tree items */
+  color: #C0C0C0;
 }
 
-/* Checkbox styling */
-.param-row input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent); /* modern browsers */
-  cursor: pointer;
-  border-radius: 4px;
+/* Save button styling when in edit mode */
+.tree-action-btn.save-active {
+  background: var(--accent-2) !important;
+  color: white !important;
 }
 
-.param-row input[type="checkbox"]:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.3);
+/* Gold label styling in param menu */
+.gold-label {
+  color: #FFD700;
+  font-weight: 600;
 }
+
+.gold-label::before {
+  content: '◦ ';
+  color :#FFD700;
+}
+
+
+
+
+
+
 
     /* Statistics */
     .stats-grid {

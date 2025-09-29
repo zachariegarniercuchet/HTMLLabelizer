@@ -5,10 +5,15 @@
   let isSourceView = false;
   let sourceViewModified = false;
   const labels = new Map(); // name -> {color, type, sublabels, params}
+  const activeGroups = new Map(); // groupId -> { labelName, groupAttributes: Map }
   let currentSelection = null;
   let expandedNodes = new Set(); // Track expanded tree nodes
   let selectedNode = null; // Track selected tree node
   let currentParamElement = null; // Track element being edited for parameters
+  
+  // ======= Group Display State =======
+  let expandedGroups = new Set(); // Track expanded groups
+  let groupsSectionExpanded = true; // Track if entire groups section is expanded
 
   let searchTimeout;
   const MIN_SEARCH_LENGTH = 2; // Only search for strings MIN_SEARCH_LENGTH+ characters
@@ -130,15 +135,16 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 
   // ======= Enhanced Label Management =======
 
-  function createLabel(name, color, type = "structured", params = {}) {
-    return {
-      name,
-      color,
-      type,
-      params: new Map(Object.entries(params)),
-      sublabels: new Map()  // nested label tree
-    };
-  }
+  function createLabel(name, color, type = "structured", params = {}, groupConfig = null) {
+  return {
+    name,
+    color,
+    type,
+    params: new Map(Object.entries(params)),
+    sublabels: new Map(),
+    groupConfig: groupConfig // { groupIdAttribute: 'id', groupAttributes: Map }
+  };
+}
 
   function addLabel(name, color, parentPath = []) {
     if (!name.trim()) return false;
@@ -230,221 +236,314 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 
   // ======= Tree UI Management =======
 
-  function refreshTreeUI() {
-    renderTree();
-    updateLabelOptions();
-    updateStats();
-  }
+function refreshTreeUI() {
+  renderTree();
+  updateLabelOptions();
+  updateStats();
+  
+  // Ensure groups header has expand button after any tree updates
+  setTimeout(() => {
+    if (typeof initializeGroupsHeader === 'function') {
+      initializeGroupsHeader();
+    }
+  }, 0);
+}
 
-  function renderTree() {
-    elements.labelTree.innerHTML = '';
-    renderTreeLevel(labels, [], 0, elements.labelTree);
-  }
+function renderTree() {
+  elements.labelTree.innerHTML = '';
+  renderTreeLevel(labels, [], 0, elements.labelTree);
+}
 
-  function renderTreeLevel(labelMap, currentPath, level, container) {
-    labelMap.forEach((label, name) => {
-      const nodePath = [...currentPath, name];
-      const nodeId = nodePath.join('.');
-      
-      // Create tree node
-      const treeNode = document.createElement('div');
-      treeNode.className = 'tree-node';
-      
-      // Create tree item
-      const treeItem = document.createElement('div');
-      treeItem.className = `tree-item level-${level}`;
-      treeItem.dataset.path = JSON.stringify(nodePath);
-      
-      if (selectedNode === nodeId) {
-        treeItem.classList.add('selected');
-      }
-      
-      // Expand/collapse button
-      const expandBtn = document.createElement('button');
-      expandBtn.className = 'tree-expand-btn';
-      const hasChildren = label.sublabels.size > 0 || label.params.size > 0;
-      
-      if (hasChildren) {
-        const isExpanded = expandedNodes.has(nodeId);
-        expandBtn.classList.add(isExpanded ? 'expanded' : 'collapsed');
-        expandBtn.onclick = (e) => {
-          e.stopPropagation();
-          toggleNode(nodeId);
-        };
-      } else {
-        expandBtn.classList.add('no-children');
-      }
-      
-      // Icon
-      const icon = document.createElement('div');
-      icon.className = 'tree-icon folder';
-      
-      // Color indicator
-      const colorIndicator = document.createElement('div');
-      colorIndicator.className = 'tree-color-indicator';
-      colorIndicator.style.backgroundColor = label.color;
-      
-      // Label text
-      const labelText = document.createElement('div');
-      labelText.className = 'tree-label';
-      labelText.textContent = name;
-      
-      // Actions
-      const actions = document.createElement('div');
-      actions.className = 'tree-actions';
-      
-      if (level === 0) {
-        const addBtn = document.createElement('button');
-        addBtn.className = 'tree-action-btn add';
-        addBtn.title = 'Add sublabel';
-        addBtn.onclick = (e) => {
-            e.stopPropagation();
-            promptAddSublabel(nodePath, treeNode);
-        };
-        actions.appendChild(addBtn);
-        }
-      
-      const addParamBtn = document.createElement('button');
-      addParamBtn.className = 'tree-action-btn edit';
-      addParamBtn.title = 'Add parameter';
-      addParamBtn.onclick = (e) => {
-        e.stopPropagation();
-        promptAddParameter(nodePath, treeNode);
-      };
-      
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'tree-action-btn delete';
-      deleteBtn.title = 'Delete label';
-      deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (confirm(`Delete "${name}" and all its children?`)) {
-          deleteLabel(nodePath);
-        }
-      };
-      
-      //actions.appendChild(addBtn);
-      actions.appendChild(addParamBtn);
-      actions.appendChild(deleteBtn);
-      
-      // Assemble tree item
-      treeItem.appendChild(expandBtn);
-      treeItem.appendChild(icon);
-      treeItem.appendChild(colorIndicator);
-      treeItem.appendChild(labelText);
-      treeItem.appendChild(actions);
-      
-      // Click handler for selection
-      treeItem.onclick = (e) => {
-        if (e.target === treeItem || e.target === labelText || e.target === icon || e.target === colorIndicator) {
-          selectNode(nodeId);
-        }
-      };
-      
-      treeNode.appendChild(treeItem);
-      
-      // Children container
-      if (hasChildren) {
-        const childrenContainer = document.createElement('div');
-        childrenContainer.className = 'tree-children';
-        
-        const isExpanded = expandedNodes.has(nodeId);
-        childrenContainer.classList.add(isExpanded ? 'expanded' : 'collapsed');
-        
-        if (isExpanded) {
-          // Render parameters first
-          label.params.forEach((value, paramName) => {
-            const paramItem = createParameterItem(nodePath, paramName, value, level + 1, treeNode);
-            childrenContainer.appendChild(paramItem);
-          });
-          
-          // Then render sublabels
-          renderTreeLevel(label.sublabels, nodePath, level + 1, childrenContainer);
-        }
-        
-        treeNode.appendChild(childrenContainer);
-      }
-      
-      container.appendChild(treeNode);
-    });
-  }
-
-  function createParameterItem(labelPath, paramName, paramValue, level, treeNode) {
-    const paramNode = document.createElement('div');
-    paramNode.className = 'tree-node';
+function renderTreeLevel(labelMap, currentPath, level, container) {
+  labelMap.forEach((label, name) => {
+    const nodePath = [...currentPath, name];
+    const nodeId = nodePath.join('.');
     
-    const paramItem = document.createElement('div');
-    paramItem.className = `tree-item level-${level}`;
+    // Create tree node
+    const treeNode = document.createElement('div');
+    treeNode.className = 'tree-node';
     
-    // Empty expand button for alignment
+    // Create tree item
+    const treeItem = document.createElement('div');
+    treeItem.className = `tree-item level-${level}`;
+    treeItem.dataset.path = JSON.stringify(nodePath);
+    
+    if (selectedNode === nodeId) {
+      treeItem.classList.add('selected');
+    }
+    
+    // Expand/collapse button
     const expandBtn = document.createElement('button');
-    expandBtn.className = 'tree-expand-btn no-children';
+    expandBtn.className = 'tree-expand-btn';
+    const hasChildren = label.sublabels.size > 0 || label.params.size > 0;
     
-    // Parameter icon
+    if (hasChildren) {
+      const isExpanded = expandedNodes.has(nodeId);
+      expandBtn.classList.add(isExpanded ? 'expanded' : 'collapsed');
+      expandBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleNode(nodeId);
+      };
+    } else {
+      expandBtn.classList.add('no-children');
+    }
+    
+    // Icon
     const icon = document.createElement('div');
-    icon.className = 'tree-icon param';
+    icon.className = 'tree-icon folder';
     
-    // Parameter name
-    const paramText = document.createElement('div');
-    paramText.className = 'tree-label';
-    paramText.textContent = paramName;
+    // Color indicator
+    const colorIndicator = document.createElement('div');
+    colorIndicator.className = 'tree-color-indicator';
+    colorIndicator.style.backgroundColor = label.color;
     
-    // Parameter value
-    const paramValueSpan = document.createElement('div');
-    paramValueSpan.className = 'tree-param-value';
-    paramValueSpan.textContent = `${paramValue.type} ${paramValue.default}` || '(empty)';
+    // Label text
+    const labelText = document.createElement('div');
+    labelText.className = 'tree-label';
+    labelText.textContent = name;
     
     // Actions
     const actions = document.createElement('div');
     actions.className = 'tree-actions';
     
-    const editBtn = document.createElement('button');
-    editBtn.className = 'tree-action-btn edit';
-    editBtn.title = 'Edit parameter';
-    editBtn.onclick = (e) => {
+    if (level === 0) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'tree-action-btn add';
+      addBtn.title = 'Add sublabel';
+      addBtn.onclick = (e) => {
+        e.stopPropagation();
+        promptAddSublabel(nodePath, treeNode);
+      };
+      actions.appendChild(addBtn);
+    }
+    
+    const addParamBtn = document.createElement('button');
+    addParamBtn.className = 'tree-action-btn edit';
+    addParamBtn.title = 'Add parameter';
+    addParamBtn.onclick = (e) => {
       e.stopPropagation();
-      promptEditParameter(labelPath, paramName, paramValue, treeNode);
+      promptAddParameter(nodePath, treeNode);
     };
     
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'tree-action-btn delete';
-    deleteBtn.title = 'Delete parameter';
+    deleteBtn.title = 'Delete label';
     deleteBtn.onclick = (e) => {
       e.stopPropagation();
-      if (confirm(`Delete parameter "${paramName}"?`)) {
-        deleteParameter(labelPath, paramName);
+      if (confirm(`Delete "${name}" and all its children?`)) {
+        deleteLabel(nodePath);
       }
     };
     
-    actions.appendChild(editBtn);
+    actions.appendChild(addParamBtn);
     actions.appendChild(deleteBtn);
     
-    paramItem.appendChild(expandBtn);
-    paramItem.appendChild(icon);
-    paramItem.appendChild(paramText);
-    paramItem.appendChild(paramValueSpan);
-    paramItem.appendChild(actions);
+    // Assemble tree item
+    treeItem.appendChild(expandBtn);
+    treeItem.appendChild(icon);
+    treeItem.appendChild(colorIndicator);
+    treeItem.appendChild(labelText);
+    treeItem.appendChild(actions);
     
-    paramNode.appendChild(paramItem);
-    return paramNode;
-  }
-
-  function toggleNode(nodeId) {
-    if (expandedNodes.has(nodeId)) {
-      expandedNodes.delete(nodeId);
-    } else {
-      expandedNodes.add(nodeId);
+    // Click handler for selection
+    treeItem.onclick = (e) => {
+      if (e.target === treeItem || e.target === labelText || e.target === icon || e.target === colorIndicator) {
+        selectNode(nodeId);
+      }
+    };
+    
+    treeNode.appendChild(treeItem);
+    
+    // Children container
+    if (hasChildren) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'tree-children';
+      
+      const isExpanded = expandedNodes.has(nodeId);
+      childrenContainer.classList.add(isExpanded ? 'expanded' : 'collapsed');
+      
+      if (isExpanded) {
+        // Sort and render parameters in order: gold, silver, regular
+        const sortedParams = getSortedParameters(label);
+        
+        sortedParams.forEach(({ paramName, paramValue, type }) => {
+          const paramItem = createParameterItem(nodePath, paramName, paramValue, level + 1, treeNode, type);
+          childrenContainer.appendChild(paramItem);
+        });
+        
+        // Then render sublabels
+        renderTreeLevel(label.sublabels, nodePath, level + 1, childrenContainer);
+      }
+      
+      treeNode.appendChild(childrenContainer);
     }
-    renderTree();
+    
+    container.appendChild(treeNode);
+  });
+}
+
+function getSortedParameters(label) {
+  const sortedParams = [];
+  
+  // Find group ID (gold) parameter
+  let groupIdParam = null;
+  if (label.groupConfig && label.groupConfig.groupIdAttribute) {
+    const groupIdName = label.groupConfig.groupIdAttribute;
+    if (label.params.has(groupIdName)) {
+      groupIdParam = {
+        paramName: groupIdName,
+        paramValue: label.params.get(groupIdName),
+        type: 'gold'
+      };
+    }
   }
-
-  function selectNode(nodeId) {
-    selectedNode = nodeId;
-    renderTree();
+  
+  // Collect group attributes (silver)
+  const groupAttributes = [];
+  if (label.groupConfig && label.groupConfig.groupAttributes) {
+    label.groupConfig.groupAttributes.forEach((value, name) => {
+      groupAttributes.push({
+        paramName: name,
+        paramValue: value,
+        type: 'silver'
+      });
+    });
   }
+  
+  // Collect regular parameters
+  const regularParams = [];
+  label.params.forEach((value, name) => {
+    // Skip if it's the group ID parameter
+    if (groupIdParam && name === groupIdParam.paramName) return;
+    
+    regularParams.push({
+      paramName: name,
+      paramValue: value,
+      type: 'regular'
+    });
+  });
+  
+  // Order: gold first, then silver, then regular
+  if (groupIdParam) sortedParams.push(groupIdParam);
+  sortedParams.push(...groupAttributes);
+  sortedParams.push(...regularParams);
+  
+  return sortedParams;
+}
 
-  // ======= User Interaction Prompts =======
+function createParameterItem(labelPath, paramName, paramValue, level, treeNode, paramType = 'regular') {
+  const paramNode = document.createElement('div');
+  paramNode.className = 'tree-node';
+  
+  const paramItem = document.createElement('div');
+  paramItem.className = `tree-item level-${level} param-${paramType}`;
+  
+  // Empty expand button for alignment
+  const expandBtn = document.createElement('button');
+  expandBtn.className = 'tree-expand-btn no-children';
+  
+  // Parameter icon
+  const icon = document.createElement('div');
+  icon.className = `tree-icon param param-${paramType}`;
+  
+  // Parameter name
+  const paramText = document.createElement('div');
+  paramText.className = 'tree-label';
+  paramText.textContent = paramName;
+  
+  // Parameter value
+  const paramValueSpan = document.createElement('div');
+  paramValueSpan.className = 'tree-param-value';
+  paramValueSpan.textContent = `${paramValue.type} ${paramValue.default}` || '(empty)';
+  
+  // Actions
+  const actions = document.createElement('div');
+  actions.className = 'tree-actions';
+  
+  const editBtn = document.createElement('button');
+  editBtn.className = 'tree-action-btn edit';
+  editBtn.title = paramType === 'silver' ? 'Edit group attribute' : 'Edit parameter';
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    if (paramType === 'silver') {
+      promptEditGroupAttribute(labelPath, paramName, paramValue, treeNode);
+    } else {
+      promptEditParameter(labelPath, paramName, paramValue, treeNode);
+    }
+  };
+  
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'tree-action-btn delete';
+  deleteBtn.title = paramType === 'gold' ? 'Delete group (removes all group attributes)' : 
+                   paramType === 'silver' ? 'Delete group attribute' : 'Delete parameter';
+  deleteBtn.onclick = (e) => {
+    e.stopPropagation();
+    if (paramType === 'gold') {
+      if (confirm(`Delete group "${paramName}" and all group attributes?`)) {
+        deleteGroup(labelPath);
+      }
+    } else if (paramType === 'silver') {
+      if (confirm(`Delete group attribute "${paramName}"?`)) {
+        deleteGroupAttribute(labelPath, paramName);
+      }
+    } else {
+      if (confirm(`Delete parameter "${paramName}"?`)) {
+        deleteParameter(labelPath, paramName);
+      }
+    }
+  };
+  
+  actions.appendChild(editBtn);
+  actions.appendChild(deleteBtn);
+  
+  paramItem.appendChild(expandBtn);
+  paramItem.appendChild(icon);
+  paramItem.appendChild(paramText);
+  paramItem.appendChild(paramValueSpan);
+  paramItem.appendChild(actions);
+  
+  paramNode.appendChild(paramItem);
+  return paramNode;
+}
 
-  function promptAddSublabel(parentPath, container) {
+function toggleNode(nodeId) {
+  if (expandedNodes.has(nodeId)) {
+    expandedNodes.delete(nodeId);
+  } else {
+    expandedNodes.add(nodeId);
+  }
+  renderTree();
+}
+
+function selectNode(nodeId) {
+  selectedNode = nodeId;
+  renderTree();
+}
+
+// ======= Group Management Functions =======
+
+function deleteGroup(labelPath) {
+  const label = getLabelByPath(labelPath);
+  if (!label || !label.groupConfig) return;
+
+  // Remove the group ID parameter
+  label.params.delete(label.groupConfig.groupIdAttribute);
+  
+  // Remove group config (this also removes all group attributes)
+  label.groupConfig = null;
+
+  refreshTreeUI();
+}
+
+function deleteGroupAttribute(labelPath, attrName) {
+  const label = getLabelByPath(labelPath);
+  if (!label || !label.groupConfig) return;
+
+  label.groupConfig.groupAttributes.delete(attrName);
+  refreshTreeUI();
+}
+
+function promptAddSublabel(parentPath, container) {
     // Create inline input row
     const inlineEditor = document.createElement("div");
     inlineEditor.className = "inline-editor";
@@ -480,8 +579,11 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     input.focus();
     }
 
+function promptAddParameter(labelPath, container) {
+  const label = getLabelByPath(labelPath);
+  const hasGroupConfig = label && label.groupConfig;
+  const hasGroupId = hasGroupConfig && label.groupConfig.groupIdAttribute;
 
-  function promptAddParameter(labelPath, container) {
   const inlineEditor = document.createElement("div");
   inlineEditor.className = "inline-editor";
 
@@ -523,7 +625,44 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
   dropdownSection.appendChild(addValueBtn);
   dropdownSection.appendChild(valuesList);
 
-  // Render default value input depending on type
+  // Group ID checkbox (show only if no group ID exists yet)
+  const groupIdSection = document.createElement("div");
+  groupIdSection.className = !hasGroupId ? "group-section gold-section" : "group-section gold-section hidden";
+
+  const groupIdCheckbox = document.createElement("input");
+  groupIdCheckbox.type = "checkbox";
+  groupIdCheckbox.id = "is-group-id-" + Date.now();
+
+  const groupIdLabel = document.createElement("label");
+  groupIdLabel.textContent = "This is the Group ID";
+  groupIdLabel.htmlFor = groupIdCheckbox.id;
+
+  groupIdSection.appendChild(groupIdCheckbox);
+  groupIdSection.appendChild(groupIdLabel);
+
+  // Group attribute checkbox (show only if group ID exists)
+  const groupAttrSection = document.createElement("div");
+  groupAttrSection.className = hasGroupId ? "group-section silver-section" : "group-section silver-section hidden";
+
+  const groupAttrCheckbox = document.createElement("input");
+  groupAttrCheckbox.type = "checkbox";
+  groupAttrCheckbox.id = "is-group-attr-" + Date.now();
+
+  const groupAttrLabel = document.createElement("label");
+  groupAttrLabel.textContent = "This is a group attribute";
+  groupAttrLabel.htmlFor = groupAttrCheckbox.id;
+
+  groupAttrSection.appendChild(groupAttrCheckbox);
+  groupAttrSection.appendChild(groupAttrLabel);
+
+  // Save button
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "Save";
+  saveBtn.className = "save-btn green";
+
+  const validNameRegex = /^[A-Za-z0-9_]+$/;
+
+  // Render default input function
   function renderDefaultInput(type, options = []) {
     defaultValueContainer.innerHTML = "";
 
@@ -537,8 +676,8 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
       input.type = "checkbox";
       defaultValueContainer.appendChild(input);
     } else if (type === "dropdown") {
-        // No default value input for dropdown anymore
-        }
+      // No default value input for dropdown
+    }
   }
 
   // Initial default input
@@ -548,13 +687,180 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
   typeSelect.onchange = () => {
     if (typeSelect.value === "dropdown") {
       dropdownSection.classList.remove("hidden");
-      renderDefaultInput("dropdown", Array.from(valuesList.querySelectorAll("input")).map(i => i.value.trim()).filter(v => v));
+      renderDefaultInput("dropdown");
     } else if (typeSelect.value === "checkbox") {
       dropdownSection.classList.add("hidden");
       renderDefaultInput("checkbox");
     } else {
       dropdownSection.classList.add("hidden");
       renderDefaultInput("string");
+    }
+  };
+
+  saveBtn.onclick = () => {
+    const paramName = nameInput.value.trim();
+    if (!paramName) {
+      alert("Parameter name cannot be empty.");
+      return;
+    }
+
+    if (!validNameRegex.test(paramName)) {
+      alert("Invalid parameter name. Use only letters, numbers, and underscores.");
+      return;
+    }
+
+    const paramType = typeSelect.value;
+    let paramValue;
+
+    if (paramType === "dropdown") {
+      const items = Array.from(valuesList.querySelectorAll("input"))
+        .map(i => i.value.trim())
+        .filter(v => v);
+
+      paramValue = {
+        type: "dropdown",
+        options: items,
+        default: items.length > 0 ? items[0] : ""
+      };
+    } else if (paramType === "checkbox") {
+      const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
+      paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
+    } else {
+      const inputEl = defaultValueContainer.querySelector("input[type='text']");
+      paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
+    }
+
+    // Handle group ID creation
+    if (groupIdCheckbox.checked) {
+      // Create group config and set this parameter as group ID
+      label.groupConfig = {
+        groupIdAttribute: paramName,
+        groupAttributes: new Map()
+      };
+      // Add as regular parameter too
+      addParameter(labelPath, paramName, paramValue);
+    } else if (hasGroupId && groupAttrCheckbox.checked) {
+      // Add as group attribute
+      label.groupConfig.groupAttributes.set(paramName, paramValue);
+    } else {
+      // Add as regular parameter
+      addParameter(labelPath, paramName, paramValue);
+    }
+
+    inlineEditor.remove();
+    const nodeId = labelPath.join(".");
+    expandedNodes.add(nodeId);
+    renderTree();
+  };
+
+  // Assemble the editor
+  inlineEditor.appendChild(nameInput);
+  inlineEditor.appendChild(typeSelect);
+  inlineEditor.appendChild(dropdownSection);
+  inlineEditor.appendChild(defaultValueContainer);
+  inlineEditor.appendChild(groupIdSection);
+  inlineEditor.appendChild(groupAttrSection);
+  inlineEditor.appendChild(saveBtn);
+
+  container.appendChild(inlineEditor);
+  nameInput.focus();
+}
+
+function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
+  const inlineEditor = document.createElement("div");
+  inlineEditor.className = "inline-editor";
+
+  let paramType = "string";
+  let defaultVal = "";
+  let options = [];
+
+  if (typeof attrValue === "object" && attrValue.type) {
+    paramType = attrValue.type;
+    defaultVal = attrValue.default || "";
+    options = attrValue.options || [];
+  } else {
+    defaultVal = attrValue || "";
+  }
+
+  // Name input
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.value = attrName;
+  nameInput.placeholder = "Group attribute name";
+
+  // Type selector
+  const typeSelect = document.createElement("select");
+  ["string", "dropdown", "checkbox"].forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    if (t === paramType) opt.selected = true;
+    typeSelect.appendChild(opt);
+  });
+
+  // Default value container
+  const defaultValueContainer = document.createElement("div");
+  defaultValueContainer.className = "default-value-container";
+
+  // Dropdown section
+  const dropdownSection = document.createElement("div");
+  dropdownSection.className = "dropdown-section" + (paramType === "dropdown" ? "" : " hidden");
+
+  const valuesList = document.createElement("div");
+  valuesList.className = "dropdown-values";
+
+  // Populate existing options
+  options.forEach(optVal => {
+    const itemInput = document.createElement("input");
+    itemInput.type = "text";
+    itemInput.value = optVal;
+    valuesList.appendChild(itemInput);
+  });
+
+  const addValueBtn = document.createElement("button");
+  addValueBtn.textContent = "+ Add option";
+  addValueBtn.type = "button";
+  addValueBtn.onclick = () => {
+    const itemInput = document.createElement("input");
+    itemInput.type = "text";
+    itemInput.placeholder = "Option";
+    valuesList.appendChild(itemInput);
+  };
+
+  dropdownSection.appendChild(addValueBtn);
+  dropdownSection.appendChild(valuesList);
+
+  // Render default input function
+  function renderDefaultInput(type, current = "") {
+    defaultValueContainer.innerHTML = "";
+
+    if (type === "string") {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = current;
+      input.placeholder = "Default value";
+      defaultValueContainer.appendChild(input);
+    } else if (type === "checkbox") {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = current === true || current === "true";
+      defaultValueContainer.appendChild(input);
+    }
+  }
+
+  renderDefaultInput(paramType, defaultVal);
+
+  // Type change handler
+  typeSelect.onchange = () => {
+    if (typeSelect.value === "dropdown") {
+      dropdownSection.classList.remove("hidden");
+      renderDefaultInput("dropdown", "");
+    } else if (typeSelect.value === "checkbox") {
+      dropdownSection.classList.add("hidden");
+      renderDefaultInput("checkbox", false);
+    } else {
+      dropdownSection.classList.add("hidden");
+      renderDefaultInput("string", "");
     }
   };
 
@@ -565,56 +871,51 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 
   const validNameRegex = /^[A-Za-z0-9_]+$/;
 
-saveBtn.onclick = () => {
-  const paramName = nameInput.value.trim();
-  if (!paramName) {
-    alert("Parameter name cannot be empty.");
-    return;
-  }
-
-  // Check param name validity
-  if (!validNameRegex.test(paramName)) {
-    alert("Invalid parameter name. Use only letters, numbers, and underscores (no spaces or special characters).");
-    return;
-  }
-
-  const paramType = typeSelect.value;
-  let paramValue;
-
-  if (paramType === "dropdown") {
-    const items = Array.from(valuesList.querySelectorAll("input"))
-      .map(i => i.value.trim())
-      .filter(v => v);
-
-    // Check each option
-    for (const item of items) {
-      if (!validNameRegex.test(item)) {
-        alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
-        return;
-      }
+  saveBtn.onclick = () => {
+    const newAttrName = nameInput.value.trim();
+    if (!newAttrName || !validNameRegex.test(newAttrName)) {
+      alert("Invalid group attribute name.");
+      return;
     }
 
-    paramValue = {
-      type: "dropdown",
-      options: items,
-      default: items.length > 0 ? items[0] : ""
-    };
-  } else if (paramType === "checkbox") {
-    const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
-    paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
-  } else {
-    const inputEl = defaultValueContainer.querySelector("input[type='text']");
-    paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
-  }
+    const newParamType = typeSelect.value;
+    let newAttrValue;
+    
+    if (newParamType === "dropdown") {
+      const items = Array.from(valuesList.querySelectorAll("input"))
+        .map(i => i.value.trim())
+        .filter(v => v);
 
-  // If all checks passed → save
-  addParameter(labelPath, paramName, paramValue);
-  inlineEditor.remove();
-  const nodeId = labelPath.join(".");
-  expandedNodes.add(nodeId);
-  renderTree();
-};
+      newAttrValue = {
+        type: "dropdown",
+        options: items,
+        default: items.length > 0 ? items[0] : ""
+      };
+    } else if (newParamType === "checkbox") {
+      const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
+      newAttrValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
+    } else {
+      const inputEl = defaultValueContainer.querySelector("input[type='text']");
+      newAttrValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
+    }
 
+    const label = getLabelByPath(labelPath);
+    if (label && label.groupConfig) {
+      // Remove old attribute if name changed
+      if (newAttrName !== attrName) {
+        label.groupConfig.groupAttributes.delete(attrName);
+      }
+      // Add new/updated attribute
+      label.groupConfig.groupAttributes.set(newAttrName, newAttrValue);
+    }
+
+    inlineEditor.remove();
+    const nodeId = labelPath.join(".");
+    expandedNodes.add(nodeId);
+    renderTree();
+  };
+
+  // Assemble editor
   inlineEditor.appendChild(nameInput);
   inlineEditor.appendChild(typeSelect);
   inlineEditor.appendChild(dropdownSection);
@@ -632,6 +933,11 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     return;
   }
 
+  const label = getLabelByPath(labelPath);
+  
+  // Check if this is the group ID parameter
+  const isGroupId = label && label.groupConfig && label.groupConfig.groupIdAttribute === oldParamName;
+
   const inlineEditor = document.createElement("div");
   inlineEditor.className = "inline-editor";
 
@@ -648,11 +954,15 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     defaultVal = oldParamValue || "";
   }
 
-  // Name
+  // Name input (disabled if it's the group ID)
   const nameInput = document.createElement("input");
   nameInput.type = "text";
   nameInput.value = oldParamName;
   nameInput.placeholder = "Parameter name";
+  if (isGroupId) {
+    nameInput.disabled = true;
+    nameInput.title = "Cannot rename group ID parameter. Delete the group first.";
+  }
 
   // Type selector
   const typeSelect = document.createElement("select");
@@ -711,8 +1021,8 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
       input.checked = current === true || current === "true";
       defaultValueContainer.appendChild(input);
     } else if (type === "dropdown") {
-        // No default value input for dropdown anymore
-        }
+      // No default value input for dropdown
+    }
   }
 
   renderDefaultInput(paramType, options, defaultVal);
@@ -732,6 +1042,16 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     }
   };
 
+  // Info message if editing group ID
+  if (isGroupId) {
+    const infoMsg = document.createElement("div");
+    infoMsg.className = "group-section gold-section";
+    infoMsg.style.fontSize = "12px";
+    infoMsg.style.fontStyle = "italic";
+    infoMsg.textContent = "⚠️ Editing the Group ID parameter. Name cannot be changed.";
+    inlineEditor.appendChild(infoMsg);
+  }
+
   // Save button
   const saveBtn = document.createElement("button");
   saveBtn.textContent = "Save";
@@ -739,56 +1059,63 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
 
   const validNameRegex = /^[A-Za-z0-9_]+$/;
 
-saveBtn.onclick = () => {
-  const paramName = nameInput.value.trim();
-  if (!paramName) {
-    alert("Parameter name cannot be empty.");
-    return;
-  }
-
-  // Check param name validity
-  if (!validNameRegex.test(paramName)) {
-    alert("Invalid parameter name. Use only letters, numbers, and underscores (no spaces or special characters).");
-    return;
-  }
-
-  const paramType = typeSelect.value;
-  let paramValue;
-
-  if (paramType === "dropdown") {
-    const items = Array.from(valuesList.querySelectorAll("input"))
-      .map(i => i.value.trim())
-      .filter(v => v);
-
-    // Check each option
-    for (const item of items) {
-      if (!validNameRegex.test(item)) {
-        alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
-        return;
-      }
+  saveBtn.onclick = () => {
+    const paramName = nameInput.value.trim();
+    if (!paramName) {
+      alert("Parameter name cannot be empty.");
+      return;
     }
 
-    paramValue = {
-      type: "dropdown",
-      options: items,
-      default: items.length > 0 ? items[0] : ""
-    };
-  } else if (paramType === "checkbox") {
-    const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
-    paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
-  } else {
-    const inputEl = defaultValueContainer.querySelector("input[type='text']");
-    paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
-  }
+    // Check param name validity
+    if (!validNameRegex.test(paramName)) {
+      alert("Invalid parameter name. Use only letters, numbers, and underscores (no spaces or special characters).");
+      return;
+    }
 
-  // If all checks passed → save
-  addParameter(labelPath, paramName, paramValue);
-  inlineEditor.remove();
-  const nodeId = labelPath.join(".");
-  expandedNodes.add(nodeId);
-  renderTree();
-};
+    const paramType = typeSelect.value;
+    let paramValue;
 
+    if (paramType === "dropdown") {
+      const items = Array.from(valuesList.querySelectorAll("input"))
+        .map(i => i.value.trim())
+        .filter(v => v);
+
+      // Check each option
+      for (const item of items) {
+        if (!validNameRegex.test(item)) {
+          alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
+          return;
+        }
+      }
+
+      paramValue = {
+        type: "dropdown",
+        options: items,
+        default: items.length > 0 ? items[0] : ""
+      };
+    } else if (paramType === "checkbox") {
+      const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
+      paramValue = { type: "checkbox", default: checkboxEl && checkboxEl.checked };
+    } else {
+      const inputEl = defaultValueContainer.querySelector("input[type='text']");
+      paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
+    }
+
+    // Delete old parameter if name changed (and it's not the group ID)
+    if (paramName !== oldParamName && !isGroupId) {
+      deleteParameter(labelPath, oldParamName);
+    }
+
+    // Save the parameter
+    addParameter(labelPath, paramName, paramValue);
+    
+    inlineEditor.remove();
+    const nodeId = labelPath.join(".");
+    expandedNodes.add(nodeId);
+    renderTree();
+  };
+
+  // Assemble the editor
   inlineEditor.appendChild(nameInput);
   inlineEditor.appendChild(typeSelect);
   inlineEditor.appendChild(dropdownSection);
@@ -799,7 +1126,94 @@ saveBtn.onclick = () => {
   nameInput.focus();
 }
 
+// ======= Groups Display Management =======
+function refreshGroupsDisplay() {
+  const groupsList = document.getElementById('groups-list');
+  if (!groupsList) return;
+  
+  groupsList.innerHTML = '';
+  
+  // Collect all active groups from the HTML content
+  updateActiveGroupsFromDOM();
+  
+  if (activeGroups.size === 0) {
+    groupsList.innerHTML = '<p>No active groups</p>';
+    return;
+  }
+  
+  activeGroups.forEach((groupData, groupId) => {
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'group-item';
+    
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `
+      <span class="group-title">${groupData.labelName} - ${groupId}</span>
+      <button class="modify-btn" data-group-id="${groupId}">Modify</button>
+    `;
+    
+    const attributesDiv = document.createElement('div');
+    attributesDiv.className = 'group-attributes';
+    
+    groupData.groupAttributes.forEach((attrDef, attrName) => {
+      const attrDiv = document.createElement('div');
+      attrDiv.className = 'group-attribute';
+      
+      let displayValue = groupData.currentValues?.get(attrName) || attrDef.default || '';
+      if (attrDef.type === 'checkbox') {
+        displayValue = displayValue === 'true' ? '✓' : '✗';
+      }
+      
+      attrDiv.innerHTML = `<span>${attrName}:</span> <span>${displayValue}</span>`;
+      attributesDiv.appendChild(attrDiv);
+    });
+    
+    groupDiv.appendChild(header);
+    groupDiv.appendChild(attributesDiv);
+    groupsList.appendChild(groupDiv);
+  });
+  
+  // Attach event listeners for modify buttons
+  groupsList.querySelectorAll('.modify-btn').forEach(btn => {
+    btn.onclick = () => showGroupEditModal(btn.dataset.groupId);
+  });
+}
 
+function updateActiveGroupsFromDOM() {
+  activeGroups.clear();
+  
+  // Scan all labeled elements in HTML content
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  
+  labelElements.forEach(labelEl => {
+    const labelName = labelEl.getAttribute('labelName');
+    const parent = labelEl.getAttribute('parent') || '';
+    const path = parent ? [parent, labelName] : [labelName];
+    const label = getLabelByPath(path);
+    
+    if (label && label.groupConfig) {
+      const groupIdAttr = label.groupConfig.groupIdAttribute;
+      const groupId = labelEl.getAttribute(groupIdAttr);
+      
+      if (groupId) {
+        if (!activeGroups.has(groupId)) {
+          activeGroups.set(groupId, {
+            labelName: labelName,
+            groupAttributes: label.groupConfig.groupAttributes,
+            currentValues: new Map()
+          });
+        }
+        
+        // Update current values
+        const groupData = activeGroups.get(groupId);
+        label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+          const currentValue = labelEl.getAttribute(attrName) || attrDef.default;
+          groupData.currentValues.set(attrName, currentValue);
+        });
+      }
+    }
+  });
+}
 
 
   // ======= Parameter Menu for Labeled Text =======
@@ -818,21 +1232,39 @@ function showParameterMenu(labelElement, x, y) {
   const labelData = getLabelByPath(path);
 
   if (!labelData || labelData.params.size === 0) {
-    //alert("This label has no parameters to edit");
     return;
   }
 
   elements.paramMenuTitle.textContent = `Edit Parameters - ${labelName}`;
   elements.paramForm.innerHTML = "";
 
-  // Create inputs depending on param type
+  // Collect group attribute names to exclude them
+  const groupAttributeNames = new Set();
+  if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
+    labelData.groupConfig.groupAttributes.forEach((value, name) => {
+      groupAttributeNames.add(name);
+    });
+  }
+
+  // Create inputs only for non-group parameters
   labelData.params.forEach((paramDef, paramName) => {
+    // Skip if this is a group attribute (silver)
+    if (groupAttributeNames.has(paramName)) {
+      return;
+    }
+
     const paramRow = document.createElement("div");
     paramRow.className = "param-row";
-    paramRow.style.position = "relative"; // For dropdown positioning
+    paramRow.style.position = "relative";
 
     const label = document.createElement("label");
     label.textContent = paramName + ":";
+
+    // Check if this is the group ID (gold) parameter
+    const isGroupId = labelData.groupConfig && labelData.groupConfig.groupIdAttribute === paramName;
+    if (isGroupId) {
+      label.classList.add("gold-label");
+    }
 
     let input;
 
@@ -845,7 +1277,6 @@ function showParameterMenu(labelElement, x, y) {
         input.type = "text";
         input.value = currentVal;
         
-        // ADD SUGGESTION FUNCTIONALITY FOR STRING INPUTS
         const allSuggestions = collectParameterSuggestions(labelName, parent, paramName);
         
         let suggestionDropdown = null;
@@ -873,7 +1304,6 @@ function showParameterMenu(labelElement, x, y) {
         };
         
         input.onblur = () => {
-          // Delay removal to allow clicking on suggestions
           setTimeout(() => {
             if (suggestionDropdown) {
               suggestionDropdown.remove();
@@ -897,12 +1327,10 @@ function showParameterMenu(labelElement, x, y) {
         });
       }
     } else {
-      // Fallback: treat as string with suggestions
       input = document.createElement("input");
       input.type = "text";
       input.value = labelElement.getAttribute(paramName) || paramDef || "";
       
-      // ADD SUGGESTION FUNCTIONALITY FOR FALLBACK STRING INPUTS
       const allSuggestions = collectParameterSuggestions(labelName, parent, paramName);
       
       let suggestionDropdown = null;
@@ -964,6 +1392,40 @@ function showParameterMenu(labelElement, x, y) {
     currentParamElement = null;
   }
 
+
+  function syncGroupAttributes(labelElement, groupId, updatedAttributes) {
+  const labelName = labelElement.getAttribute('labelName');
+  const parent = labelElement.getAttribute('parent') || '';
+  const path = parent ? [parent, labelName] : [labelName];
+  const label = getLabelByPath(path);
+  
+  if (!label || !label.groupConfig) return;
+  
+  // Find all elements with the same group ID
+  const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+  const sameGroupElements = Array.from(allLabelElements).filter(el => {
+    const elLabelName = el.getAttribute('labelName');
+    const elParent = el.getAttribute('parent') || '';
+    const elPath = elParent ? [elParent, elLabelName] : [elLabelName];
+    const elLabel = getLabelByPath(elPath);
+    
+    if (!elLabel || !elLabel.groupConfig) return false;
+    
+    const elGroupId = el.getAttribute(elLabel.groupConfig.groupIdAttribute);
+    return elGroupId === groupId;
+  });
+  
+  // Update all elements in the same group
+  sameGroupElements.forEach(el => {
+    updatedAttributes.forEach((value, attrName) => {
+      el.setAttribute(attrName, value);
+    });
+  });
+  
+  updateCurrentHtmlFromDOM();
+  updateStats();
+}
+
   // ======= Enhanced Parameter Saving for Multi-Selection =======
 function saveParameters() {
   if (!currentParamElement) return;
@@ -987,6 +1449,32 @@ function saveParameters() {
 
     paramValues[paramName] = paramValue;
   });
+
+  // Check if this label has group configuration
+  const labelName = currentParamElement.getAttribute('labelName');
+  const parent = currentParamElement.getAttribute('parent') || '';
+  const path = parent ? [parent, labelName] : [labelName];
+  const label = getLabelByPath(path);
+  
+  if (label && label.groupConfig) {
+    const groupIdAttr = label.groupConfig.groupIdAttribute;
+    const groupId = currentParamElement.getAttribute(groupIdAttr);
+    
+    if (groupId) {
+      // Separate group attributes from regular parameters
+      const groupUpdates = new Map();
+      
+      label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+        if (paramValues[attrName] !== undefined) {
+          groupUpdates.set(attrName, paramValues[attrName]);
+        }
+      });
+      
+      if (groupUpdates.size > 0) {
+        syncGroupAttributes(currentParamElement, groupId, groupUpdates);
+      }
+    }
+  }
 
   // Apply parameters to current element
   Object.entries(paramValues).forEach(([paramName, paramValue]) => {
@@ -1017,6 +1505,7 @@ function saveParameters() {
 
   hideParameterMenu();
   updateStats();
+  refreshGroupsDisplay();
 }
 
 // Function to collect existing parameter values for suggestions
@@ -1129,6 +1618,391 @@ function handleSuggestionKeydown(event, input, dropdown) {
   }
 }
 
+// ======= Group Display functions =======
+function refreshGroupsDisplay() {
+  const groupsList = document.getElementById('groups-list');
+  if (!groupsList) return;
+  
+  groupsList.innerHTML = '';
+  
+  // Collect all active groups from the HTML content
+  const activeGroups = collectActiveGroups();
+  
+  if (activeGroups.size === 0) {
+    const noGroupsDiv = document.createElement('div');
+    noGroupsDiv.className = 'no-groups';
+    noGroupsDiv.textContent = 'No active groups in document';
+    groupsList.appendChild(noGroupsDiv);
+    return;
+  }
+  
+  activeGroups.forEach((groupData, groupKey) => {
+    const { labelName, groupId, groupIdAttr, groupAttributes, values } = groupData;
+    
+    // Create group node container
+    const groupNode = document.createElement('div');
+    groupNode.className = 'tree-node';
+    
+    // Create main group item (similar to tree-item)
+    const groupItem = document.createElement('div');
+    groupItem.className = 'tree-item level-0 group-item';
+    groupItem.dataset.editing = 'false';
+    
+    // Expand/collapse button - only show if group has attributes
+    const expandBtn = document.createElement('button');
+    if (groupAttributes.size === 0) {
+      expandBtn.className = 'tree-expand-btn no-children';
+    } else {
+      expandBtn.className = `tree-expand-btn ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
+      expandBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleGroupExpansion(groupKey);
+      };
+    }
+    
+    // Get label color for the colored circle icon
+    const label = getLabelByPath([labelName]);
+    const labelColor = label ? label.color : '#6aa3ff';
+    
+    // Group icon - colored circle instead of folder
+    const icon = document.createElement('div');
+    icon.className = 'tree-color-indicator';
+    icon.style.backgroundColor = labelColor;
+    icon.style.border = '1px solid var(--border)';
+    icon.style.width = '12px';
+    icon.style.height = '12px';
+    icon.style.borderRadius = '50%';
+    icon.style.marginRight = '10px';
+    icon.style.flexShrink = '0';
+    
+    // Group title
+    const titleSpan = document.createElement('div');
+    titleSpan.className = 'tree-label';
+    titleSpan.textContent = `${labelName} - ${groupId}`;
+    
+    // Actions (modify button - only visible on hover and only if there are attributes to modify)
+    const actions = document.createElement('div');
+    actions.className = 'tree-actions';
+    
+    if (groupAttributes.size > 0) {
+      const modifyBtn = document.createElement('button');
+      modifyBtn.className = 'tree-action-btn edit';
+      modifyBtn.title = 'Modify group attributes';
+      modifyBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleGroupEdit(groupItem, groupKey);
+      };
+      
+      actions.appendChild(modifyBtn);
+    }
+    
+    // Assemble group header
+    groupItem.appendChild(expandBtn);
+    groupItem.appendChild(icon);
+    groupItem.appendChild(titleSpan);
+    groupItem.appendChild(actions);
+    
+    // Create children container for attributes (only if there are attributes)
+    const childrenDiv = document.createElement('div');
+    if (groupAttributes.size === 0) {
+      childrenDiv.className = 'tree-children collapsed';
+    } else {
+      childrenDiv.className = `tree-children ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
+    }
+    
+    // Add attributes as child items
+    groupAttributes.forEach((attrDef, attrName) => {
+      const attrNode = document.createElement('div');
+      attrNode.className = 'tree-node';
+      
+      const attrItem = document.createElement('div');
+      attrItem.className = 'tree-item level-1 group-attribute-item';
+      
+      // Empty expand button for alignment
+      const attrExpandBtn = document.createElement('button');
+      attrExpandBtn.className = 'tree-expand-btn no-children';
+      
+      // Attribute icon (silver)
+      const attrIcon = document.createElement('div');
+      attrIcon.className = 'tree-icon param param-silver';
+      
+      // Attribute name
+      const attrLabel = document.createElement('div');
+      attrLabel.className = 'tree-label';
+      attrLabel.textContent = attrName;
+      
+      // Attribute value
+      const attrValue = document.createElement('div');
+      attrValue.className = 'tree-param-value';
+      attrValue.dataset.attrName = attrName;
+      
+      const currentValue = values.get(attrName) || attrDef.default || '';
+      
+      if (attrDef.type === 'checkbox') {
+        attrValue.textContent = currentValue === 'true' ? '✓' : '✗';
+      } else {
+        attrValue.textContent = currentValue;
+      }
+      
+      // Assemble attribute item
+      attrItem.appendChild(attrExpandBtn);
+      attrItem.appendChild(attrIcon);
+      attrItem.appendChild(attrLabel);
+      attrItem.appendChild(attrValue);
+      
+      attrNode.appendChild(attrItem);
+      childrenDiv.appendChild(attrNode);
+    });
+    
+    // Assemble complete group
+    groupNode.appendChild(groupItem);
+    groupNode.appendChild(childrenDiv);
+    groupsList.appendChild(groupNode);
+  });
+}
+
+// Toggle group expansion
+function toggleGroupExpansion(groupKey) {
+  if (expandedGroups.has(groupKey)) {
+    expandedGroups.delete(groupKey);
+  } else {
+    expandedGroups.add(groupKey);
+  }
+  refreshGroupsDisplay();
+}
+
+// Initialize groups header with expand button
+function initializeGroupsHeader() {
+  const groupsSection = document.getElementById('groups-section');
+  if (groupsSection) {
+    const header = groupsSection.querySelector('h3');
+    if (header && !header.querySelector('.tree-expand-btn')) {
+      // Create expand button
+      const expandBtn = document.createElement('button');
+      expandBtn.className = `tree-expand-btn ${groupsSectionExpanded ? 'expanded' : 'collapsed'}`;
+      expandBtn.style.marginRight = '8px';
+      expandBtn.onclick = () => toggleGroupsSection();
+      
+      // Insert button before the text
+      header.insertBefore(expandBtn, header.firstChild);
+    }
+  }
+}
+
+// Toggle entire groups section
+function toggleGroupsSection() {
+  groupsSectionExpanded = !groupsSectionExpanded;
+  const groupsList = document.getElementById('groups-list');
+  const header = document.querySelector('#groups-section h3');
+  const expandBtn = header.querySelector('.tree-expand-btn');
+  
+  if (groupsSectionExpanded) {
+    groupsList.style.display = 'block';
+    expandBtn.className = 'tree-expand-btn expanded';
+  } else {
+    groupsList.style.display = 'none';
+    expandBtn.className = 'tree-expand-btn collapsed';
+  }
+}
+
+function collectActiveGroups() {
+  const groups = new Map();
+  
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  
+  labelElements.forEach(labelEl => {
+    const labelName = labelEl.getAttribute('labelName');
+    const parent = labelEl.getAttribute('parent') || '';
+    const path = parent ? [parent, labelName] : [labelName];
+    const label = getLabelByPath(path);
+    
+    if (label && label.groupConfig && label.groupConfig.groupIdAttribute) {
+      const groupIdAttr = label.groupConfig.groupIdAttribute;
+      const groupId = labelEl.getAttribute(groupIdAttr);
+      
+      // Show ALL labels that have a gold attribute (group ID), even if groupId is empty
+      if (labelEl.hasAttribute(groupIdAttr)) {
+        const groupKey = `${labelName}_${groupId || 'undefined'}`;
+        
+        if (!groups.has(groupKey)) {
+          const values = new Map();
+          
+          // For silver attributes, find the first occurrence across all elements with this group ID
+          label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+            let firstValue = attrDef.default || '';
+            
+            // Find first occurrence of this attribute for this group
+            const allElementsWithSameGroup = Array.from(labelElements).filter(el => {
+              const elLabelName = el.getAttribute('labelName');
+              const elParent = el.getAttribute('parent') || '';
+              const elGroupId = el.getAttribute(groupIdAttr);
+              
+              return elLabelName === labelName && 
+                     elParent === parent && 
+                     elGroupId === groupId;
+            });
+            
+            // Look for first non-empty value
+            for (const el of allElementsWithSameGroup) {
+              const value = el.getAttribute(attrName);
+              if (value !== null && value.trim() !== '') {
+                firstValue = value;
+                break;
+              }
+            }
+            
+            values.set(attrName, firstValue);
+          });
+          
+          groups.set(groupKey, {
+            labelName,
+            groupId: groupId || 'undefined',
+            groupIdAttr,
+            groupAttributes: label.groupConfig.groupAttributes,
+            values
+          });
+        }
+      }
+    }
+  });
+  
+  return groups;
+}
+
+function toggleGroupEdit(groupDiv, groupKey) {
+  const isEditing = groupDiv.dataset.editing === 'true';
+  const groupNode = groupDiv.parentNode; // Get the parent tree-node
+  const attributesDiv = groupNode.querySelector('.tree-children');
+  const modifyBtn = groupDiv.querySelector('.tree-action-btn.edit');
+  
+  if (!isEditing) {
+    // Switch to edit mode
+    groupDiv.dataset.editing = 'true';
+    modifyBtn.title = 'Save changes';
+    modifyBtn.classList.add('save-active');
+    
+    // Ensure the group is expanded when editing
+    if (!expandedGroups.has(groupKey)) {
+      expandedGroups.add(groupKey);
+      attributesDiv.className = 'tree-children expanded';
+      const expandBtn = groupDiv.querySelector('.tree-expand-btn');
+      expandBtn.className = 'tree-expand-btn expanded';
+    }
+    
+    // Convert attribute values to inputs
+    const attrItems = attributesDiv.querySelectorAll('.tree-item');
+    attrItems.forEach(attrItem => {
+      const attrValueDiv = attrItem.querySelector('.tree-param-value');
+      const attrName = attrValueDiv.dataset.attrName;
+      const currentValue = attrValueDiv.textContent;
+      
+      // Get attribute definition to know the type
+      const [labelName, groupId] = groupKey.split('_');
+      const label = Array.from(labels.values()).find(l => l.name === labelName);
+      
+      if (label && label.groupConfig) {
+        const attrDef = label.groupConfig.groupAttributes.get(attrName);
+        
+        let input;
+        if (attrDef.type === 'string') {
+          input = document.createElement('input');
+          input.type = 'text';
+          input.value = currentValue;
+          input.style.background = 'var(--bg)';
+          input.style.color = 'var(--text)';
+          input.style.border = '1px solid var(--border)';
+          input.style.borderRadius = '4px';
+          input.style.padding = '2px 6px';
+          input.style.fontSize = '11px';
+          input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+        } else if (attrDef.type === 'checkbox') {
+          input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = currentValue === '✓';
+        } else if (attrDef.type === 'dropdown') {
+          input = document.createElement('select');
+          input.style.background = 'var(--bg)';
+          input.style.color = 'var(--text)';
+          input.style.border = '1px solid var(--border)';
+          input.style.borderRadius = '4px';
+          input.style.padding = '2px 6px';
+          input.style.fontSize = '11px';
+          input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+          
+          attrDef.options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            if (opt === currentValue) option.selected = true;
+            input.appendChild(option);
+          });
+        }
+        
+        input.dataset.attrName = attrName;
+        attrValueDiv.textContent = '';
+        attrValueDiv.appendChild(input);
+      }
+    });
+    
+  } else {
+    // Save and switch back to display mode
+    const [labelName, groupId] = groupKey.split('_');
+    
+    // Collect new values
+    const newValues = new Map();
+    const inputs = attributesDiv.querySelectorAll('input, select');
+    inputs.forEach(input => {
+      const attrName = input.dataset.attrName;
+      let value;
+      
+      if (input.type === 'checkbox') {
+        value = input.checked ? 'true' : 'false';
+      } else {
+        value = input.value;
+      }
+      
+      newValues.set(attrName, value);
+    });
+    
+    // Update all labels with this group ID
+    updateGroupInDocument(labelName, groupId, newValues);
+    
+    // Refresh the display
+    groupDiv.dataset.editing = 'false';
+    modifyBtn.title = 'Modify group attributes';
+    modifyBtn.classList.remove('save-active');
+    
+    refreshGroupsDisplay();
+  }
+}
+
+function updateGroupInDocument(labelName, groupId, newValues) {
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  
+  labelElements.forEach(labelEl => {
+    const elLabelName = labelEl.getAttribute('labelName');
+    
+    if (elLabelName === labelName) {
+      const parent = labelEl.getAttribute('parent') || '';
+      const path = parent ? [parent, labelName] : [labelName];
+      const label = getLabelByPath(path);
+      
+      if (label && label.groupConfig) {
+        const elGroupId = labelEl.getAttribute(label.groupConfig.groupIdAttribute);
+        
+        if (elGroupId === groupId) {
+          // Update this element's group attributes
+          newValues.forEach((value, attrName) => {
+            labelEl.setAttribute(attrName, value);
+          });
+        }
+      }
+    }
+  });
+  
+  updateCurrentHtmlFromDOM();
+  updateStats();
+}
 
   // ======= Label Options for Context Menu =======
 
@@ -1273,8 +2147,6 @@ function applySourceChanges() {
 
   // ======= HTML Processing =======
   function extractExistingLabels(htmlString) {
-  labels.clear();
-
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, "text/html");
 
@@ -1294,40 +2166,187 @@ function applySourceChanges() {
     }
   }
 
-  // 2. If schema found, build labels
+  // 2. If schema found, clear existing labels and build from schema
   if (schema) {
+    console.log("HTMLLabelizer schema found - rebuilding label tree from document");
+    labels.clear();
     buildLabelsFromSchema(schema);
+    // 3. Parse existing manual_label elements and populate group attributes
+    populateGroupAttributesFromExistingLabels(doc);
+
+    refreshTreeUI();
+  } else {
+    console.log("No HTMLLabelizer schema found - preserving existing label tree");
+    // If no schema found, preserve the existing tree
+    // Only refresh the UI without clearing labels
+    if (labels.size > 0) {
+      refreshTreeUI();
+    }
   }
 
-  refreshTreeUI();
+  
+}
+
+// Replace the populateGroupAttributesFromExistingLabels function with this:
+function populateGroupAttributesFromExistingLabels(doc) {
+  // Don't modify the document here - just extract group info
+  // The actual syncing will happen when the user interacts with groups
+  
+  // This function should only be used during initial parsing
+  // to preserve existing group attribute values if they exist
+}
+
+// The correct extractExistingLabels function is defined above - this duplicate has been removed
+
+// Update collectActiveGroups to handle empty/undefined group IDs:
+function collectActiveGroups() {
+  const groups = new Map();
+  
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  
+  labelElements.forEach(labelEl => {
+    const labelName = labelEl.getAttribute('labelName');
+    const parent = labelEl.getAttribute('parent') || '';
+    const path = parent ? [parent, labelName] : [labelName];
+    const label = getLabelByPath(path);
+    
+    if (label && label.groupConfig && label.groupConfig.groupIdAttribute) {
+      const groupIdAttr = label.groupConfig.groupIdAttribute;
+      
+      // Check if element has the group ID attribute (even if empty)
+      if (labelEl.hasAttribute(groupIdAttr)) {
+        const groupId = labelEl.getAttribute(groupIdAttr) || 'undefined';
+        const groupKey = `${labelName}_${groupId}`;
+        
+        if (!groups.has(groupKey)) {
+          const values = new Map();
+          
+          // Collect FIRST occurrence of each group attribute value
+          label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+            // Find first element with this group ID that has a value for this attribute
+            const firstValueElement = Array.from(labelElements).find(el => {
+              const elLabelName = el.getAttribute('labelName');
+              const elParent = el.getAttribute('parent') || '';
+              const elGroupId = el.getAttribute(groupIdAttr);
+              
+              if (elLabelName === labelName && elParent === parent && elGroupId === groupId) {
+                const value = el.getAttribute(attrName);
+                return value !== null && value.trim() !== '';
+              }
+              return false;
+            });
+            
+            const firstValue = firstValueElement 
+              ? firstValueElement.getAttribute(attrName) 
+              : (attrDef.default || '');
+            
+            values.set(attrName, firstValue);
+          });
+          
+          groups.set(groupKey, {
+            labelName,
+            groupId,
+            groupIdAttr,
+            groupAttributes: label.groupConfig.groupAttributes,
+            values
+          });
+        }
+      }
+    }
+  });
+  
+  return groups;
+}
+
+function buildSchemaFromLabels(map) {
+  const obj = {};
+  map.forEach(label => {
+    const attributes = {};
+    
+    // Process all regular parameters
+    label.params.forEach((paramDef, paramName) => {
+      let groupRole = "regular";
+      
+      // Check if this is the group ID
+      if (label.groupConfig && label.groupConfig.groupIdAttribute === paramName) {
+        groupRole = "groupID";
+      }
+      
+      attributes[paramName] = {
+        ...paramDef,
+        groupRole: groupRole
+      };
+    });
+    
+    // Add group attributes
+    if (label.groupConfig && label.groupConfig.groupAttributes) {
+      label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+        attributes[attrName] = {
+          ...attrDef,
+          groupRole: "groupAttribute"
+        };
+      });
+    }
+    
+    obj[label.name] = {
+      color: label.color,
+      sublabels: buildSchemaFromLabels(label.sublabels),
+      attributes: attributes
+    };
+  });
+  return obj;
 }
 
 function buildLabelsFromSchema(schema, parent = null, map = labels) {
   Object.entries(schema).forEach(([name, def]) => {
-  // prepare params
-  const paramsMap = new Map();
-  if (def.attributes && typeof def.attributes === "object") {
-    Object.entries(def.attributes).forEach(([pname, pdef]) => {
-      paramsMap.set(pname, pdef);
-    });
-  }
+    const paramsMap = new Map();
+    let groupConfig = null;
+    let groupIdAttribute = null;
+    const groupAttributes = new Map();
+    
+    // Process attributes and separate them by groupRole
+    if (def.attributes && typeof def.attributes === "object") {
+      Object.entries(def.attributes).forEach(([pname, pdef]) => {
+        const { groupRole, ...paramDef } = pdef;
+        
+        if (groupRole === "groupID") {
+          // This is the group ID parameter
+          groupIdAttribute = pname;
+          paramsMap.set(pname, paramDef);
+        } else if (groupRole === "groupAttribute") {
+          // This is a group attribute
+          groupAttributes.set(pname, paramDef);
+        } else {
+          // Regular parameter
+          paramsMap.set(pname, paramDef);
+        }
+      });
+    }
+    
+    // Build group config if we have a group ID
+    if (groupIdAttribute) {
+      groupConfig = {
+        groupIdAttribute: groupIdAttribute,
+        groupAttributes: groupAttributes
+      };
+    }
 
-  const labelObj = {
-    name,
-    color: def.color || generateRandomColor(),
-    type: "structured",
-    params: paramsMap,
-    sublabels: new Map(),
-    parent,
-  };
+    const labelObj = {
+      name,
+      color: def.color || generateRandomColor(),
+      type: "structured",
+      params: paramsMap,
+      sublabels: new Map(),
+      parent,
+      groupConfig
+    };
 
-  map.set(name, labelObj);
+    map.set(name, labelObj);
 
-  if (def.sublabels && Object.keys(def.sublabels).length > 0) {
-    buildLabelsFromSchema(def.sublabels, name, labelObj.sublabels);
-  }
-});
-
+    if (def.sublabels && Object.keys(def.sublabels).length > 0) {
+      buildLabelsFromSchema(def.sublabels, name, labelObj.sublabels);
+    }
+  });
 }
 
 
@@ -1393,6 +2412,8 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     
     attachLabelEventListeners();
     updateStats();
+
+     refreshGroupsDisplay()
   }
 
   function attachLabelEventListeners() {
@@ -1914,6 +2935,19 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
     labelElement.setAttribute(paramName, initialValue);
   });
   
+  // Apply group attributes (silver attributes) with their default values
+  if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
+    labelData.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+      let initialValue = "";
+      if (typeof attrDef === "object" && attrDef.type) {
+        initialValue = attrDef.default ?? "";
+      } else {
+        initialValue = attrDef;
+      }
+      labelElement.setAttribute(attrName, initialValue);
+    });
+  }
+  
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
 
@@ -2041,6 +3075,19 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
     labelElement.setAttribute(paramName, initialValue);
   });
   
+  // Apply group attributes (silver attributes) with their default values
+  if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
+    labelData.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+      let initialValue = "";
+      if (typeof attrDef === "object" && attrDef.type) {
+        initialValue = attrDef.default ?? "";
+      } else {
+        initialValue = attrDef;
+      }
+      labelElement.setAttribute(attrName, initialValue);
+    });
+  }
+  
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
 
@@ -2084,6 +3131,19 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
     }
     labelElement.setAttribute(paramName, initialValue);
   });
+  
+  // Apply group attributes (silver attributes) with their default values
+  if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
+    labelData.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+      let initialValue = "";
+      if (typeof attrDef === "object" && attrDef.type) {
+        initialValue = attrDef.default ?? "";
+      } else {
+        initialValue = attrDef;
+      }
+      labelElement.setAttribute(attrName, initialValue);
+    });
+  }
   
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -2307,6 +3367,21 @@ function cloneAdvancedStructure() {
           label.setAttribute(paramName, defaultValue);
         }
       });
+      
+      // Ensure all group attributes are set correctly
+      if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
+        labelData.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+          if (!label.hasAttribute(attrName)) {
+            let defaultValue = "";
+            if (typeof attrDef === "object" && attrDef.type) {
+              defaultValue = attrDef.default ?? "";
+            } else {
+              defaultValue = attrDef;
+            }
+            label.setAttribute(attrName, defaultValue);
+          }
+        });
+      }
     }
   });
   
@@ -2777,6 +3852,7 @@ function clearSearchHighlights() {
       
       extractExistingLabels(currentHtml);
       renderHtmlContent();
+      refreshGroupsDisplay(); // Update groups display after parsing
       elements.downloadBtn.disabled = false;
       elements.viewToggle.disabled = false;
 
@@ -2838,7 +3914,7 @@ function clearSearchHighlights() {
   });
 
   // Download
-  elements.downloadBtn.addEventListener('click', () => {
+elements.downloadBtn.addEventListener('click', () => {
   if (!currentHtml) return;
 
   const parser = new DOMParser();
@@ -2849,20 +3925,8 @@ function clearSearchHighlights() {
   deleteButtons.forEach(button => button.remove());
 
   // 2. Build JSON schema from your current labels tree
-  function buildSchemaFromLabels(map) {
-    const obj = {};
-    map.forEach(label => {
-      obj[label.name] = {
-        color: label.color,
-        sublabels: buildSchemaFromLabels(label.sublabels),
-        attributes: Object.fromEntries(label.params || []),
-      };
-    });
-    return obj;
-  }
-
   const schema = buildSchemaFromLabels(labels);
-  const schemaJson = JSON.stringify(schema, null, 2); // pretty print
+  const schemaJson = JSON.stringify(schema, null, 2);
 
   // 3. Find existing HTMLLabelizer comment
   let found = false;
@@ -3220,6 +4284,8 @@ elements.clearAdvancedLabels.addEventListener('click', () => {
   updateStats();
 });
 
+elements.htmlContent.addEventListener('DOMSubtreeModified', refreshGroupsDisplay);
+
 
 // When a click occurs, store the coordinates
 window.addEventListener('click', (event) => {
@@ -3229,6 +4295,7 @@ window.addEventListener('click', (event) => {
 
   // ======= Initialize =======
   elements.newLabelColor.value = generateRandomColor();
+  initializeGroupsHeader();
   refreshTreeUI();
   console.log('Enhanced HTML Labelizer ready!');
 })();
