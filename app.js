@@ -6,10 +6,17 @@
   let sourceViewModified = false;
   const labels = new Map(); // name -> {color, type, sublabels, params}
   const activeGroups = new Map(); // groupId -> { labelName, groupAttributes: Map }
-  let currentSelection = null;
+  // ======= COMPLETE SEPARATION OF SELECTION TYPES =======
+  let currentSelection = null; // For user mouse selections in HTML content
+  let currentSearchSelection = null; // For search matches in HTML content - ONLY used by Apply button
+  let currentAdvancedMouseSelection = null; // For user mouse selections in advanced content - PURELY advanced content
   let expandedNodes = new Set(); // Track expanded tree nodes
   let selectedNode = null; // Track selected tree node
   let currentParamElement = null; // Track element being edited for parameters
+  
+  // ======= Search Overlay State =======
+  let searchOverlays = []; // Array of overlay elements for highlighting
+  let currentSearchMatches = []; // Array of match data
   
   // ======= Group Display State =======
   let expandedGroups = new Set(); // Track expanded groups
@@ -2097,6 +2104,15 @@ function toggleView() {
   // Re-render content
   renderHtmlContent();
   
+  // If switching back to rendered view and there's text in advanced content, restore search
+  if (!isSourceView) {
+    const advancedText = getCleanAdvancedText();
+    if (advancedText) {
+      console.log('Restoring search after view toggle');
+      searchInHtmlContent(advancedText);
+    }
+  }
+  
   // Apply scroll position to new view after a small delay
   setTimeout(() => {
     if (isSourceView) {
@@ -2513,6 +2529,26 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
 
           attachLabelEventListeners();
           updateStats();
+          refreshGroupsDisplay();
+          
+          // Refresh search if there's text in advanced content, preserving current match position
+          const advancedText = getCleanAdvancedText();
+          if (advancedText) {
+            const currentMatchIndex = currentSearchSelection?.matchIndex ?? 0;
+            console.log('Refreshing search after label deletion, preserving match index:', currentMatchIndex);
+            
+            // Re-run search
+            const matches = searchInHtmlContent(advancedText);
+            
+            // Try to preserve the current match position
+            if (matches.length > 0 && currentMatchIndex < matches.length) {
+              setCurrentSearchSelection(matches[currentMatchIndex], currentMatchIndex);
+            } else if (matches.length > 0) {
+              // If current index is out of bounds, go to the last available match
+              const lastIndex = matches.length - 1;
+              setCurrentSearchSelection(matches[lastIndex], lastIndex);
+            }
+          }
         };
       }
 
@@ -2583,6 +2619,12 @@ function updateStats() {
 
   function hideContextMenu() {
     elements.contextMenu.classList.add('hidden');
+  }
+
+  function clearAllSelections() {
+    currentSelection = null;
+    currentAdvancedMouseSelection = null;
+    // Note: We don't clear currentSearchSelection here as it should persist until explicitly cleared
   }
 
   // Validation function to check if selection crosses manual_label boundaries
@@ -2898,13 +2940,15 @@ function applyLabelToSelection(labelPath, labelData) {
     return;
   }
 
-  // Original single selection logic
-  if (!currentSelection || !currentSelection.range) return;
+  // Priority: Advanced mouse selection > Regular mouse selection
+  // NOTE: Search selections should ONLY be used via applyAdvancedLabels(), NOT for direct labeling
+  let targetSelection = currentAdvancedMouseSelection || currentSelection;
+  if (!targetSelection || !targetSelection.range) return;
 
   hideContextMenu();
 
   try {
-    const range = currentSelection.range;
+    const range = targetSelection.range;
     const selectedText = range.toString().trim();
     if (!selectedText) return;
 
@@ -2914,20 +2958,25 @@ function applyLabelToSelection(labelPath, labelData) {
       return;
     }
 
-    const previousMatchIndex = currentSelection.matchIndex;
-    const wasAdvanced = currentSelection.isAdvanced;
+    const wasAdvancedMouseSelection = !!currentAdvancedMouseSelection;
 
     let labelElement = null;
 
-    if (currentSelection.isAdvanced) {
+    if (wasAdvancedMouseSelection) {
+      console.log('Applying label to advanced content mouse selection');
+      // This is a manual mouse selection in advanced content - PURELY advanced content
       labelElement = applyLabelToAdvancedContent(range, labelPath, labelData);
-      if (window.currentSearchMatches && window.currentSearchMatches.length > 0) {
-        setTimeout(() => {
-          restoreOrFindNextSelection(previousMatchIndex);
-        }, 10);
-      }
+      currentAdvancedMouseSelection = null; // Clear the advanced mouse selection
+    } else if (currentSelection && currentSelection.isAdvanced) {
+      console.log('Applying label to advanced content selection (legacy)');
+      // This is an advanced content selection (legacy fallback) - PURELY advanced content
+      labelElement = applyLabelToAdvancedContent(range, labelPath, labelData);
+      currentSelection = null; // Clear the selection
     } else {
+      console.log('Applying label to HTML content selection');
+      // This is a regular HTML content selection  
       labelElement = applyLabelToHtmlContent(range, labelPath, labelData);
+      currentSelection = null; // Clear the selection
     }
 
     if (labelElement) {
@@ -2943,38 +2992,15 @@ function applyLabelToSelection(labelPath, labelData) {
 }
 
 
-function restoreOrFindNextSelection(previousMatchIndex) {
-  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
-    currentSelection = null;
-    return;
-  }
-
-  // Try to find a valid highlight at or after the previous position
-  let targetIndex = previousMatchIndex || 0;
-  let attempts = 0;
-  
-  while (attempts < window.currentSearchMatches.length) {
-    const highlight = elements.htmlContent.querySelector(`[data-match-index="${targetIndex}"]`);
-    if (highlight) {
-      setCurrentSelection(window.currentSearchMatches[targetIndex], targetIndex);
-      return;
-    }
-    targetIndex = (targetIndex + 1) % window.currentSearchMatches.length;
-    attempts++;
-  }
-  
-  // If no highlights found, clear selection
-  currentSelection = null;
-}
+// Old restoreOrFindNextSelection function removed - now using navigateToNextMatch
 
 function applyLabelToAdvancedContent(range, labelPath, labelData) {
+  console.log('applyLabelToAdvancedContent: Working PURELY in advanced content - no HTML content interaction');
+  
   const selectedText = range.toString().trim();
   if (!selectedText) return;
 
-  // Store current match info before applying label
-  const currentMatchIndex = currentSelection?.matchIndex;
-
-  // Create the label element (same as HTML content)
+  // Create the label element - ONLY for advanced content, no connection to HTML content
   const labelElement = document.createElement("manual_label");
 
   // Set attributes
@@ -3034,7 +3060,9 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   
   // Attach event listeners for advanced content
   attachAdvancedLabelEventListeners();
-  updateStats();
+  
+  // Note: We don't call updateStats() here because this is purely advanced content
+  // Stats will be updated when labels are applied to HTML content via applyAdvancedLabels()
 
   return labelElement;
 }
@@ -3060,7 +3088,7 @@ function attachAdvancedLabelEventListeners() {
         }
 
         attachAdvancedLabelEventListeners();
-        updateStats();
+        // Note: We don't call updateStats() here because this is purely advanced content manipulation
       };
     }
 
@@ -3245,9 +3273,13 @@ function preserveFormattingInLabel(fragment) {
 
 
   // ======= Advanced Labeling =================================================
+  // This function is the ONLY bridge between advanced content and HTML content
+  // It takes the labeled structure from advanced content and applies it to the current search selection in HTML content
 function applyAdvancedLabels() {
-  if (!currentSelection || !currentSelection.range) {
-    alert("No current selection. Please navigate to a match first.");
+  console.log('applyAdvancedLabels: Starting - this is the ONLY bridge between advanced and HTML content');
+  
+  if (!currentSearchSelection) {
+    alert("No current search selection. Please navigate to a match first.");
     return;
   }
 
@@ -3257,71 +3289,67 @@ function applyAdvancedLabels() {
     return;
   }
 
-  // Store the current match info BEFORE applying labels
-  const currentMatchIndex = currentSelection.matchIndex;
-  const searchText = getCleanAdvancedText(); // Get the clean text from advanced content
+  const currentMatchIndex = currentSearchSelection.matchIndex;
+  const searchText = getCleanAdvancedText();
+  const match = currentSearchSelection.match;
 
   try {
-    // Get the selected text from the current selection
-    const selectedText = currentSelection.range.toString();
-    
-    // Get the clean advanced content text (what the user typed)
+    // Recreate the range from the stored match data to ensure it's fresh
+    if (!match || !match.node || !match.node.parentNode) {
+      alert("The selected match is no longer valid. Please navigate to another match.");
+      return;
+    }
+
+    const range = document.createRange();
+    try {
+      range.setStart(match.node, match.startOffset);
+      range.setEnd(match.node, match.endOffset);
+    } catch (e) {
+      alert("Could not create selection range. The text may have changed.");
+      console.error("Range creation error:", e);
+      return;
+    }
+
+    const selectedText = range.toString();
     const advancedText = getCleanAdvancedText();
     
-    // NEW VALIDATION: Check if ALL text is labeled by exactly ONE root label
     if (!isFullyLabeled()) {
-      alert("Please ensure all text is covered by exactly ONE main label in the advanced content. You cannot have multiple separate labels at the root level - all text must be within a single parent label (which can contain nested labels).");
+      alert("Please ensure all text is covered by exactly ONE main label in the advanced content.");
       return;
     }
     
-    // Verify that the selected text matches the advanced text
     if (normalizeText(selectedText) !== normalizeText(advancedText)) {
       alert(`Selected text "${selectedText}" doesn't match advanced content "${advancedText}"`);
       return;
     }
 
-    // Create the exact label structure by cloning and adapting the advanced content
     const labelStructure = cloneAdvancedStructure();
-    
-    // Apply the structure to the current selection
-    replaceSelectionWithStructure(currentSelection.range, labelStructure);
+    replaceSelectionWithStructure(range, labelStructure);
 
-    // Update currentHtml
     updateCurrentHtmlFromDOM();
-    
-    // Clear current selection
-    currentSelection = null;
-
-    // Re-search with the ORIGINAL search text to find next match
-    setTimeout(() => {
-      if (searchText && searchText.length >= MIN_SEARCH_LENGTH) {
-        const matches = searchInHtmlContent(searchText);
-        
-        if (matches.length > 0) {
-          const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
-            .map(h => ({
-              element: h,
-              index: parseInt(h.dataset.matchIndex)
-            }))
-            .filter(h => !isNaN(h.index))
-            .sort((a, b) => a.index - b.index);
-
-          if (availableHighlights.length > 0) {
-            let targetHighlight = availableHighlights.find(h => h.index >= currentMatchIndex);
-            
-            if (!targetHighlight) {
-              targetHighlight = availableHighlights[0];
-            }
-            
-            setCurrentSelection(matches[targetHighlight.index], targetHighlight.index);
-          }
-        }
-      }
-    }, 10);
-
-    window.getSelection().removeAllRanges();
     attachLabelEventListeners();
     updateStats();
+    
+    // Re-search and navigate to next available match
+    setTimeout(() => {
+      const matches = searchInHtmlContent(searchText);
+      
+      if (matches.length > 0) {
+        // Find next match after the current one
+        let nextIndex = 0;
+        // Look for first match with index >= current
+        for (let i = 0; i < matches.length; i++) {
+          if (i >= currentMatchIndex) {
+            nextIndex = i;
+            break;
+          }
+        }
+        setCurrentSearchSelection(matches[nextIndex], nextIndex);
+      } else {
+        currentSearchSelection = null;
+        clearSearchOverlays();
+      }
+    }, 100);
 
     console.log("Labels applied successfully");
     
@@ -3501,16 +3529,16 @@ function addDeleteButtonToLabel(labelElement) {
   
 function searchInHtmlContent(searchText) {
   if (!currentHtml || !searchText) {
-    clearSearchHighlights();
-    currentSelection = null;
+    clearSearchOverlays();
+    currentSearchSelection = null;
     return [];
   }
   
-  // Store current selection info before clearing highlights
-  const previousMatchIndex = currentSelection?.matchIndex ?? 0;
+  // Store current selection info before clearing overlays
+  const previousMatchIndex = currentSearchSelection?.matchIndex ?? 0;
   
-  // Clear highlights BEFORE searching
-  clearSearchHighlights();
+  // Clear overlays BEFORE searching
+  clearSearchOverlays();
   
   // Update currentHtml to reflect current DOM state (including new labels)
   updateCurrentHtmlFromDOM();
@@ -3519,33 +3547,20 @@ function searchInHtmlContent(searchText) {
   const matches = findTextMatches(elements.htmlContent, searchText);
   console.log(`Found ${matches.length} matches for "${searchText}"`);
   
-  // Highlight matches
-  highlightMatches(matches);
+  // Create overlay highlights for matches
+  createSearchOverlays(matches);
   
-  // Try to find the first available highlight for navigation
+  // Set current search selection
   if (matches.length > 0) {
-    // Get all current highlights in document order
-    const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
-      .map(h => ({
-        element: h,
-        index: parseInt(h.dataset.matchIndex)
-      }))
-      .filter(h => !isNaN(h.index))
-      .sort((a, b) => a.index - b.index); // Sort by match index (document order)
-    
-    if (availableHighlights.length > 0) {
-      // Try to find a highlight at or after the previous position
-      let targetHighlight = availableHighlights.find(h => h.index >= previousMatchIndex);
-      
-      // If no match found after previous position, use the first available
-      if (!targetHighlight) {
-        targetHighlight = availableHighlights[0];
-      }
-      
-      setCurrentSelection(matches[targetHighlight.index], targetHighlight.index);
+    // Try to find a match at or after the previous position
+    let targetIndex = previousMatchIndex;
+    if (targetIndex >= matches.length) {
+      targetIndex = 0;
     }
+    
+    setCurrentSearchSelection(matches[targetIndex], targetIndex);
   } else {
-    currentSelection = null;
+    currentSearchSelection = null;
   }
   
   return matches;
@@ -3565,75 +3580,185 @@ function updateCurrentHtmlFromDOM() {
   currentHtml = doc.documentElement.outerHTML;
 }
 
-function setCurrentSelection(match, matchIndex) {
-  try {
-    const highlightedElement = elements.htmlContent.querySelector(`[data-match-index="${matchIndex}"]`);
-    
-    if (!highlightedElement) {
-      console.error('Could not find highlighted element for match index:', matchIndex);
-      // Try to find any available highlight
-      const anyHighlight = elements.htmlContent.querySelector('.search-highlight');
-      if (anyHighlight) {
-        const anyIndex = parseInt(anyHighlight.dataset.matchIndex) || 0;
-        setCurrentSelection(window.currentSearchMatches[anyIndex], anyIndex);
-        return;
+// ======= Overlay-based Search Highlighting System =======
+
+function createSearchOverlays(matches) {
+  clearSearchOverlays();
+  
+  currentSearchMatches = matches;
+  
+  matches.forEach((match, index) => {
+    try {
+      const overlay = createOverlayForMatch(match, index);
+      if (overlay) {
+        searchOverlays.push(overlay);
+        // Append to the scrollable container's parent for proper positioning
+        elements.htmlContent.appendChild(overlay);
       }
-      currentSelection = null;
+    } catch (error) {
+      console.warn('Could not create overlay for match:', error, match);
+    }
+  });
+}
+
+function createOverlayForMatch(match, index) {
+  const range = document.createRange();
+  range.setStart(match.node, match.startOffset);
+  range.setEnd(match.node, match.endOffset);
+  
+  const rect = range.getBoundingClientRect();
+  const containerRect = elements.htmlContent.getBoundingClientRect();
+  
+  const overlay = document.createElement('div');
+  overlay.className = 'search-overlay';
+  overlay.dataset.matchIndex = index;
+  
+  // Position relative to the container's content area
+  overlay.style.position = 'absolute';
+  overlay.style.left = (rect.left - containerRect.left + elements.htmlContent.scrollLeft) + 'px';
+  overlay.style.top = (rect.top - containerRect.top + elements.htmlContent.scrollTop) + 'px';
+  overlay.style.width = rect.width + 'px';
+  overlay.style.height = rect.height + 'px';
+  overlay.style.backgroundColor = '#ffff00';
+  overlay.style.opacity = '0.4';
+  overlay.style.borderRadius = '2px';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.zIndex = '100';
+  overlay.style.transition = 'opacity 0.2s ease, background-color 0.2s ease';
+  
+  return overlay;
+}
+
+function setCurrentSearchSelection(match, matchIndex) {
+  try {
+    // Validate that the node still exists in the document
+    if (!match.node || !match.node.parentNode) {
+      console.warn('Match node no longer in document, skipping');
       return;
     }
     
-    // Create range that selects the text content
     const range = document.createRange();
+    range.setStart(match.node, match.startOffset);
+    range.setEnd(match.node, match.endOffset);
     
-    if (highlightedElement.childNodes.length === 1 && 
-        highlightedElement.firstChild.nodeType === Node.TEXT_NODE) {
-      range.selectNodeContents(highlightedElement);
-    } else {
-      range.selectNode(highlightedElement);
-    }
-    
-    currentSelection = {
+    currentSearchSelection = {
       range: range,
-      isAdvanced: false,
       matchIndex: matchIndex,
-      text: highlightedElement.textContent,
-      highlightElement: highlightedElement
+      text: match.text,
+      match: match  // Store the complete match object for later recreation
     };
     
-    updateCurrentSelectionHighlight(matchIndex);
+    updateCurrentSearchSelectionHighlight(matchIndex);
+    scrollToCurrentSelection();
     
-    console.log(`Current selection set to match ${matchIndex}: "${currentSelection.text}"`);
+    console.log(`Current search selection set to match ${matchIndex}: "${currentSearchSelection.text}"`);
   } catch (error) {
-    console.error('Error setting current selection:', error);
-    currentSelection = null;
+    console.error('Error setting current search selection:', error);
+    currentSearchSelection = null;
   }
 }
 
-function updateCurrentSelectionHighlight(currentIndex) {
-  // Remove current selection styling from all highlights
-  const allHighlights = elements.htmlContent.querySelectorAll('.search-highlight');
-  allHighlights.forEach(highlight => {
-    highlight.classList.remove('current-selection');
-    highlight.style.backgroundColor = '#ffff00';
-    highlight.style.border = 'none';
-  });
+function scrollToCurrentSelection() {
+  if (!currentSearchSelection) return;
   
-  // Add current selection styling to the current match
-  const currentHighlight = elements.htmlContent.querySelector(`[data-match-index="${currentIndex}"]`);
-  if (currentHighlight) {
-    currentHighlight.classList.add('current-selection');
-    currentHighlight.style.backgroundColor = '#ff6b35';
-    currentHighlight.style.border = '2px solid #ff4500';
-    currentHighlight.style.boxShadow = '0 0 4px rgba(255, 69, 0, 0.5)';
+  try {
+    const range = currentSearchSelection.range;
+    const rect = range.getBoundingClientRect();
+    const containerRect = elements.htmlContent.getBoundingClientRect();
     
-    // Scroll the current selection into view
-    currentHighlight.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-      inline: 'nearest'
-    });
+    // Check if selection is visible
+    if (rect.bottom < containerRect.top || rect.top > containerRect.bottom) {
+      // Calculate scroll position to center the selection
+      const targetScrollTop = elements.htmlContent.scrollTop + 
+        (rect.top - containerRect.top) - (containerRect.height / 2);
+      
+      elements.htmlContent.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      });
+    }
+  } catch (error) {
+    console.warn('Could not scroll to selection:', error);
   }
 }
+
+function updateCurrentSearchSelectionHighlight(currentIndex) {
+  // Reset all overlays to default appearance
+  searchOverlays.forEach(overlay => {
+    overlay.style.backgroundColor = '#ffff00';
+    overlay.style.opacity = '0.4';
+    overlay.style.border = 'none';
+    overlay.style.boxShadow = 'none';
+  });
+  
+  // Highlight the current selection
+  const currentOverlay = searchOverlays.find(overlay => 
+    parseInt(overlay.dataset.matchIndex) === currentIndex
+  );
+  
+  if (currentOverlay) {
+    currentOverlay.style.backgroundColor = '#ff6b35';
+    currentOverlay.style.opacity = '0.7';
+    currentOverlay.style.border = '2px solid #ff4500';
+    currentOverlay.style.boxShadow = '0 0 4px rgba(255, 69, 0, 0.8)';
+    
+    // Scroll the current selection into view
+    const range = currentSearchSelection.range;
+    const rect = range.getBoundingClientRect();
+    const containerRect = elements.htmlContent.getBoundingClientRect();
+    
+    // Check if the selection is visible
+    if (rect.bottom < containerRect.top || rect.top > containerRect.bottom) {
+      // Scroll to make it visible
+      const targetScrollTop = elements.htmlContent.scrollTop + 
+        (rect.top - containerRect.top) - (containerRect.height / 2);
+      
+      elements.htmlContent.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      });
+    }
+  }
+}
+
+function clearSearchOverlays() {
+  searchOverlays.forEach(overlay => {
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+  });
+  searchOverlays = [];
+  currentSearchMatches = [];
+  currentSearchSelection = null;
+}
+
+// Update overlays when scrolling or resizing
+function updateSearchOverlayPositions() {
+  if (currentSearchMatches.length === 0 || searchOverlays.length === 0) return;
+  
+  currentSearchMatches.forEach((match, index) => {
+    const overlay = searchOverlays[index];
+    if (!overlay || !match.node.parentNode) return;
+    
+    try {
+      const range = document.createRange();
+      range.setStart(match.node, match.startOffset);
+      range.setEnd(match.node, match.endOffset);
+      
+      const rect = range.getBoundingClientRect();
+      const containerRect = elements.htmlContent.getBoundingClientRect();
+      
+      overlay.style.left = (rect.left - containerRect.left + elements.htmlContent.scrollLeft) + 'px';
+      overlay.style.top = (rect.top - containerRect.top + elements.htmlContent.scrollTop) + 'px';
+      overlay.style.width = rect.width + 'px';
+      overlay.style.height = rect.height + 'px';
+    } catch (error) {
+      console.warn('Could not update overlay position:', error);
+    }
+  });
+}
+
+// This function is now replaced by updateCurrentSearchSelectionHighlight in the overlay system
 
 
 
@@ -3776,124 +3901,41 @@ function highlightMatches(matches) {
   window.currentSearchMatches = matches;
 }
 
-// Simple clear function
-function clearSearchHighlights() {
-  const highlights = elements.htmlContent.querySelectorAll('.search-highlight');
-  highlights.forEach(highlight => {
-    // Check if highlight contains a manual_label
-    const manualLabel = highlight.querySelector('manual_label');
-    
-    if (manualLabel) {
-      // If highlight contains a label, replace highlight with the label
-      highlight.parentNode.replaceChild(manualLabel, highlight);
-    } else {
-      // Replace highlight with its content
-      const parent = highlight.parentNode;
-      const content = highlight.innerHTML;
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
-      
-      // Insert all content before the highlight
-      while (tempDiv.firstChild) {
-        parent.insertBefore(tempDiv.firstChild, highlight);
-      }
-      
-      // Remove the highlight
-      parent.removeChild(highlight);
-    }
-  });
-  
-  // Clean up empty tags like <i></i>
-  const emptyTags = elements.htmlContent.querySelectorAll('i:empty, b:empty, em:empty, strong:empty, u:empty, s:empty, del:empty, sup:empty, sub:empty');
-  emptyTags.forEach(tag => tag.remove());
-  
-  window.currentSearchMatches = [];
-  currentSelection = null;
-}
+// Old clearSearchHighlights function removed - now using clearSearchOverlays
 
 function navigateToNextMatch() {
-  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
+  if (!currentSearchMatches || currentSearchMatches.length === 0) {
     alert('No matches found to navigate to');
     return;
   }
   
-  const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
-    .map(h => ({
-      element: h,
-      index: parseInt(h.dataset.matchIndex)
-    }))
-    .filter(h => !isNaN(h.index))
-    .sort((a, b) => a.index - b.index);
+  const currentIndex = currentSearchSelection?.matchIndex ?? -1;
+  let nextIndex = currentIndex + 1;
   
-  if (availableHighlights.length === 0) {
-    alert('No more matches to navigate to');
-    currentSelection = null;
-    return;
+  if (nextIndex >= currentSearchMatches.length) {
+    nextIndex = 0; // Wrap to first match
   }
   
-  const currentIndex = currentSelection?.matchIndex ?? -1;
-  let nextHighlight = availableHighlights.find(h => h.index > currentIndex);
-  
-  if (!nextHighlight) {
-    nextHighlight = availableHighlights[0];
-  }
-  
-  setCurrentSelection(window.currentSearchMatches[nextHighlight.index], nextHighlight.index);
+  setCurrentSearchSelection(currentSearchMatches[nextIndex], nextIndex);
 }
 
 function navigateToPreviousMatch() {
-  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
+  if (!currentSearchMatches || currentSearchMatches.length === 0) {
     alert('No matches found to navigate to');
     return;
   }
   
-  const availableHighlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'))
-    .map(h => ({
-      element: h,
-      index: parseInt(h.dataset.matchIndex)
-    }))
-    .filter(h => !isNaN(h.index))
-    .sort((a, b) => a.index - b.index);
+  const currentIndex = currentSearchSelection?.matchIndex ?? currentSearchMatches.length;
+  let prevIndex = currentIndex - 1;
   
-  if (availableHighlights.length === 0) {
-    alert('No more matches to navigate to');
-    currentSelection = null;
-    return;
+  if (prevIndex < 0) {
+    prevIndex = currentSearchMatches.length - 1; // Wrap to last match
   }
   
-  const currentIndex = currentSelection?.matchIndex ?? Number.MAX_SAFE_INTEGER;
-  const reverseHighlights = [...availableHighlights].reverse();
-  let prevHighlight = reverseHighlights.find(h => h.index < currentIndex);
-  
-  if (!prevHighlight) {
-    prevHighlight = availableHighlights[availableHighlights.length - 1];
-  }
-  
-  setCurrentSelection(window.currentSearchMatches[prevHighlight.index], prevHighlight.index);
+  setCurrentSearchSelection(currentSearchMatches[prevIndex], prevIndex);
 }
 
-// Update the clear function to also clear current selection
-function clearSearchHighlights() {
-  const highlights = elements.htmlContent.querySelectorAll('.search-highlight');
-  highlights.forEach(highlight => {
-    // Check if highlight contains a manual_label
-    const manualLabel = highlight.querySelector('manual_label');
-    
-    if (manualLabel) {
-      // If highlight contains a label, replace highlight with the label
-      highlight.parentNode.replaceChild(manualLabel, highlight);
-    } else {
-      // If highlight only contains text, replace with text node
-      const parent = highlight.parentNode;
-      const textNode = document.createTextNode(highlight.textContent);
-      parent.replaceChild(textNode, highlight);
-      parent.normalize();
-    }
-  });
-  
-  window.currentSearchMatches = [];
-  currentSelection = null;
-}
+// Duplicate clearSearchHighlights function removed - now using clearSearchOverlays
 
   // ======= Event Listeners =======
   
@@ -4179,12 +4221,26 @@ document.addEventListener('mouseup', (e) => {
         return;
       } else if (!multiSelectionMode) {
         // Single selection mode
-        console.log('Single selection made:', selection.toString().trim());
-        currentSelection = {
-          text: selection.toString().trim(),
-          range: range.cloneRange(),
-          isAdvanced: isInAdvancedContent
-        };
+        if (isInAdvancedContent) {
+          console.log('Advanced content mouse selection made:', selection.toString().trim());
+          // Advanced content mouse selection - DON'T interfere with search selection
+          currentAdvancedMouseSelection = {
+            text: selection.toString().trim(),
+            range: range.cloneRange(),
+            isAdvanced: true
+          };
+          currentSelection = null; // Clear regular selection
+        } else {
+          console.log('HTML content mouse selection made:', selection.toString().trim());
+          // HTML content mouse selection - completely separate from search selections
+          currentSelection = {
+            text: selection.toString().trim(),
+            range: range.cloneRange(),
+            isAdvanced: false
+          };
+          currentAdvancedMouseSelection = null; // Clear advanced mouse selection
+          // NOTE: We don't touch currentSearchSelection - search selections are managed independently
+        }
         
         showContextMenu(e.clientX, e.clientY);
         return;
@@ -4203,6 +4259,9 @@ document.addEventListener('mouseup', (e) => {
   document.addEventListener('mousedown', (e) => {
     if (!elements.contextMenu.contains(e.target)) {
       hideContextMenu();
+      // Clear mouse selections when hiding context menu (but preserve search selection)
+      currentSelection = null;
+      currentAdvancedMouseSelection = null;
     }
     if (!elements.paramMenu.contains(e.target)) {
       hideParameterMenu();
@@ -4219,6 +4278,9 @@ document.addEventListener('mouseup', (e) => {
     if (e.key === 'Escape') {
       hideContextMenu();
       hideParameterMenu();
+      // Clear mouse selections but preserve search selection
+      currentSelection = null;
+      currentAdvancedMouseSelection = null;
     }
   });
 
@@ -4311,6 +4373,10 @@ document.addEventListener('keyup', (e) => {
 window.addEventListener('scroll', updateMultiSelectionOverlays);
 window.addEventListener('resize', updateMultiSelectionOverlays);
 
+// Also update search overlays on scroll and resize
+elements.htmlContent.addEventListener('scroll', updateSearchOverlayPositions);
+window.addEventListener('resize', updateSearchOverlayPositions);
+
 
 elements.advancedContent.addEventListener('input', () => {
   const searchText = elements.advancedContent.textContent.trim().replace(/×.*$/, '');
@@ -4320,7 +4386,7 @@ elements.advancedContent.addEventListener('input', () => {
   
   // If search text is too short, clear highlights and return
   if (searchText.length < MIN_SEARCH_LENGTH) {
-    clearSearchHighlights();
+    clearSearchOverlays();
     return;
   }
   
@@ -4330,7 +4396,7 @@ elements.advancedContent.addEventListener('input', () => {
       console.log('Searching for:', searchText);
       searchInHtmlContent(searchText);
     } else {
-      clearSearchHighlights();
+      clearSearchOverlays();
     }
   }, SEARCH_DEBOUNCE_MS);
 });
@@ -4348,7 +4414,7 @@ elements.navigateNext.addEventListener('click', () => {
 });
 
 elements.applyAllAdvanced.addEventListener('click', () => {
-  if (!window.currentSearchMatches || window.currentSearchMatches.length === 0) {
+  if (!currentSearchMatches || currentSearchMatches.length === 0) {
     alert('No matches found');
     return;
   }
@@ -4368,35 +4434,26 @@ elements.applyAllAdvanced.addEventListener('click', () => {
   // Store the search text for re-searching at the end
   const searchText = getCleanAdvancedText();
   
-  // Get all current highlights
-  const highlights = Array.from(elements.htmlContent.querySelectorAll('.search-highlight'));
+  // Apply to all current search matches
   let totalApplied = 0;
   let skipped = 0;
   
-  highlights.forEach(highlight => {
+  currentSearchMatches.forEach((match, index) => {
     try {
-      // Set current selection to this highlight
-      const matchIndex = parseInt(highlight.dataset.matchIndex) || 0;
+      // Create range for this match
       const range = document.createRange();
-      range.selectNodeContents(highlight);
+      range.setStart(match.node, match.startOffset);
+      range.setEnd(match.node, match.endOffset);
       
-      // Verify the highlighted text matches the advanced content
-      const highlightedText = highlight.textContent;
+      // Verify the match text matches the advanced content
+      const matchText = match.text;
       const advancedText = getCleanAdvancedText();
       
-      if (normalizeText(highlightedText) !== normalizeText(advancedText)) {
-        console.warn(`Skipping highlight ${matchIndex}: text mismatch`);
+      if (normalizeText(matchText) !== normalizeText(advancedText)) {
+        console.warn(`Skipping match ${index}: text mismatch`);
         skipped++;
         return;
       }
-      
-      currentSelection = {
-        range: range,
-        isAdvanced: false,
-        matchIndex: matchIndex,
-        text: highlightedText,
-        highlightElement: highlight
-      };
       
       // Create the label structure and apply it
       const labelStructure = cloneAdvancedStructure();
@@ -4405,7 +4462,7 @@ elements.applyAllAdvanced.addEventListener('click', () => {
       totalApplied++;
       
     } catch (e) {
-      console.warn('Could not apply label to highlight:', e);
+      console.warn('Could not apply label to match:', e);
       skipped++;
     }
   });
@@ -4413,8 +4470,8 @@ elements.applyAllAdvanced.addEventListener('click', () => {
   // Update currentHtml after all applications
   updateCurrentHtmlFromDOM();
   
-  // Clear current selection
-  currentSelection = null;
+  // Clear current search selection
+  currentSearchSelection = null;
   
   // Show results
   let message = `Applied labels to ${totalApplied} matches`;
@@ -4428,7 +4485,7 @@ elements.applyAllAdvanced.addEventListener('click', () => {
     if (searchText && searchText.length >= MIN_SEARCH_LENGTH) {
       searchInHtmlContent(searchText);
     } else {
-      clearSearchHighlights();
+      clearSearchOverlays();
     }
     
     // Refresh event listeners and stats
@@ -4440,14 +4497,7 @@ elements.applyAllAdvanced.addEventListener('click', () => {
 // Clear advanced content
 elements.clearAdvancedLabels.addEventListener('click', () => {
   elements.advancedContent.innerHTML = '';
-  clearSearchHighlights();
-  updateStats();
-});
-
-// Clear advanced content
-elements.clearAdvancedLabels.addEventListener('click', () => {
-  elements.advancedContent.innerHTML = '';
-  clearSearchHighlights();
+  clearSearchOverlays();
   updateStats();
 });
 

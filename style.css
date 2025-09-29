@@ -888,6 +888,20 @@
       display: none !important;
     }
 
+    /* Search Overlay System - Non-DOM highlighting like browser Ctrl+F */
+    .search-overlay {
+      position: absolute;
+      pointer-events: none;
+      z-index: 100;
+      border-radius: 2px;
+      transition: all 0.2s ease;
+    }
+
+    /* Make sure html-content container has relative positioning for overlays */
+    .html-content {
+      position: relative;
+    }
+
 
 
 
