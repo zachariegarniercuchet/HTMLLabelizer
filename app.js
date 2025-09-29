@@ -4197,10 +4197,28 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Control' || e.key === 'Meta') {
     if (!ctrlPressed) {
       ctrlPressed = true;
-      multiSelectionMode = true;
-      document.body.classList.add('multi-selection-mode');
-      
+      // Only activate multiselection mode if no other keys are pressed
+      // and we're not in an input field or the source view
+      if (!e.shiftKey && !e.altKey && 
+          !document.activeElement.matches('input, textarea, select') &&
+          !elements.sourceView.contains(document.activeElement)) {
+        // Delay activation slightly to allow for keyboard shortcuts like Ctrl+F
+        setTimeout(() => {
+          if (ctrlPressed && !document.activeElement.matches('input, textarea, select')) {
+            multiSelectionMode = true;
+            document.body.classList.add('multi-selection-mode');
+          }
+        }, 100);
+      }
     }
+  }
+  
+  // Check for common Ctrl combinations that should NOT activate multiselection
+  if ((e.ctrlKey || e.metaKey) && ['f', 'h', 'g', 's', 'z', 'y', 'a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
+    // These are browser shortcuts, don't activate multiselection mode
+    ctrlPressed = false;
+    multiSelectionMode = false;
+    document.body.classList.remove('multi-selection-mode');
   }
   
   // Existing escape key handling
