@@ -13,11 +13,12 @@
       <h1>HTML Labelizer</h1>
     </div>
     <div class="controls">
-      <div class="file-input" id="file-input-trigger">
-    <input type="file" id="html-file-input" accept=".html,.htm" style="display:none">
-    <label for="html-file-input" style="cursor:pointer;">Load HTML File</label>
-    </div>
-      <button id="download-html" disabled>Download Labeled HTML</button>
+      <div class="file-input">
+        <input type="file" id="html-file-input" accept=".html,.htm" style="display:none">
+        <button type="button" onclick="document.getElementById('html-file-input').click()">Load HTML File</button>
+      </div>
+      <button id="download-html" disabled>Download</button>
+      <button id="save-as" disabled>Save As...</button>
       <button id="clear-all">Clear All</button>
     </div>
   </div>

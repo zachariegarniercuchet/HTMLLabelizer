@@ -29,6 +29,7 @@
   const elements = {
     htmlFileInput: document.getElementById('html-file-input'),
     downloadBtn: document.getElementById('download-html'),
+    saveAsBtn: document.getElementById('save-as'),
     clearBtn: document.getElementById('clear-all'),
     htmlContent: document.getElementById('html-content'),
     currentFilename: document.getElementById('current-filename'),
@@ -3844,6 +3845,17 @@ function clearSearchHighlights() {
       currentHtml = await readFileAsText(file);
       currentFileName = file.name;
 
+      // Debug logging for file loading
+      console.log('=== FILE LOADING DEBUG ===');
+      console.log('File name:', file.name);
+      console.log('File size:', file.size, 'bytes');
+      console.log('File type:', file.type);
+      console.log('File last modified:', new Date(file.lastModified));
+      console.log('File webkitRelativePath:', file.webkitRelativePath || 'Not available');
+      console.log('Note: Browser security prevents access to the original file path');
+      console.log('Available file properties:', Object.getOwnPropertyNames(file));
+      console.log('=========================');
+
       // Reset source view state
       sourceViewModified = false;
       isSourceView = false;
@@ -3854,6 +3866,7 @@ function clearSearchHighlights() {
       renderHtmlContent();
       refreshGroupsDisplay(); // Update groups display after parsing
       elements.downloadBtn.disabled = false;
+      elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
 
       
@@ -3866,10 +3879,7 @@ function clearSearchHighlights() {
   }
   });
 
-  document.getElementById('upload-link').addEventListener('click', (e) => {
-    e.preventDefault(); // stop page jump
-    document.getElementById('html-file-input').click();
-  });
+  // Upload link removed - now using proper button in HTML
 
   // ✅ Gestion drag & drop
   ['dragenter', 'dragover'].forEach(eventName => {
@@ -3897,6 +3907,7 @@ function clearSearchHighlights() {
       currentHtml = await readFileAsText(file);
       currentFileName = file.name;
 
+
       sourceViewModified = false;
       isSourceView = false;
       elements.viewToggle.textContent = 'View Source';
@@ -3905,6 +3916,7 @@ function clearSearchHighlights() {
       extractExistingLabels(currentHtml);
       renderHtmlContent();
       elements.downloadBtn.disabled = false;
+      elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
 
     } catch (error) {
@@ -3913,54 +3925,129 @@ function clearSearchHighlights() {
     }
   });
 
-  // Download
-elements.downloadBtn.addEventListener('click', () => {
-  if (!currentHtml) return;
+  // ======= Download Functions =======
+  function prepareHtmlForDownload() {
+    if (!currentHtml) return null;
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(currentHtml, 'text/html');
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(currentHtml, 'text/html');
 
-  // 1. Remove delete buttons
-  const deleteButtons = doc.querySelectorAll('.delete-btn');
-  deleteButtons.forEach(button => button.remove());
+    // 1. Remove delete buttons
+    const deleteButtons = doc.querySelectorAll('.delete-btn');
+    deleteButtons.forEach(button => button.remove());
 
-  // 2. Build JSON schema from your current labels tree
-  const schema = buildSchemaFromLabels(labels);
-  const schemaJson = JSON.stringify(schema, null, 2);
+    // 2. Build JSON schema from your current labels tree
+    const schema = buildSchemaFromLabels(labels);
+    const schemaJson = JSON.stringify(schema, null, 2);
 
-  // 3. Find existing HTMLLabelizer comment
-  let found = false;
-  const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT, null);
-  let commentNode;
-  while ((commentNode = walker.nextNode())) {
-    if (commentNode.nodeValue && commentNode.nodeValue.trim().startsWith("HTMLLabelizer")) {
-      // Replace old content
-      commentNode.nodeValue = " HTMLLabelizer\n" + schemaJson + "\n";
-      found = true;
-      break;
+    // 3. Find existing HTMLLabelizer comment
+    let found = false;
+    const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT, null);
+    let commentNode;
+    while ((commentNode = walker.nextNode())) {
+      if (commentNode.nodeValue && commentNode.nodeValue.trim().startsWith("HTMLLabelizer")) {
+        // Replace old content
+        commentNode.nodeValue = " HTMLLabelizer\n" + schemaJson + "\n";
+        found = true;
+        break;
+      }
+    }
+
+    // 4. If not found, insert before <head>
+    if (!found) {
+      const newComment = doc.createComment(" HTMLLabelizer\n" + schemaJson + "\n");
+      const htmlEl = doc.documentElement;
+      const headEl = htmlEl.querySelector("head");
+      htmlEl.insertBefore(newComment, headEl);
+    }
+
+    // 5. Serialize back to HTML
+    return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+  }
+
+  function downloadFile() {
+    const finalHtml = prepareHtmlForDownload();
+    if (!finalHtml) return;
+
+    const fileName = currentFileName || 'labeled.html';
+    console.log('Downloading file:', fileName);
+
+    const blob = new Blob([finalHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function saveAsFile() {
+    const finalHtml = prepareHtmlForDownload();
+    if (!finalHtml) return;
+
+    console.log('Save As - File System Access API available:', 'showSaveFilePicker' in window);
+
+    // Use File System Access API if available, fallback to traditional download
+    if ('showSaveFilePicker' in window) {
+      // Modern browsers with File System Access API
+      (async () => {
+        try {
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: currentFileName || 'labeled.html',
+            types: [
+              {
+                description: 'HTML files',
+                accept: {
+                  'text/html': ['.html', '.htm']
+                }
+              }
+            ]
+          });
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(finalHtml);
+          await writable.close();
+          
+          console.log('File saved successfully using File System Access API');
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.error('Failed to save file:', err);
+            // Fallback to regular download
+            downloadFile();
+          } else {
+            console.log('User cancelled save dialog');
+          }
+        }
+      })();
+    } else {
+      // Fallback for browsers that don't support File System Access API
+      console.log('File System Access API not available, using fallback');
+      const blob = new Blob([finalHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = currentFileName || 'labeled.html';
+      
+      // Try to open in new window for manual save
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(finalHtml)}`;
+      const newWindow = window.open(dataUrl, '_blank');
+      if (!newWindow) {
+        // If popup is blocked, fallback to regular download
+        console.log('Popup blocked, falling back to regular download');
+        a.click();
+      } else {
+        console.log('Opened in new window - user can save manually');
+      }
+      
+      URL.revokeObjectURL(url);
     }
   }
 
-  // 4. If not found, insert before <head>
-  if (!found) {
-    const newComment = doc.createComment(" HTMLLabelizer\n" + schemaJson + "\n");
-    const htmlEl = doc.documentElement;
-    const headEl = htmlEl.querySelector("head");
-    htmlEl.insertBefore(newComment, headEl);
-  }
+  // Download button event listener
+  elements.downloadBtn.addEventListener('click', downloadFile);
 
-  // 5. Serialize back to HTML
-  const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
-
-  // 6. Download
-  const blob = new Blob([finalHtml], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = currentFileName || 'labeled.html';
-  a.click();
-  URL.revokeObjectURL(url);
-});
+  // Save As button event listener
+  elements.saveAsBtn.addEventListener('click', saveAsFile);
 
 
   // Clear all
@@ -3978,6 +4065,7 @@ elements.downloadBtn.addEventListener('click', () => {
       renderHtmlContent();
       refreshTreeUI();
       elements.downloadBtn.disabled = true;
+      elements.saveAsBtn.disabled = true;
       elements.viewToggle.disabled = true;
 
     }
@@ -4297,5 +4385,7 @@ window.addEventListener('click', (event) => {
   elements.newLabelColor.value = generateRandomColor();
   initializeGroupsHeader();
   refreshTreeUI();
+  
   console.log('Enhanced HTML Labelizer ready!');
+
 })();

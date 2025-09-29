@@ -70,24 +70,24 @@
       flex-wrap: wrap;
     }
 
-    button, .file-input {
-    border: 1px solid var(--hover);
-    background: #152043;
-    color: var(--text);
-    padding: 10px 16px;
-    border-radius: 12px;
-    cursor: pointer;
-    box-shadow: var(--shadow);
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    display: inline-block;
-  }
+    button {
+      border: 1px solid var(--hover);
+      background: #152043;
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: inline-block;
+    }
 
-  button:hover, .file-input label:hover {
-    filter: brightness(1.15);
-    background: var(--hover);
-  }
+    button:hover {
+      filter: brightness(1.15);
+      background: var(--hover);
+    }
 
     button:disabled {
       opacity: 0.5;
@@ -104,6 +104,20 @@
       inset: 0;
       opacity: 0;
       cursor: pointer;
+    }
+
+    .file-input button {
+      /* Ensure file input button has same styling as other buttons */
+      border: 1px solid var(--hover);
+      background: #152043;
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
     }
 
     .layout {
