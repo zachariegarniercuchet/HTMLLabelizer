@@ -2355,15 +2355,18 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
   function renderHtmlContent() {
     if (!currentHtml) {
       elements.htmlContent.innerHTML = `
-        <div class="empty-state">
+        <div class="empty-state drop-zone" id="drop-zone">
           <h3>No HTML loaded</h3>
-          <p>Upload an HTML file to start labeling</p>
+          <p><a href="#" id="upload-link">Upload an HTML File</a> or drag & drop here to start labeling</p>
         </div>
       `;
       // Update filename display
       if (elements.currentFilename) {
         elements.currentFilename.textContent = '';
       }
+      
+      // Re-attach event listeners for the newly created elements
+      attachEmptyStateEventListeners();
       return;
     }
 
@@ -2415,6 +2418,64 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     updateStats();
 
      refreshGroupsDisplay()
+  }
+
+  function attachEmptyStateEventListeners() {
+    // Update dropZone reference to the newly created element
+    const currentDropZone = document.getElementById('drop-zone');
+    if (!currentDropZone) return;
+
+    // Attach upload link event listener
+    const uploadLink = document.getElementById('upload-link');
+    if (uploadLink) {
+      uploadLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('html-file-input').click();
+      });
+    }
+
+    // Attach drag & drop event listeners
+    ['dragenter', 'dragover'].forEach(eventName => {
+      currentDropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        currentDropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      currentDropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        currentDropZone.classList.remove('dragover');
+      });
+    });
+
+    currentDropZone.addEventListener('drop', async (e) => {
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+
+      try {
+        currentHtml = await readFileAsText(file);
+        currentFileName = file.name;
+
+        sourceViewModified = false;
+        isSourceView = false;
+        elements.viewToggle.textContent = 'View Source';
+        elements.viewToggle.classList.remove('active');
+
+        extractExistingLabels(currentHtml);
+        renderHtmlContent();
+        refreshTreeUI();
+
+        elements.downloadBtn.disabled = false;
+        elements.saveAsBtn.disabled = false;
+        elements.viewToggle.disabled = false;
+      } catch (error) {
+        console.error('Error reading file:', error);
+        alert('Error reading file. Please try again.');
+      }
+    });
   }
 
   function attachLabelEventListeners() {
@@ -4067,7 +4128,7 @@ function clearSearchHighlights() {
       elements.downloadBtn.disabled = true;
       elements.saveAsBtn.disabled = true;
       elements.viewToggle.disabled = true;
-
+      refreshGroupsDisplay();
     }
   });
 
