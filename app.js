@@ -1,4 +1,7 @@
 (() => {
+  // ======= Configuration =======
+  const ENHANCED_FORMATTING_SEARCH = true; // Set to false for simple text matching, true for enhanced matching across formatting tags
+  
   // ======= State =======
   let currentHtml = '';
   let currentFileName = '';
@@ -3116,6 +3119,52 @@ function attachAdvancedLabelEventListeners() {
   });
 }
 
+function refreshSearchAfterLabeling() {
+  // Check if there's an active search that needs refreshing
+  if (currentSearchMatches.length > 0 || currentSearchSelection) {
+    // Get the current search text from advanced content
+    const advancedText = elements.advancedContent.textContent.trim();
+    
+    if (advancedText && advancedText.length >= MIN_SEARCH_LENGTH) {
+      // Store the current match index to try to maintain position
+      const previousMatchIndex = currentSearchSelection?.matchIndex ?? 0;
+      
+      console.log(`Refreshing search for "${advancedText}" after labeling, trying to maintain position ${previousMatchIndex}`);
+      
+      // Re-run the search
+      setTimeout(() => {
+        const matches = searchInHtmlContent(advancedText);
+        
+        if (matches.length > 0) {
+          // Try to set the selection to the same position, or the closest available
+          let targetIndex = previousMatchIndex;
+          
+          // If the previous index is out of bounds, use the last available match
+          if (targetIndex >= matches.length) {
+            targetIndex = matches.length - 1;
+          }
+          
+          // If we had no previous selection, default to first match
+          if (targetIndex < 0) {
+            targetIndex = 0;
+          }
+          
+          setCurrentSearchSelection(matches[targetIndex], targetIndex);
+          console.log(`Search refreshed: ${matches.length} matches found, positioned at match ${targetIndex}`);
+        } else {
+          console.log('Search refreshed: no matches found');
+          currentSearchSelection = null;
+          clearSearchOverlays();
+        }
+      }, 50); // Small delay to ensure DOM is updated
+    } else {
+      // No valid search text, clear everything
+      clearSearchOverlays();
+      currentSearchSelection = null;
+    }
+  }
+}
+
 
 
 function applyLabelToHtmlContent(range, labelPath, labelData) {
@@ -3198,6 +3247,10 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   window.getSelection().removeAllRanges();
   attachLabelEventListeners();
   updateStats();
+  
+  // Refresh search if there's an active search to maintain highlights and position
+  refreshSearchAfterLabeling();
+  
   return labelElement;
 }
 
@@ -3257,6 +3310,9 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
   window.getSelection().removeAllRanges();
   attachLabelEventListeners();
   updateStats();
+  
+  // Refresh search if there's an active search to maintain highlights and position
+  refreshSearchAfterLabeling();
 }
 
 function preserveFormattingInLabel(fragment) {
@@ -3275,6 +3331,509 @@ function preserveFormattingInLabel(fragment) {
   // ======= Advanced Labeling =================================================
   // This function is the ONLY bridge between advanced content and HTML content
   // It takes the labeled structure from advanced content and applies it to the current search selection in HTML content
+function applyAdvancedStructureSimple(range) {
+  // Get the root advanced label (there should be exactly one)
+  const rootLabels = getRootLabels();
+  if (rootLabels.length !== 1) {
+    throw new Error("Must have exactly one root label in advanced content");
+  }
+  
+  const rootAdvancedLabel = rootLabels[0];
+  
+  // Extract the original content with formatting preserved
+  const fragment = range.extractContents();
+  const processedContent = preserveFormattingInLabel(fragment);
+  
+  // Create the complete nested structure from advanced content
+  const completeStructure = createNestedLabelStructure(rootAdvancedLabel, processedContent);
+  
+  // Insert the complete structure
+  range.insertNode(completeStructure);
+}
+
+function createNestedLabelStructure(advancedLabel, originalContent) {
+  // Create the current label element
+  const labelElement = document.createElement("manual_label");
+  
+  // Copy all attributes from the advanced label
+  Array.from(advancedLabel.attributes).forEach(attr => {
+    if (attr.name !== 'style') { // Don't copy style attributes
+      labelElement.setAttribute(attr.name, attr.value);
+    }
+  });
+  
+  // Apply styling based on label definition
+  const labelName = advancedLabel.getAttribute('labelName');
+  const parent = advancedLabel.getAttribute('parent') || '';
+  const path = parent ? [parent, labelName] : [labelName];
+  const labelData = getLabelByPath(path);
+  
+  if (labelData) {
+    labelElement.style.backgroundColor = labelData.color;
+    labelElement.style.color = getContrastColor(labelData.color);
+  }
+  
+  // Check for nested manual_label elements (direct children only)
+  const directChildLabels = Array.from(advancedLabel.children).filter(
+    child => child.tagName === 'MANUAL_LABEL'
+  );
+  
+  if (directChildLabels.length === 0) {
+    // No nested labels - add the original content directly
+    labelElement.appendChild(originalContent);
+  } else {
+    // Has nested labels - need to map content properly
+    mapAdvancedStructureToOriginalContent(advancedLabel, originalContent, labelElement);
+  }
+  
+  // Add delete button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "×";
+  labelElement.appendChild(deleteBtn);
+  
+  return labelElement;
+}
+
+function mapAdvancedStructureToOriginalContent(advancedLabel, originalContent, targetLabel) {
+  // Get the clean text from both sources
+  const advancedText = getCleanTextFromElement(advancedLabel);
+  const originalText = getTextFromFragment(originalContent);
+  
+  console.log('Mapping advanced structure:');
+  console.log('Advanced text:', advancedText);
+  console.log('Original text:', originalText);
+  
+  // Verify they match (normalized)
+  if (normalizeText(advancedText) !== normalizeText(originalText)) {
+    console.warn('Text mismatch, falling back to simple structure');
+    targetLabel.appendChild(originalContent);
+    return;
+  }
+  
+  // Use a simpler approach: apply the structure but preserve the original formatting
+  // by doing a smart replacement
+  applyStructureWithFormattingPreservation(advancedLabel, originalContent, targetLabel);
+}
+
+function applyStructureWithFormattingPreservation(advancedLabel, originalContent, targetLabel) {
+  // New approach: Process the advanced label structure while preserving original formatting
+  console.log('Advanced structure preservation - processing nested labels');
+  
+  // Get the text content from both sources for alignment
+  const advancedText = getCleanTextFromElement(advancedLabel);
+  const originalText = getTextFromFragment(originalContent);
+  
+  console.log('Advanced text:', advancedText);
+  console.log('Original text:', originalText);
+  
+  // Use a more sophisticated approach that maps the advanced structure onto the original DOM structure
+  // instead of trying to extract by text offsets
+  const mappingResult = mapAdvancedStructureToOriginalDOM(advancedLabel, originalContent);
+  
+  if (mappingResult.success) {
+    // Apply the mapped structure
+    mappingResult.elements.forEach(element => {
+      targetLabel.appendChild(element);
+    });
+  } else {
+    // Fallback to simple content preservation
+    console.warn('Structure mapping failed, using simple content preservation');
+    targetLabel.appendChild(originalContent.cloneNode(true));
+  }
+}
+
+function mapAdvancedStructureToOriginalDOM(advancedLabel, originalContent) {
+  // This function creates a more sophisticated mapping that preserves formatting
+  // by working with the DOM structure rather than text offsets
+  
+  const result = {
+    success: false,
+    elements: []
+  };
+  
+  try {
+    // Create a working copy of the original content
+    const workingDiv = document.createElement('div');
+    workingDiv.appendChild(originalContent.cloneNode(true));
+    
+    // Build a text-to-node mapping for the original content
+    const originalMapping = buildTextToNodeMapping(workingDiv);
+    const advancedMapping = buildAdvancedLabelMapping(advancedLabel);
+    
+    console.log('Original mapping:', originalMapping);
+    console.log('Advanced mapping:', advancedMapping);
+    
+    // Process each section in the advanced mapping
+    let processedOffset = 0;
+    
+    advancedMapping.forEach(section => {
+      const startOffset = processedOffset;
+      const endOffset = processedOffset + section.text.length;
+      
+      if (section.isLabel) {
+        // Create a nested label with the corresponding original content
+        const labelContent = extractContentFromMapping(originalMapping, startOffset, endOffset);
+        const nestedLabel = createSingleLabel(section, labelContent);
+        result.elements.push(nestedLabel);
+      } else {
+        // Regular content - extract from original with formatting preserved
+        const content = extractContentFromMapping(originalMapping, startOffset, endOffset);
+        if (content && content.childNodes.length > 0) {
+          Array.from(content.childNodes).forEach(node => {
+            result.elements.push(node.cloneNode(true));
+          });
+        }
+      }
+      
+      processedOffset += section.text.length;
+    });
+    
+    result.success = true;
+  } catch (error) {
+    console.error('Error in mapAdvancedStructureToOriginalDOM:', error);
+    result.success = false;
+  }
+  
+  return result;
+}
+
+function buildTextToNodeMapping(container) {
+  // Build a mapping of text positions to DOM nodes
+  const mapping = [];
+  let textOffset = 0;
+  
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_ALL,
+    null,
+    false
+  );
+  
+  let node;
+  while (node = walker.nextNode()) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      if (text.length > 0) {
+        mapping.push({
+          startOffset: textOffset,
+          endOffset: textOffset + text.length,
+          node: node,
+          text: text,
+          type: 'text'
+        });
+        textOffset += text.length;
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      // Store element boundaries for formatting preservation
+      mapping.push({
+        startOffset: textOffset,
+        endOffset: textOffset, // Elements have no text length themselves
+        node: node,
+        text: '',
+        type: 'element_start'
+      });
+    }
+  }
+  
+  return mapping;
+}
+
+function buildAdvancedLabelMapping(advancedLabel) {
+  // Build a mapping of the advanced label structure
+  const mapping = [];
+  
+  Array.from(advancedLabel.childNodes).forEach(child => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const text = child.textContent;
+      if (text.trim()) {
+        mapping.push({
+          text: text,
+          isLabel: false,
+          element: null
+        });
+      }
+    } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'MANUAL_LABEL') {
+      const text = getCleanTextFromElement(child);
+      mapping.push({
+        text: text,
+        isLabel: true,
+        element: child
+      });
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      // Other HTML elements in advanced structure (should be treated as content)
+      const text = child.textContent;
+      if (text) {
+        mapping.push({
+          text: text,
+          isLabel: false,
+          element: child
+        });
+      }
+    }
+  });
+  
+  return mapping;
+}
+
+function extractContentFromMapping(originalMapping, startOffset, endOffset) {
+  // Extract content from the original mapping while preserving formatting
+  const fragment = document.createDocumentFragment();
+  
+  // Find all nodes that overlap with our range
+  const relevantNodes = originalMapping.filter(item => 
+    item.type === 'text' && 
+    !(item.endOffset <= startOffset || item.startOffset >= endOffset)
+  );
+  
+  relevantNodes.forEach(nodeInfo => {
+    const nodeStart = Math.max(nodeInfo.startOffset, startOffset);
+    const nodeEnd = Math.min(nodeInfo.endOffset, endOffset);
+    
+    if (nodeStart < nodeEnd) {
+      // Extract the relevant portion of this text node
+      const relativeStart = nodeStart - nodeInfo.startOffset;
+      const relativeEnd = nodeEnd - nodeInfo.startOffset;
+      const extractedText = nodeInfo.text.substring(relativeStart, relativeEnd);
+      
+      if (extractedText) {
+        // Clone the text node's parent hierarchy to preserve formatting
+        const textNode = document.createTextNode(extractedText);
+        const formattedNode = cloneFormattingHierarchy(nodeInfo.node, textNode);
+        fragment.appendChild(formattedNode);
+      }
+    }
+  });
+  
+  return fragment;
+}
+
+function cloneFormattingHierarchy(originalTextNode, newTextNode) {
+  // Clone the formatting hierarchy around a text node
+  let currentNode = newTextNode;
+  let parent = originalTextNode.parentNode;
+  
+  // Walk up the hierarchy and clone formatting elements
+  while (parent && parent.nodeType === Node.ELEMENT_NODE && isFormattingElement(parent)) {
+    const formattingClone = parent.cloneNode(false); // Clone without children
+    formattingClone.appendChild(currentNode);
+    currentNode = formattingClone;
+    parent = parent.parentNode;
+  }
+  
+  return currentNode;
+}
+
+function buildStructureMap(advancedLabel) {
+  const map = [];
+  let currentOffset = 0;
+  
+  Array.from(advancedLabel.childNodes).forEach(child => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const text = child.textContent;
+      if (text) {
+        map.push({
+          start: currentOffset,
+          end: currentOffset + text.length,
+          labelInfo: null // Just text, no label
+        });
+        currentOffset += text.length;
+      }
+    } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'MANUAL_LABEL') {
+      const labelText = getCleanTextFromElement(child);
+      map.push({
+        start: currentOffset,
+        end: currentOffset + labelText.length,
+        labelInfo: {
+          element: child,
+          text: labelText
+        }
+      });
+      currentOffset += labelText.length;
+    }
+  });
+  
+  return map;
+}
+
+function createSingleLabel(labelInfo, content) {
+  const labelElement = document.createElement("manual_label");
+  
+  // Copy attributes from the source label
+  Array.from(labelInfo.element.attributes).forEach(attr => {
+    if (attr.name !== 'style') {
+      labelElement.setAttribute(attr.name, attr.value);
+    }
+  });
+  
+  // Apply styling
+  const labelName = labelInfo.element.getAttribute('labelName');
+  const parent = labelInfo.element.getAttribute('parent') || '';
+  const path = parent ? [parent, labelName] : [labelName];
+  const labelData = getLabelByPath(path);
+  
+  if (labelData) {
+    labelElement.style.backgroundColor = labelData.color;
+    labelElement.style.color = getContrastColor(labelData.color);
+  }
+  
+  // Add content
+  labelElement.appendChild(content);
+  
+  // Add delete button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "×";
+  labelElement.appendChild(deleteBtn);
+  
+  return labelElement;
+}
+
+function extractFormattedContentPortion(originalContent, startOffset, endOffset, fullText) {
+  // This function extracts a portion of formatted content while preserving HTML structure
+  
+  if (startOffset === 0 && endOffset === fullText.length) {
+    // If we need the entire content, return a clone
+    return originalContent.cloneNode(true);
+  }
+  
+  // Create a range to extract the specific portion
+  const tempDiv = document.createElement('div');
+  tempDiv.appendChild(originalContent.cloneNode(true));
+  
+  // Find the start and end positions within the formatted content
+  const walker = document.createTreeWalker(
+    tempDiv,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false
+  );
+  
+  let currentOffset = 0;
+  let startNode = null;
+  let startNodeOffset = 0;
+  let endNode = null;
+  let endNodeOffset = 0;
+  
+  let textNode;
+  while (textNode = walker.nextNode()) {
+    const nodeText = textNode.textContent;
+    const nodeLength = nodeText.length;
+    
+    // Check if start position is in this node
+    if (startNode === null && currentOffset + nodeLength > startOffset) {
+      startNode = textNode;
+      startNodeOffset = startOffset - currentOffset;
+    }
+    
+    // Check if end position is in this node
+    if (currentOffset + nodeLength >= endOffset) {
+      endNode = textNode;
+      endNodeOffset = endOffset - currentOffset;
+      break;
+    }
+    
+    currentOffset += nodeLength;
+  }
+  
+  if (!startNode || !endNode) {
+    // Fallback to simple text node if we can't find the positions
+    const extractedText = fullText.substring(startOffset, endOffset);
+    return document.createTextNode(extractedText);
+  }
+  
+  try {
+    // Create a range within the temporary div
+    const range = document.createRange();
+    range.setStart(startNode, startNodeOffset);
+    range.setEnd(endNode, endNodeOffset);
+    
+    // Extract the contents - but we need better handling for split formatting
+    const extractedFragment = range.extractContents();
+    
+    // Handle split formatting by preserving incomplete opening/closing tags
+    const processedFragment = handleSplitFormattingInExtraction(extractedFragment, startNode, endNode, startNodeOffset, endNodeOffset);
+    
+    return processedFragment;
+  } catch (e) {
+    console.warn('Could not extract formatted portion, falling back to text:', e);
+    // Fallback to simple text node
+    const extractedText = fullText.substring(startOffset, endOffset);
+    return document.createTextNode(extractedText);
+  }
+}
+
+function handleSplitFormattingInExtraction(fragment, startNode, endNode, startOffset, endOffset) {
+  // This function handles cases where formatting elements are split across extraction boundaries
+  // It ensures that partial formatting elements are properly reconstructed
+  
+  const processedFragment = document.createDocumentFragment();
+  const nodes = Array.from(fragment.childNodes);
+  
+  // Handle each node, looking for incomplete formatting elements
+  nodes.forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // Check if this element was truncated and needs reconstruction
+      const reconstructedNode = reconstructTruncatedFormattingElement(node, startNode, endNode, startOffset, endOffset);
+      processedFragment.appendChild(reconstructedNode);
+    } else {
+      // Text nodes and other nodes can be added directly
+      processedFragment.appendChild(node.cloneNode(true));
+    }
+  });
+  
+  return processedFragment;
+}
+
+function reconstructTruncatedFormattingElement(element, startNode, endNode, startOffset, endOffset) {
+  // Check if the element appears to be a formatting element that was truncated
+  if (isFormattingElement(element)) {
+    // For formatting elements, we need to ensure the content is properly preserved
+    const reconstructed = element.cloneNode(false); // Clone without children
+    
+    // Process all child nodes recursively
+    Array.from(element.childNodes).forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        reconstructed.appendChild(reconstructTruncatedFormattingElement(child, startNode, endNode, startOffset, endOffset));
+      } else {
+        reconstructed.appendChild(child.cloneNode(true));
+      }
+    });
+    
+    return reconstructed;
+  }
+  
+  // For non-formatting elements, return as-is
+  return element.cloneNode(true);
+}
+
+function isFormattingElement(element) {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+
+  const formattingTags = [
+    "i", "em", "italic",        // italic
+    "b", "strong", "bold",      // bold
+    "u", "underline",           // underline
+    "s", "strike", "del",       // strikethrough
+    "sup", "sub"                // superscript/subscript
+  ];
+
+  return formattingTags.includes(element.tagName.toLowerCase());
+}
+
+function getCleanTextFromElement(element) {
+  const clone = element.cloneNode(true);
+  const deleteButtons = clone.querySelectorAll('.delete-btn');
+  deleteButtons.forEach(btn => btn.remove());
+  return clone.textContent;
+}
+
+function getTextFromFragment(fragment) {
+  const div = document.createElement('div');
+  div.appendChild(fragment.cloneNode(true));
+  return div.textContent;
+}
+
 function applyAdvancedLabels() {
   console.log('applyAdvancedLabels: Starting - this is the ONLY bridge between advanced and HTML content');
   
@@ -3294,37 +3853,48 @@ function applyAdvancedLabels() {
   const match = currentSearchSelection.match;
 
   try {
-    // Recreate the range from the stored match data to ensure it's fresh
-    if (!match || !match.node || !match.node.parentNode) {
-      alert("The selected match is no longer valid. Please navigate to another match.");
-      return;
+    // Handle both simple matches and enhanced multi-node matches
+    let primaryNode, secondaryNode;
+    
+    if (match.isMultiNode) {
+      primaryNode = match.startNode;
+      secondaryNode = match.endNode;
+      
+      if (!primaryNode || !primaryNode.parentNode || !secondaryNode || !secondaryNode.parentNode) {
+        alert("The selected match is no longer valid. Please navigate to another match.");
+        return;
+      }
+    } else {
+      primaryNode = match.node;
+      
+      if (!primaryNode || !primaryNode.parentNode) {
+        alert("The selected match is no longer valid. Please navigate to another match.");
+        return;
+      }
     }
 
     const range = document.createRange();
     try {
-      range.setStart(match.node, match.startOffset);
-      range.setEnd(match.node, match.endOffset);
+      if (match.isMultiNode) {
+        range.setStart(match.startNode, match.startOffset);
+        range.setEnd(match.endNode, match.endOffset);
+      } else {
+        range.setStart(match.node, match.startOffset);
+        range.setEnd(match.node, match.endOffset);
+      }
     } catch (e) {
       alert("Could not create selection range. The text may have changed.");
       console.error("Range creation error:", e);
       return;
     }
 
-    const selectedText = range.toString();
-    const advancedText = getCleanAdvancedText();
-    
     if (!isFullyLabeled()) {
       alert("Please ensure all text is covered by exactly ONE main label in the advanced content.");
       return;
     }
-    
-    if (normalizeText(selectedText) !== normalizeText(advancedText)) {
-      alert(`Selected text "${selectedText}" doesn't match advanced content "${advancedText}"`);
-      return;
-    }
 
-    const labelStructure = cloneAdvancedStructure();
-    replaceSelectionWithStructure(range, labelStructure);
+    // Apply the advanced label structure the same way as applyLabelToHtmlContent
+    applyAdvancedStructureSimple(range);
 
     updateCurrentHtmlFromDOM();
     attachLabelEventListeners();
@@ -3603,8 +4173,15 @@ function createSearchOverlays(matches) {
 
 function createOverlayForMatch(match, index) {
   const range = document.createRange();
-  range.setStart(match.node, match.startOffset);
-  range.setEnd(match.node, match.endOffset);
+  
+  // Handle both simple matches and enhanced multi-node matches
+  if (match.isMultiNode) {
+    range.setStart(match.startNode, match.startOffset);
+    range.setEnd(match.endNode, match.endOffset);
+  } else {
+    range.setStart(match.node, match.startOffset);
+    range.setEnd(match.node, match.endOffset);
+  }
   
   const rect = range.getBoundingClientRect();
   const containerRect = elements.htmlContent.getBoundingClientRect();
@@ -3631,15 +4208,24 @@ function createOverlayForMatch(match, index) {
 
 function setCurrentSearchSelection(match, matchIndex) {
   try {
+    // Handle both simple matches and enhanced multi-node matches
+    let primaryNode = match.isMultiNode ? match.startNode : match.node;
+    
     // Validate that the node still exists in the document
-    if (!match.node || !match.node.parentNode) {
+    if (!primaryNode || !primaryNode.parentNode) {
       console.warn('Match node no longer in document, skipping');
       return;
     }
     
     const range = document.createRange();
-    range.setStart(match.node, match.startOffset);
-    range.setEnd(match.node, match.endOffset);
+    
+    if (match.isMultiNode) {
+      range.setStart(match.startNode, match.startOffset);
+      range.setEnd(match.endNode, match.endOffset);
+    } else {
+      range.setStart(match.node, match.startOffset);
+      range.setEnd(match.node, match.endOffset);
+    }
     
     currentSearchSelection = {
       range: range,
@@ -3651,7 +4237,7 @@ function setCurrentSearchSelection(match, matchIndex) {
     updateCurrentSearchSelectionHighlight(matchIndex);
     scrollToCurrentSelection();
     
-    console.log(`Current search selection set to match ${matchIndex}: "${currentSearchSelection.text}"`);
+    console.log(`Current search selection set to match ${matchIndex}: "${currentSearchSelection.text}" ${match.isEnhanced ? '(enhanced)' : '(simple)'}`);
   } catch (error) {
     console.error('Error setting current search selection:', error);
     currentSearchSelection = null;
@@ -3738,12 +4324,20 @@ function updateSearchOverlayPositions() {
   
   currentSearchMatches.forEach((match, index) => {
     const overlay = searchOverlays[index];
-    if (!overlay || !match.node.parentNode) return;
+    let primaryNode = match.isMultiNode ? match.startNode : match.node;
+    
+    if (!overlay || !primaryNode || !primaryNode.parentNode) return;
     
     try {
       const range = document.createRange();
-      range.setStart(match.node, match.startOffset);
-      range.setEnd(match.node, match.endOffset);
+      
+      if (match.isMultiNode) {
+        range.setStart(match.startNode, match.startOffset);
+        range.setEnd(match.endNode, match.endOffset);
+      } else {
+        range.setStart(match.node, match.startOffset);
+        range.setEnd(match.node, match.endOffset);
+      }
       
       const rect = range.getBoundingClientRect();
       const containerRect = elements.htmlContent.getBoundingClientRect();
@@ -3763,6 +4357,14 @@ function updateSearchOverlayPositions() {
 
 
 function findTextMatches(element, searchText) {
+  if (ENHANCED_FORMATTING_SEARCH) {
+    return findEnhancedTextMatches(element, searchText);
+  } else {
+    return findSimpleTextMatches(element, searchText);
+  }
+}
+
+function findSimpleTextMatches(element, searchText) {
   const matches = [];
   const walker = document.createTreeWalker(
     element,
@@ -3821,6 +4423,217 @@ function findTextMatches(element, searchText) {
   }
   
   return matches;
+}
+
+function findEnhancedTextMatches(element, searchText) {
+  console.log('Enhanced search for:', searchText);
+  const matches = [];
+  
+  // Normalize the search text
+  const normalizedSearch = searchText.replace(/\s+/g, ' ').trim().toLowerCase();
+  console.log('Normalized search:', normalizedSearch);
+  
+  // Get all text nodes in order
+  const textNodes = getOrderedTextNodes(element);
+  console.log('Found text nodes:', textNodes.length);
+  
+  if (textNodes.length === 0) return matches;
+  
+  // Build a continuous text representation with position mapping
+  let continuousText = '';
+  let positionMap = []; // Maps each character position in continuousText to {node, offset}
+  
+  textNodes.forEach((nodeInfo, nodeIndex) => {
+    const text = nodeInfo.node.textContent;
+    console.log(`Node ${nodeIndex}: "${text}"`);
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      
+      positionMap.push({
+        node: nodeInfo.node,
+        offset: i,
+        nodeIndex: nodeIndex
+      });
+      
+      continuousText += char;
+    }
+    
+    // Add space between nodes if needed (but don't map this space to any node)
+    if (nodeIndex < textNodes.length - 1 && !text.endsWith(' ') && !textNodes[nodeIndex + 1].node.textContent.startsWith(' ')) {
+      positionMap.push({
+        node: null,
+        offset: -1,
+        nodeIndex: -1,
+        isVirtualSpace: true
+      });
+      continuousText += ' ';
+    }
+  });
+  
+  console.log('Continuous text length:', continuousText.length);
+  console.log('Continuous text preview:', continuousText.substring(0, 200) + '...');
+  
+  // Normalize the continuous text
+  const normalizedContinuous = continuousText.replace(/\s+/g, ' ').trim().toLowerCase();
+  console.log('Normalized continuous length:', normalizedContinuous.length);
+  
+  // Find matches in normalized text
+  let searchIndex = 0;
+  while ((searchIndex = normalizedContinuous.indexOf(normalizedSearch, searchIndex)) !== -1) {
+    console.log(`Found match at normalized position ${searchIndex}: "${normalizedContinuous.substring(searchIndex, searchIndex + normalizedSearch.length)}"`);
+    
+    const matchStart = searchIndex;
+    const matchEnd = searchIndex + normalizedSearch.length;
+    
+    // Map back to original positions
+    const realMatch = mapNormalizedMatchToReal(continuousText, positionMap, matchStart, matchEnd, normalizedContinuous);
+    
+    if (realMatch) {
+      console.log('Real match:', realMatch.text);
+      matches.push(realMatch);
+    } else {
+      console.log('Failed to map normalized match to real positions');
+    }
+    
+    searchIndex += normalizedSearch.length;
+  }
+  
+  console.log(`Enhanced search found ${matches.length} matches`);
+  return matches;
+}
+
+function getOrderedTextNodes(element) {
+  const textNodes = [];
+  const walker = document.createTreeWalker(
+    element,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: function(node) {
+        // Skip text inside manual_label tags, delete buttons, and search highlights
+        let parent = node.parentNode;
+        while (parent && parent !== element) {
+          if (parent.tagName === 'MANUAL_LABEL' || 
+              parent.classList?.contains('delete-btn') ||
+              parent.classList?.contains('search-highlight')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          parent = parent.parentNode;
+        }
+        
+        // Also skip if the text is already fully contained within a manual_label
+        let checkParent = node.parentNode;
+        while (checkParent && checkParent !== element) {
+          if (checkParent.tagName === 'MANUAL_LABEL') {
+            return NodeFilter.FILTER_REJECT;
+          }
+          checkParent = checkParent.parentNode;
+        }
+        
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+
+  let textNode;
+  while (textNode = walker.nextNode()) {
+    if (textNode.textContent.trim()) { // Only include nodes with actual content
+      textNodes.push({
+        node: textNode,
+        text: textNode.textContent
+      });
+    }
+  }
+  
+  return textNodes;
+}
+
+function mapNormalizedMatchToReal(originalText, positionMap, normalizedStart, normalizedEnd, normalizedText) {
+  // Find the real start and end positions by mapping from normalized back to original
+  const realStart = mapNormalizedPositionToReal(originalText, normalizedText, normalizedStart);
+  const realEnd = mapNormalizedPositionToReal(originalText, normalizedText, normalizedEnd);
+  
+  if (realStart === -1 || realEnd === -1 || realStart >= realEnd) {
+    return null;
+  }
+  
+  // Check bounds
+  if (realStart >= positionMap.length || realEnd > positionMap.length) {
+    return null;
+  }
+  
+  const startPos = positionMap[realStart];
+  const endPos = positionMap[Math.min(realEnd - 1, positionMap.length - 1)];
+  
+  // Skip virtual spaces
+  if (!startPos?.node || !endPos?.node || startPos.isVirtualSpace || endPos.isVirtualSpace) {
+    return null;
+  }
+  
+  // Extract the actual matched text
+  let matchedText = '';
+  for (let i = realStart; i < realEnd && i < positionMap.length; i++) {
+    const pos = positionMap[i];
+    if (pos.node && !pos.isVirtualSpace) {
+      matchedText += pos.node.textContent[pos.offset] || '';
+    }
+  }
+  
+  if (startPos.node === endPos.node) {
+    // Single node match
+    return {
+      node: startPos.node,
+      startOffset: startPos.offset,
+      endOffset: endPos.offset + 1,
+      text: matchedText,
+      isEnhanced: true
+    };
+  } else {
+    // Multi-node match
+    return {
+      startNode: startPos.node,
+      startOffset: startPos.offset,
+      endNode: endPos.node,
+      endOffset: endPos.offset + 1,
+      text: matchedText,
+      isEnhanced: true,
+      isMultiNode: true
+    };
+  }
+}
+
+function mapNormalizedPositionToReal(originalText, normalizedText, normalizedPos) {
+  let realPos = 0;
+  let normPos = 0;
+  
+  while (realPos < originalText.length && normPos < normalizedPos) {
+    const realChar = originalText[realPos];
+    
+    if (/\s/.test(realChar)) {
+      // Skip consecutive whitespace in original
+      while (realPos < originalText.length && /\s/.test(originalText[realPos])) {
+        realPos++;
+      }
+      // Count as one space in normalized
+      normPos++;
+    } else {
+      realPos++;
+      normPos++;
+    }
+  }
+  
+  return realPos <= originalText.length ? realPos : -1;
+}
+
+function extractTextFromRange(startNode, startOffset, endNode, endOffset) {
+  try {
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+    return range.toString();
+  } catch (e) {
+    return '';
+  }
 }
 
 function mapNormalizedToOriginalPosition(originalText, normalizedPosition) {
@@ -4434,38 +5247,64 @@ elements.applyAllAdvanced.addEventListener('click', () => {
   // Store the search text for re-searching at the end
   const searchText = getCleanAdvancedText();
   
-  // Apply to all current search matches
+  // Apply to all current search matches IN REVERSE ORDER
+  // This prevents DOM modifications from invalidating subsequent matches
   let totalApplied = 0;
   let skipped = 0;
   
-  currentSearchMatches.forEach((match, index) => {
+  // Process matches from last to first to avoid DOM invalidation issues
+  for (let i = currentSearchMatches.length - 1; i >= 0; i--) {
+    const match = currentSearchMatches[i];
     try {
+      // Handle both simple matches and enhanced multi-node matches
+      let primaryNode, secondaryNode;
+      
+      if (match.isMultiNode) {
+        primaryNode = match.startNode;
+        secondaryNode = match.endNode;
+        
+        if (!primaryNode || !primaryNode.parentNode || !secondaryNode || !secondaryNode.parentNode) {
+          console.warn(`Skipping match ${i}: nodes no longer valid`);
+          skipped++;
+          continue;
+        }
+      } else {
+        primaryNode = match.node;
+        
+        if (!primaryNode || !primaryNode.parentNode) {
+          console.warn(`Skipping match ${i}: node no longer valid`);
+          skipped++;
+          continue;
+        }
+      }
+
       // Create range for this match
       const range = document.createRange();
-      range.setStart(match.node, match.startOffset);
-      range.setEnd(match.node, match.endOffset);
       
-      // Verify the match text matches the advanced content
-      const matchText = match.text;
-      const advancedText = getCleanAdvancedText();
-      
-      if (normalizeText(matchText) !== normalizeText(advancedText)) {
-        console.warn(`Skipping match ${index}: text mismatch`);
+      try {
+        if (match.isMultiNode) {
+          range.setStart(match.startNode, match.startOffset);
+          range.setEnd(match.endNode, match.endOffset);
+        } else {
+          range.setStart(match.node, match.startOffset);
+          range.setEnd(match.node, match.endOffset);
+        }
+        
+        // Apply the advanced label structure
+        applyAdvancedStructureSimple(range);
+        
+        totalApplied++;
+        
+      } catch (rangeError) {
+        console.warn(`Could not create range for match ${i}:`, rangeError);
         skipped++;
-        return;
       }
       
-      // Create the label structure and apply it
-      const labelStructure = cloneAdvancedStructure();
-      replaceSelectionWithStructure(range, labelStructure);
-      
-      totalApplied++;
-      
     } catch (e) {
-      console.warn('Could not apply label to match:', e);
+      console.warn(`Could not apply label to match ${i}:`, e);
       skipped++;
     }
-  });
+  }
   
   // Update currentHtml after all applications
   updateCurrentHtmlFromDOM();
@@ -4476,7 +5315,7 @@ elements.applyAllAdvanced.addEventListener('click', () => {
   // Show results
   let message = `Applied labels to ${totalApplied} matches`;
   if (skipped > 0) {
-    message += ` (${skipped} skipped due to text mismatches)`;
+    message += ` (${skipped} skipped due to errors)`;
   }
   alert(message);
   
