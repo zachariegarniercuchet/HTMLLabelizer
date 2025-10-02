@@ -647,6 +647,43 @@
       padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
       font-weight: 600;
+      cursor: grab;
+      user-select: none;
+      padding: 4px 0 8px 0;
+      margin: -4px 0 12px 0;
+    }
+
+    .param-menu h4:active {
+      cursor: grabbing;
+    }
+
+    .param-close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: var(--sub);
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .param-close-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .param-close-btn:active {
+      background: var(--danger);
+      color: white;
     }
 
     .param-form {

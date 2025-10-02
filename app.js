@@ -52,8 +52,6 @@
     paramMenu: document.getElementById('param-menu'),
     paramMenuTitle: document.getElementById('param-menu-title'),
     paramForm: document.getElementById('param-form'),
-    saveParams: document.getElementById('save-params'),
-    cancelParams: document.getElementById('cancel-params'),
     totalMentions: document.getElementById('total-mentions'),
     labelTypes: document.getElementById('label-types'),
     sourceView: document.getElementById('source-view'),
@@ -143,6 +141,76 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 }
 
 
+  // ======= Make Element Draggable =======
+  function makeDraggable(element, handle) {
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+
+    handle.addEventListener('mousedown', dragStart);
+
+    function dragStart(e) {
+      // Get the current position of the element
+      const rect = element.getBoundingClientRect();
+      xOffset = rect.left;
+      yOffset = rect.top;
+      
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      if (e.target === handle) {
+        isDragging = true;
+        handle.style.cursor = 'grabbing';
+      }
+    }
+
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', dragEnd);
+
+    function drag(e) {
+      if (isDragging) {
+        e.preventDefault();
+        
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+
+        xOffset = currentX;
+        yOffset = currentY;
+
+        // Keep the menu within viewport bounds
+        const rect = element.getBoundingClientRect();
+        const maxX = window.innerWidth - rect.width;
+        const maxY = window.innerHeight - rect.height;
+        
+        currentX = Math.max(0, Math.min(currentX, maxX));
+        currentY = Math.max(0, Math.min(currentY, maxY));
+
+        element.style.left = currentX + 'px';
+        element.style.top = currentY + 'px';
+      }
+    }
+
+    function dragEnd() {
+      initialX = currentX;
+      initialY = currentY;
+
+      isDragging = false;
+      handle.style.cursor = 'grab';
+      
+      // Restore focus to first input after dragging
+      const firstInput = element.querySelector('input, select');
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }
+
+    // Set initial cursor style
+    handle.style.cursor = 'grab';
+  }
 
   // ======= Enhanced Label Management =======
 
@@ -1249,6 +1317,19 @@ function showParameterMenu(labelElement, x, y) {
   elements.paramMenuTitle.textContent = `Edit Parameters - ${labelName}`;
   elements.paramForm.innerHTML = "";
 
+  // Add close button if it doesn't exist
+  let closeBtn = elements.paramMenu.querySelector('.param-close-btn');
+  if (!closeBtn) {
+    closeBtn = document.createElement('button');
+    closeBtn.className = 'param-close-btn';
+    closeBtn.textContent = '×';
+    closeBtn.onclick = (e) => {
+      e.stopPropagation(); // Prevent dragging when clicking close button
+      hideParameterMenu();
+    };
+    elements.paramMenu.appendChild(closeBtn);
+  }
+
   // Collect group attribute names to exclude them
   const groupAttributeNames = new Set();
   if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
@@ -1395,10 +1476,55 @@ function showParameterMenu(labelElement, x, y) {
   elements.paramMenu.style.left = `${x}px`;
   elements.paramMenu.style.top = `${y}px`;
   elements.paramMenu.classList.remove("hidden");
+  
+  // Make the parameter menu draggable by its header
+  makeDraggable(elements.paramMenu, elements.paramMenuTitle);
+  
+  // Focus on first input and setup Enter key navigation
+  const allInputs = elements.paramForm.querySelectorAll('input, select');
+  if (allInputs.length > 0) {
+    // Focus on first input
+    allInputs[0].focus();
+    
+    // Add Enter key navigation to all inputs
+    allInputs.forEach((input, index) => {
+      // Store original keydown handler if it exists
+      const originalKeydownHandler = input.onkeydown;
+      
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          // First check if suggestions are handling the event
+          let suggestionHandled = false;
+          if (originalKeydownHandler) {
+            // Call the original handler and check if it handled the event
+            const suggestionDropdown = input.parentElement.querySelector('.suggestion-dropdown');
+            if (suggestionDropdown) {
+              suggestionHandled = handleSuggestionKeydown(e, input, suggestionDropdown);
+            }
+          }
+          
+          // Only navigate if suggestions didn't handle the Enter key
+          if (!suggestionHandled) {
+            e.preventDefault();
+            if (index < allInputs.length - 1) {
+              // Move to next input
+              allInputs[index + 1].focus();
+            } else {
+              // Last input - close the menu
+              hideParameterMenu();
+            }
+          }
+        }
+      });
+    });
+  }
 }
 
 
   function hideParameterMenu() {
+    // Auto-save parameters before closing
+    saveParameters();
+    
     elements.paramMenu.classList.add('hidden');
     currentParamElement = null;
   }
@@ -1514,7 +1640,8 @@ function saveParameters() {
     updateCurrentHtmlFromDOM();
   }
 
-  hideParameterMenu();
+  // Don't call hideParameterMenu() here to avoid infinite loop
+  // The caller of saveParameters() will handle closing the menu
   updateStats();
   refreshGroupsDisplay();
 }
@@ -4916,9 +5043,7 @@ function navigateToPreviousMatch() {
     }
   });
 
-  // Parameter menu event listeners
-  elements.saveParams.addEventListener('click', saveParameters);
-  elements.cancelParams.addEventListener('click', hideParameterMenu);
+  // Parameter menu event listeners removed - now auto-saves on close
 
 // ======= Enhanced Text Selection Handling =======
 document.addEventListener('mouseup', (e) => {
