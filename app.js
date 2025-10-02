@@ -145,6 +145,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
   // ======= Make Element Draggable =======
   function makeDraggable(element, handle) {
     let isDragging = false;
+    let hasMoved = false;
     let currentX;
     let currentY;
     let initialX;
@@ -165,6 +166,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 
       if (e.target === handle) {
         isDragging = true;
+        hasMoved = false;
         handle.style.cursor = 'grabbing';
       }
     }
@@ -175,6 +177,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     function drag(e) {
       if (isDragging) {
         e.preventDefault();
+        hasMoved = true;
         
         currentX = e.clientX - initialX;
         currentY = e.clientY - initialY;
@@ -202,10 +205,13 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
       isDragging = false;
       handle.style.cursor = 'grab';
       
-      // Restore focus to first input after dragging (if menu has inputs)
-      const firstInput = element.querySelector('input, select');
-      if (firstInput) {
-        firstInput.focus();
+      // Only restore focus to first input if we actually moved the menu
+      // Don't interfere with normal clicking on inputs
+      if (hasMoved) {
+        const firstInput = element.querySelector('input, select');
+        if (firstInput) {
+          firstInput.focus();
+        }
       }
     }
 
