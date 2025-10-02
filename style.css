@@ -412,6 +412,11 @@
       opacity: 1;
     }
 
+    /* Keep actions visible when editing */
+    .tree-item[data-editing="true"] .tree-actions {
+      opacity: 1;
+    }
+
     .tree-action-btn {
       width: 24px;
       height: 24px;
@@ -832,6 +837,16 @@
 .tree-action-btn.save-active {
   background: var(--accent-2) !important;
   color: white !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Group ID input styling */
+.group-id-value input {
+  background: var(--bg) !important;
+  color: #FFD700 !important;
+  border: 2px solid #FFD700 !important;
+  font-weight: 600 !important;
 }
 
 /* Gold label styling in param menu */

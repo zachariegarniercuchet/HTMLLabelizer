@@ -1813,26 +1813,32 @@ function refreshGroupsDisplay() {
     icon.style.marginRight = '10px';
     icon.style.flexShrink = '0';
     
-    // Group title
+    // Group title and gold parameter (group ID)
     const titleSpan = document.createElement('div');
     titleSpan.className = 'tree-label';
-    titleSpan.textContent = `${labelName} - ${groupId}`;
+    titleSpan.textContent = `${labelName} - `;
     
-    // Actions (modify button - only visible on hover and only if there are attributes to modify)
+    // Add the group ID as an editable element
+    const groupIdSpan = document.createElement('span');
+    groupIdSpan.className = 'tree-param-value group-id-value';
+    groupIdSpan.dataset.paramName = groupIdAttr;
+    groupIdSpan.textContent = groupId === 'undefined' ? '' : groupId;
+    titleSpan.appendChild(groupIdSpan);
+    
+    // Actions (modify button - always show if there are attributes or group ID to modify)
     const actions = document.createElement('div');
     actions.className = 'tree-actions';
     
-    if (groupAttributes.size > 0) {
-      const modifyBtn = document.createElement('button');
-      modifyBtn.className = 'tree-action-btn edit';
-      modifyBtn.title = 'Modify group attributes';
-      modifyBtn.onclick = (e) => {
-        e.stopPropagation();
-        toggleGroupEdit(groupItem, groupKey);
-      };
-      
-      actions.appendChild(modifyBtn);
-    }
+    // Always show modify button (for both group ID and attributes)
+    const modifyBtn = document.createElement('button');
+    modifyBtn.className = 'tree-action-btn edit';
+    modifyBtn.title = 'Modify group ID and attributes';
+    modifyBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleGroupEdit(groupItem, groupKey);
+    };
+    
+    actions.appendChild(modifyBtn);
     
     // Assemble group header
     groupItem.appendChild(expandBtn);
@@ -2014,107 +2020,164 @@ function toggleGroupEdit(groupDiv, groupKey) {
   const modifyBtn = groupDiv.querySelector('.tree-action-btn.edit');
   
   if (!isEditing) {
+    // Close any other edit sessions without saving
+    const allEditingItems = document.querySelectorAll('.tree-item[data-editing="true"]');
+    const hasOtherEditing = Array.from(allEditingItems).some(item => item !== groupDiv);
+    
+    if (hasOtherEditing) {
+      // Refresh display to reset all edit states, then re-open this one
+      refreshGroupsDisplay();
+      
+      // Find the group div again after refresh and start editing it
+      setTimeout(() => {
+        const allGroups = document.querySelectorAll('.group-item');
+        const targetGroup = Array.from(allGroups).find(item => {
+          const titleSpan = item.querySelector('.tree-label');
+          const groupIdValue = titleSpan.querySelector('.group-id-value');
+          const [labelName, groupId] = groupKey.split('_');
+          const expectedText = groupId === 'undefined' ? '' : groupId;
+          return titleSpan.textContent.includes(labelName) && 
+                 (groupIdValue ? groupIdValue.textContent === expectedText : true);
+        });
+        
+        if (targetGroup) {
+          toggleGroupEdit(targetGroup, groupKey);
+        }
+      }, 0);
+      return;
+    }
     // Switch to edit mode
     groupDiv.dataset.editing = 'true';
     modifyBtn.title = 'Save changes';
     modifyBtn.classList.add('save-active');
     
-    // Ensure the group is expanded when editing
-    if (!expandedGroups.has(groupKey)) {
+    // Ensure the group is expanded when editing (if it has attributes)
+    if (attributesDiv && attributesDiv.children.length > 0 && !expandedGroups.has(groupKey)) {
       expandedGroups.add(groupKey);
       attributesDiv.className = 'tree-children expanded';
       const expandBtn = groupDiv.querySelector('.tree-expand-btn');
-      expandBtn.className = 'tree-expand-btn expanded';
+      if (expandBtn) expandBtn.className = 'tree-expand-btn expanded';
     }
     
-    // Convert attribute values to inputs
-    const attrItems = attributesDiv.querySelectorAll('.tree-item');
-    attrItems.forEach(attrItem => {
-      const attrValueDiv = attrItem.querySelector('.tree-param-value');
-      const attrName = attrValueDiv.dataset.attrName;
-      const currentValue = attrValueDiv.textContent;
+    // Convert group ID (gold parameter) to input
+    const groupIdSpan = groupDiv.querySelector('.group-id-value');
+    if (groupIdSpan) {
+      const currentValue = groupIdSpan.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentValue;
+      input.dataset.paramName = groupIdSpan.dataset.paramName;
+      input.style.background = 'var(--bg)';
+      input.style.color = 'var(--text)';
+      input.style.border = '1px solid var(--border)';
+      input.style.borderRadius = '4px';
+      input.style.padding = '2px 6px';
+      input.style.fontSize = '11px';
+      input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+      input.style.minWidth = '100px';
       
-      // Get attribute definition to know the type
-      const [labelName, groupId] = groupKey.split('_');
-      const label = Array.from(labels.values()).find(l => l.name === labelName);
-      
-      if (label && label.groupConfig) {
-        const attrDef = label.groupConfig.groupAttributes.get(attrName);
+      groupIdSpan.textContent = '';
+      groupIdSpan.appendChild(input);
+    }
+    
+    // Convert attribute values to inputs (silver parameters)
+    if (attributesDiv) {
+      const attrItems = attributesDiv.querySelectorAll('.tree-item');
+      attrItems.forEach(attrItem => {
+        const attrValueDiv = attrItem.querySelector('.tree-param-value');
+        if (!attrValueDiv) return;
         
-        let input;
-        if (attrDef.type === 'string') {
-          input = document.createElement('input');
-          input.type = 'text';
-          input.value = currentValue;
-          input.style.background = 'var(--bg)';
-          input.style.color = 'var(--text)';
-          input.style.border = '1px solid var(--border)';
-          input.style.borderRadius = '4px';
-          input.style.padding = '2px 6px';
-          input.style.fontSize = '11px';
-          input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
-        } else if (attrDef.type === 'checkbox') {
-          input = document.createElement('input');
-          input.type = 'checkbox';
-          input.checked = currentValue === '✓';
-        } else if (attrDef.type === 'dropdown') {
-          input = document.createElement('select');
-          input.style.background = 'var(--bg)';
-          input.style.color = 'var(--text)';
-          input.style.border = '1px solid var(--border)';
-          input.style.borderRadius = '4px';
-          input.style.padding = '2px 6px';
-          input.style.fontSize = '11px';
-          input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+        const attrName = attrValueDiv.dataset.attrName;
+        const currentValue = attrValueDiv.textContent;
+        
+        // Get attribute definition to know the type
+        const [labelName, groupId] = groupKey.split('_');
+        const label = Array.from(labels.values()).find(l => l.name === labelName);
+        
+        if (label && label.groupConfig) {
+          const attrDef = label.groupConfig.groupAttributes.get(attrName);
           
-          attrDef.options.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt;
-            option.textContent = opt;
-            if (opt === currentValue) option.selected = true;
-            input.appendChild(option);
-          });
+          let input;
+          if (attrDef.type === 'string') {
+            input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentValue;
+            input.style.background = 'var(--bg)';
+            input.style.color = 'var(--text)';
+            input.style.border = '1px solid var(--border)';
+            input.style.borderRadius = '4px';
+            input.style.padding = '2px 6px';
+            input.style.fontSize = '11px';
+            input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+          } else if (attrDef.type === 'checkbox') {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = currentValue === '✓';
+          } else if (attrDef.type === 'dropdown') {
+            input = document.createElement('select');
+            input.style.background = 'var(--bg)';
+            input.style.color = 'var(--text)';
+            input.style.border = '1px solid var(--border)';
+            input.style.borderRadius = '4px';
+            input.style.padding = '2px 6px';
+            input.style.fontSize = '11px';
+            input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+            
+            attrDef.options.forEach(opt => {
+              const option = document.createElement('option');
+              option.value = opt;
+              option.textContent = opt;
+              if (opt === currentValue) option.selected = true;
+              input.appendChild(option);
+            });
+          }
+          
+          input.dataset.attrName = attrName;
+          attrValueDiv.textContent = '';
+          attrValueDiv.appendChild(input);
         }
-        
-        input.dataset.attrName = attrName;
-        attrValueDiv.textContent = '';
-        attrValueDiv.appendChild(input);
-      }
-    });
+      });
+    }
     
   } else {
     // Save and switch back to display mode
-    const [labelName, groupId] = groupKey.split('_');
+    const [labelName, oldGroupId] = groupKey.split('_');
     
-    // Collect new values
+    // Get new group ID from input
+    const groupIdInput = groupDiv.querySelector('.group-id-value input');
+    const newGroupId = groupIdInput ? groupIdInput.value.trim() : oldGroupId;
+    
+    // Collect new values for attributes
     const newValues = new Map();
-    const inputs = attributesDiv.querySelectorAll('input, select');
-    inputs.forEach(input => {
-      const attrName = input.dataset.attrName;
-      let value;
-      
-      if (input.type === 'checkbox') {
-        value = input.checked ? 'true' : 'false';
-      } else {
-        value = input.value;
-      }
-      
-      newValues.set(attrName, value);
-    });
+    if (attributesDiv) {
+      const inputs = attributesDiv.querySelectorAll('input, select');
+      inputs.forEach(input => {
+        const attrName = input.dataset.attrName;
+        let value;
+        
+        if (input.type === 'checkbox') {
+          value = input.checked ? 'true' : 'false';
+        } else {
+          value = input.value;
+        }
+        
+        newValues.set(attrName, value);
+      });
+    }
     
     // Update all labels with this group ID
-    updateGroupInDocument(labelName, groupId, newValues);
+    updateGroupInDocument(labelName, oldGroupId === 'undefined' ? '' : oldGroupId, newValues, newGroupId);
     
     // Refresh the display
     groupDiv.dataset.editing = 'false';
-    modifyBtn.title = 'Modify group attributes';
+    modifyBtn.title = 'Modify group ID and attributes';
     modifyBtn.classList.remove('save-active');
     
     refreshGroupsDisplay();
   }
 }
 
-function updateGroupInDocument(labelName, groupId, newValues) {
+function updateGroupInDocument(labelName, oldGroupId, newValues, newGroupId) {
   const labelElements = elements.htmlContent.querySelectorAll('manual_label');
   
   labelElements.forEach(labelEl => {
@@ -2126,12 +2189,26 @@ function updateGroupInDocument(labelName, groupId, newValues) {
       const label = getLabelByPath(path);
       
       if (label && label.groupConfig) {
-        const elGroupId = labelEl.getAttribute(label.groupConfig.groupIdAttribute);
+        const groupIdAttr = label.groupConfig.groupIdAttribute;
+        const elGroupId = labelEl.getAttribute(groupIdAttr) || '';
         
-        if (elGroupId === groupId) {
-          // Update this element's group attributes
+        if (elGroupId === oldGroupId) {
+          // Update group ID (gold parameter) if changed
+          if (newGroupId !== undefined && newGroupId !== oldGroupId) {
+            if (newGroupId === '') {
+              labelEl.removeAttribute(groupIdAttr);
+            } else {
+              labelEl.setAttribute(groupIdAttr, newGroupId);
+            }
+          }
+          
+          // Update this element's group attributes (silver parameters)
           newValues.forEach((value, attrName) => {
-            labelEl.setAttribute(attrName, value);
+            if (value === '') {
+              labelEl.removeAttribute(attrName);
+            } else {
+              labelEl.setAttribute(attrName, value);
+            }
           });
         }
       }
