@@ -849,6 +849,32 @@
   font-weight: 600 !important;
 }
 
+/* Group filter styles */
+.group-filter-dimmed {
+  opacity: 0.3 !important;
+  transition: opacity 0.3s ease;
+}
+
+.group-filter-highlight {
+  background-color: rgba(255, 215, 0, 0.2) !important;
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.4) !important;
+  transition: all 0.3s ease;
+}
+
+.group-filtered-active {
+  background-color: rgba(255, 215, 0, 0.1) !important;
+  border-left: 3px solid #FFD700 !important;
+}
+
+/* Make group items clickable */
+.group-item {
+  cursor: pointer;
+}
+
+.group-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
 /* Gold label styling in param menu */
 .gold-label {
   color: #FFD700;

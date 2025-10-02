@@ -24,6 +24,7 @@
   // ======= Group Display State =======
   let expandedGroups = new Set(); // Track expanded groups
   let groupsSectionExpanded = true; // Track if entire groups section is expanded
+  let activeGroupFilter = null; // Track active group filter
 
   let searchTimeout;
   const MIN_SEARCH_LENGTH = 2; // Only search for strings MIN_SEARCH_LENGTH+ characters
@@ -1761,6 +1762,9 @@ function refreshGroupsDisplay() {
   const groupsList = document.getElementById('groups-list');
   if (!groupsList) return;
   
+  // Clear any active group filter when refreshing
+  clearGroupFilter();
+  
   groupsList.innerHTML = '';
   
   // Collect all active groups from the HTML content
@@ -1840,6 +1844,15 @@ function refreshGroupsDisplay() {
     
     actions.appendChild(modifyBtn);
     
+    // Add click handler for group filtering
+    groupItem.onclick = (e) => {
+      // Don't trigger if clicking on actions or expand button
+      if (e.target.closest('.tree-actions') || e.target.closest('.tree-expand-btn')) {
+        return;
+      }
+      toggleGroupFilter(groupKey, labelName, groupData.groupId, groupData.groupIdAttr);
+    };
+    
     // Assemble group header
     groupItem.appendChild(expandBtn);
     groupItem.appendChild(icon);
@@ -1914,6 +1927,81 @@ function toggleGroupExpansion(groupKey) {
   }
   refreshGroupsDisplay();
 }
+
+// Toggle group filter to highlight specific group
+function toggleGroupFilter(groupKey, labelName, groupId, groupIdAttr) {
+  const isCurrentlyFiltered = activeGroupFilter === groupKey;
+  
+  // Reset any existing filter
+  clearGroupFilter();
+  
+  if (!isCurrentlyFiltered) {
+    // Apply new filter
+    activeGroupFilter = groupKey;
+    applyGroupFilter(labelName, groupId, groupIdAttr);
+    
+    // Update group item appearance to show it's active
+    const groupItems = document.querySelectorAll('.group-item');
+    groupItems.forEach(item => {
+      const titleSpan = item.querySelector('.tree-label');
+      if (titleSpan && titleSpan.textContent.includes(labelName) && 
+          titleSpan.textContent.includes(groupId === 'undefined' ? '' : groupId)) {
+        item.classList.add('group-filtered-active');
+      }
+    });
+  }
+}
+
+// Apply group filter to HTML content
+function applyGroupFilter(labelName, groupId, groupIdAttr) {
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  
+  labelElements.forEach(labelEl => {
+    const elLabelName = labelEl.getAttribute('labelName');
+    const elGroupId = labelEl.getAttribute(groupIdAttr) || '';
+    const actualGroupId = groupId === 'undefined' ? '' : groupId;
+    
+    if (elLabelName === labelName && elGroupId === actualGroupId) {
+      // This label belongs to the filtered group - highlight it
+      labelEl.classList.add('group-filter-highlight');
+    } else {
+      // This label doesn't belong to the filtered group - dim it
+      labelEl.classList.add('group-filter-dimmed');
+    }
+  });
+}
+
+// Clear group filter
+function clearGroupFilter() {
+  if (activeGroupFilter) {
+    // Remove all filter classes from labels
+    const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+    labelElements.forEach(labelEl => {
+      labelEl.classList.remove('group-filter-highlight', 'group-filter-dimmed');
+    });
+    
+    // Remove active state from group items
+    const groupItems = document.querySelectorAll('.group-item');
+    groupItems.forEach(item => {
+      item.classList.remove('group-filtered-active');
+    });
+    
+    activeGroupFilter = null;
+  }
+}
+
+// Add global click handler to clear group filter when clicking elsewhere
+document.addEventListener('click', function(e) {
+  // Don't clear if clicking within the groups section
+  if (e.target.closest('#groups-section')) {
+    return;
+  }
+  
+  // Clear the filter if one is active
+  if (activeGroupFilter) {
+    clearGroupFilter();
+  }
+});
 
 // Initialize groups header with expand button
 function initializeGroupsHeader() {
