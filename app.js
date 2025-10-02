@@ -3123,7 +3123,7 @@ function refreshSearchAfterLabeling() {
   // Check if there's an active search that needs refreshing
   if (currentSearchMatches.length > 0 || currentSearchSelection) {
     // Get the current search text from advanced content
-    const advancedText = elements.advancedContent.textContent.trim();
+    const advancedText = elements.advancedContent.textContent.trim().replace(/×/g, '');
     
     if (advancedText && advancedText.length >= MIN_SEARCH_LENGTH) {
       // Store the current match index to try to maintain position
@@ -4625,96 +4625,7 @@ function mapNormalizedPositionToReal(originalText, normalizedText, normalizedPos
   return realPos <= originalText.length ? realPos : -1;
 }
 
-function extractTextFromRange(startNode, startOffset, endNode, endOffset) {
-  try {
-    const range = document.createRange();
-    range.setStart(startNode, startOffset);
-    range.setEnd(endNode, endOffset);
-    return range.toString();
-  } catch (e) {
-    return '';
-  }
-}
 
-function mapNormalizedToOriginalPosition(originalText, normalizedPosition) {
-  let originalPos = 0;
-  let normalizedPos = 0;
-  
-  while (originalPos < originalText.length && normalizedPos < normalizedPosition) {
-    const char = originalText[originalPos];
-    
-    if (/\s/.test(char)) {
-      // This is whitespace - in normalized version, multiple whitespace becomes single space
-      // Skip consecutive whitespace in original
-      while (originalPos < originalText.length && /\s/.test(originalText[originalPos])) {
-        originalPos++;
-      }
-      normalizedPos++; // One space in normalized version
-    } else {
-      // Regular character
-      originalPos++;
-      normalizedPos++;
-    }
-  }
-  
-  return originalPos;
-}
-
-function highlightMatches(matches) {
-  if (matches.length === 0) return;
-  
-  // Process matches in reverse order to maintain text positions
-  // but keep original indices for proper navigation
-  const indexedMatches = matches.map((match, originalIndex) => ({
-    ...match,
-    originalIndex
-  }));
-  
-  const sortedMatches = [...indexedMatches].sort((a, b) => {
-    const nodeComparison = a.node.compareDocumentPosition(b.node);
-    if (nodeComparison & Node.DOCUMENT_POSITION_FOLLOWING) {
-      return -1;
-    } else if (nodeComparison & Node.DOCUMENT_POSITION_PRECEDING) {
-      return 1;
-    } else {
-      return b.startOffset - a.startOffset;
-    }
-  });
-  
-  sortedMatches.forEach((match) => {
-    try {
-      if (!match.node.parentNode || 
-          match.startOffset >= match.node.textContent.length ||
-          match.endOffset > match.node.textContent.length) {
-        console.warn('Skipping invalid match:', match);
-        return;
-      }
-      
-      const range = document.createRange();
-      range.setStart(match.node, match.startOffset);
-      range.setEnd(match.node, match.endOffset);
-      
-      const highlight = document.createElement('span');
-      highlight.className = 'search-highlight';
-      highlight.style.backgroundColor = '#ffff00';
-      highlight.style.color = '#000';
-      highlight.style.padding = '1px 2px';
-      highlight.style.borderRadius = '2px';
-      // Use original index for proper navigation order
-      highlight.dataset.matchIndex = match.originalIndex;
-      
-      range.surroundContents(highlight);
-      
-    } catch (e) {
-      console.warn('Could not highlight match:', e, match);
-    }
-  });
-  
-  // Store matches for navigation (keep original order)
-  window.currentSearchMatches = matches;
-}
-
-// Old clearSearchHighlights function removed - now using clearSearchOverlays
 
 function navigateToNextMatch() {
   if (!currentSearchMatches || currentSearchMatches.length === 0) {
@@ -5192,7 +5103,8 @@ window.addEventListener('resize', updateSearchOverlayPositions);
 
 
 elements.advancedContent.addEventListener('input', () => {
-  const searchText = elements.advancedContent.textContent.trim().replace(/×.*$/, '');
+  const searchText = lements.advancedContent.textContent.trim().replace(/×/g, '');
+  e
   
   // Clear existing timeout
   clearTimeout(searchTimeout);
@@ -5353,6 +5265,9 @@ window.addEventListener('click', (event) => {
   elements.newLabelColor.value = generateRandomColor();
   initializeGroupsHeader();
   refreshTreeUI();
+  
+  // Initialize empty state event listeners on page load
+  attachEmptyStateEventListeners();
   
   console.log('Enhanced HTML Labelizer ready!');
 
