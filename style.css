@@ -585,13 +585,26 @@
     }
 
     .context-menu h4 {
-      color: var(--sub);
-      font-size: 12px;
-      margin-bottom: 8px;
-      padding: 0 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      color: var(--accent);
+      font-size: 14px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
       font-weight: 600;
+      cursor: grab;
+      user-select: none;
+      padding: 4px 0 8px 0;
+      margin: -4px 0 12px 0;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+
+    .context-menu h4:hover {
+      cursor: grab;
+    }
+
+    .context-menu h4:active {
+      cursor: grabbing;
     }
 
     .label-options {
@@ -651,6 +664,10 @@
       user-select: none;
       padding: 4px 0 8px 0;
       margin: -4px 0 12px 0;
+    }
+
+    .param-menu h4:hover {
+      cursor: grab;
     }
 
     .param-menu h4:active {

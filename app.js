@@ -201,7 +201,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
       isDragging = false;
       handle.style.cursor = 'grab';
       
-      // Restore focus to first input after dragging
+      // Restore focus to first input after dragging (if menu has inputs)
       const firstInput = element.querySelector('input, select');
       if (firstInput) {
         firstInput.focus();
@@ -2745,6 +2745,12 @@ function updateStats() {
     elements.contextMenu.style.left = `${x}px`;
     elements.contextMenu.style.top = `${y}px`;
     elements.contextMenu.classList.remove('hidden');
+    
+    // Make the context menu draggable by its header
+    const contextHeader = elements.contextMenu.querySelector('h4');
+    if (contextHeader) {
+      makeDraggable(elements.contextMenu, contextHeader);
+    }
   }
 
   function hideContextMenu() {
