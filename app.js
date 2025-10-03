@@ -629,7 +629,18 @@ function deleteGroupAttribute(labelPath, attrName) {
   refreshTreeUI();
 }
 
+/**
+ * Close all open inline editors without saving
+ */
+function closeAllInlineEditors() {
+  const inlineEditors = document.querySelectorAll('.inline-editor');
+  inlineEditors.forEach(editor => editor.remove());
+}
+
 function promptAddSublabel(parentPath, container) {
+    // Close any existing inline editors first
+    closeAllInlineEditors();
+    
     // Create inline input row
     const inlineEditor = document.createElement("div");
     inlineEditor.className = "inline-editor";
@@ -666,6 +677,9 @@ function promptAddSublabel(parentPath, container) {
     }
 
 function promptAddParameter(labelPath, container) {
+  // Close any existing inline editors first
+  closeAllInlineEditors();
+  
   const label = getLabelByPath(labelPath);
   const hasGroupConfig = label && label.groupConfig;
   const hasGroupId = hasGroupConfig && label.groupConfig.groupIdAttribute;
@@ -853,6 +867,9 @@ function promptAddParameter(labelPath, container) {
 }
 
 function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
+  // Close any existing inline editors first
+  closeAllInlineEditors();
+  
   const inlineEditor = document.createElement("div");
   inlineEditor.className = "inline-editor";
 
@@ -1018,6 +1035,9 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     console.error("Container is undefined or null!");
     return;
   }
+
+  // Close any existing inline editors first
+  closeAllInlineEditors();
 
   const label = getLabelByPath(labelPath);
   

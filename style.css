@@ -242,6 +242,13 @@
       border: none !important;
     }
 
+    /* Save active button in light mode - override the edit button color */
+    :root[data-theme="light"] .tree-action-btn.edit.save-active {
+      background: var(--accent-2) !important;
+      color: white !important;
+      border: none !important;
+    }
+
     /* Header buttons always use dark theme styling */
     .app-header button {
       background: #152043 !important;
