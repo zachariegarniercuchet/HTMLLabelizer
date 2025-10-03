@@ -20,6 +20,7 @@
       <button id="download-html" disabled>Download</button>
       <button id="save-as" disabled>Save As...</button>
       <button id="clear-all">Clear All</button>
+      <button id="settings-btn" class="settings-btn" title="Settings">⚙</button> <!-- ⚙️ -->
     </div>
   </div>
 
@@ -135,6 +136,66 @@
     <h4 id="param-menu-title">Edit Parameters</h4>
     <div class="param-form" id="param-form">
       <!-- Parameter inputs will be populated here -->
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-modal hidden" id="settings-modal">
+    <div class="settings-overlay" id="settings-overlay"></div>
+    <div class="settings-content">
+      <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="settings-close-btn" id="settings-close-btn">×</button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-group">
+          <h4>Theme</h4>
+          <div class="theme-toggle-container">
+            <label class="theme-toggle">
+              <input type="checkbox" id="theme-toggle" />
+              <span class="theme-slider"></span>
+              <span class="theme-labels">
+                <span class="theme-label-dark">🌙 Dark</span>
+                <span class="theme-label-light">☀️ Light</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <h4>Text Contrast</h4>
+          <div class="contrast-container">
+            <label for="contrast-slider">Adjust text visibility</label>
+            <div class="slider-container">
+              <span class="slider-label">High</span>
+              <input type="range" id="contrast-slider" min="0" max="100" value="100" class="contrast-slider" />
+              <span class="slider-label">Low</span>
+            </div>
+            <div class="contrast-preview" id="contrast-preview">
+              Sample text preview
+            </div>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <h4>Background Warmth</h4>
+          <div class="background-container">
+            <label for="background-slider">Adjust background tone</label>
+            <div class="slider-container">
+              <span class="slider-label">Cool</span>
+              <input type="range" id="background-slider" min="0" max="100" value="50" class="background-slider" />
+              <span class="slider-label">Warm</span>
+            </div>
+            <div class="background-preview" id="background-preview">
+              Background preview
+            </div>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <button id="reset-settings" class="reset-btn">Reset to Defaults</button>
+        </div>
+      </div>
     </div>
   </div>
 

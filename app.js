@@ -5302,10 +5302,302 @@ window.addEventListener('click', (event) => {
   window.lastClickY = event.clientY;
 });
 
+  // ======= Theme Management =======
+  
+  // Theme settings keys for localStorage
+  const THEME_STORAGE_KEY = 'htmlLabelizer_theme';
+  const CONTRAST_STORAGE_KEY = 'htmlLabelizer_contrast';
+  const BACKGROUND_STORAGE_KEY = 'htmlLabelizer_background';
+  
+  // Theme state
+  let currentTheme = 'dark';
+  let textContrast = 100;
+  let backgroundWarmth = 50;
+  
+  // Initialize theme system
+  function initializeTheme() {
+    // Load saved preferences
+    loadThemeSettings();
+    
+    // Apply initial theme
+    applyTheme(currentTheme);
+    applyContrast(textContrast);
+    
+    // Initialize HTML content background for light theme
+    if (currentTheme === 'light') {
+      const root = document.documentElement;
+      root.style.setProperty('--html-content-bg', '#ffffff');
+    }
+    
+    applyBackgroundWarmth(backgroundWarmth);
+    
+    // Update UI controls
+    updateThemeControls();
+  }
+  
+  // Load theme settings from localStorage
+  function loadThemeSettings() {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    const savedContrast = localStorage.getItem(CONTRAST_STORAGE_KEY);
+    const savedBackground = localStorage.getItem(BACKGROUND_STORAGE_KEY);
+    
+    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+      currentTheme = savedTheme;
+    }
+    
+    if (savedContrast !== null) {
+      const contrast = parseInt(savedContrast, 10);
+      if (!isNaN(contrast) && contrast >= 0 && contrast <= 100) {
+        textContrast = contrast;
+      }
+    }
+    
+    if (savedBackground !== null) {
+      const background = parseInt(savedBackground, 10);
+      if (!isNaN(background) && background >= 0 && background <= 100) {
+        backgroundWarmth = background;
+      }
+    }
+  }
+  
+  // Save theme settings to localStorage
+  function saveThemeSettings() {
+    localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
+    localStorage.setItem(CONTRAST_STORAGE_KEY, textContrast.toString());
+    localStorage.setItem(BACKGROUND_STORAGE_KEY, backgroundWarmth.toString());
+  }
+  
+  // Apply theme to document
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    
+    if (theme === 'light') {
+      root.setAttribute('data-theme', 'light');
+    } else {
+      root.removeAttribute('data-theme');
+    }
+    
+    currentTheme = theme;
+    saveThemeSettings();
+    
+    // Reapply background warmth for the new theme
+    applyBackgroundWarmth(backgroundWarmth);
+  }
+  
+  // Apply text contrast
+  function applyContrast(contrast) {
+    const root = document.documentElement;
+    const opacity = contrast / 100;
+    
+    root.style.setProperty('--contrast-opacity', opacity);
+    textContrast = contrast;
+    saveThemeSettings();
+    
+    // Update preview text
+    updateContrastPreview(contrast);
+  }
+  
+  // Apply background warmth
+  function applyBackgroundWarmth(warmth) {
+    const root = document.documentElement;
+    
+    if (currentTheme === 'dark') {
+      // Dark theme: 0 = very dark, 100 = lighter/warmer dark
+      const intensity = warmth / 100;
+      const baseR = 11 + (intensity * 20);  // 11 to 31
+      const baseG = 16 + (intensity * 25);  // 16 to 41  
+      const baseB = 32 + (intensity * 30);  // 32 to 62
+      
+      root.style.setProperty('--bg-custom', `rgb(${Math.round(baseR)}, ${Math.round(baseG)}, ${Math.round(baseB)})`);
+      root.style.setProperty('--bg', 'var(--bg-custom)');
+    } else {
+      // Light theme: 0 = cool white, 100 = warm grey
+      const intensity = warmth / 100;
+      const baseR = 245 - (intensity * 30);  // 245 to 215 (warmer)
+      const baseG = 247 - (intensity * 25);  // 247 to 222
+      const baseB = 250 - (intensity * 35);  // 250 to 215 (less blue, more warm)
+      
+      root.style.setProperty('--bg-custom', `rgb(${Math.round(baseR)}, ${Math.round(baseG)}, ${Math.round(baseB)})`);
+      root.style.setProperty('--bg', 'var(--bg-custom)');
+      
+      // Also update HTML content background for light theme to be more grey/warm
+      const contentR = 255 - (intensity * 50);  // 255 to 205 (more noticeable change)
+      const contentG = 255 - (intensity * 45);  // 255 to 210
+      const contentB = 255 - (intensity * 55);  // 255 to 200 (warmer, less blue)
+      
+      root.style.setProperty('--html-content-bg', `rgb(${Math.round(contentR)}, ${Math.round(contentG)}, ${Math.round(contentB)})`);
+    }
+    
+    backgroundWarmth = warmth;
+    saveThemeSettings();
+    
+    // Update preview
+    updateBackgroundPreview(warmth);
+  }
+
+  // Update background preview
+  function updateBackgroundPreview(warmth) {
+    const preview = document.getElementById('background-preview');
+    if (preview) {
+      const percentage = Math.round(warmth);
+      const descriptor = currentTheme === 'dark' ? 
+        (warmth < 33 ? 'Very Dark' : warmth < 66 ? 'Medium Dark' : 'Warm Dark') :
+        (warmth < 33 ? 'Cool White' : warmth < 66 ? 'Neutral' : 'Warm Grey');
+      
+      preview.textContent = `Background: ${percentage}% - ${descriptor}`;
+      
+      // Apply the same background calculation for preview
+      if (currentTheme === 'dark') {
+        const intensity = warmth / 100;
+        const baseR = 11 + (intensity * 20);
+        const baseG = 16 + (intensity * 25);
+        const baseB = 32 + (intensity * 30);
+        preview.style.background = `rgb(${Math.round(baseR)}, ${Math.round(baseG)}, ${Math.round(baseB)})`;
+      } else {
+        const intensity = warmth / 100;
+        const baseR = 245 - (intensity * 30);
+        const baseG = 247 - (intensity * 25);
+        const baseB = 250 - (intensity * 35);
+        preview.style.background = `rgb(${Math.round(baseR)}, ${Math.round(baseG)}, ${Math.round(baseB)})`;
+      }
+    }
+  }
+
+  // Update contrast preview text
+  function updateContrastPreview(contrast) {
+    const preview = document.getElementById('contrast-preview');
+    if (preview) {
+      const percentage = Math.round(contrast);
+      preview.textContent = `Text visibility: ${percentage}% - This is how your text will appear`;
+      preview.style.color = `rgba(var(--text-rgb), ${contrast / 100})`;
+    }
+  }
+  
+  // Update theme controls in settings modal
+  function updateThemeControls() {
+    const themeToggle = document.getElementById('theme-toggle');
+    const contrastSlider = document.getElementById('contrast-slider');
+    const backgroundSlider = document.getElementById('background-slider');
+    
+    if (themeToggle) {
+      themeToggle.checked = currentTheme === 'light';
+    }
+    
+    if (contrastSlider) {
+      contrastSlider.value = textContrast;
+      updateContrastPreview(textContrast);
+    }
+    
+    if (backgroundSlider) {
+      backgroundSlider.value = backgroundWarmth;
+      updateBackgroundPreview(backgroundWarmth);
+    }
+  }
+  
+  // Toggle between light and dark theme
+  function toggleTheme() {
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(newTheme);
+  }
+  
+  // Reset to default settings
+  function resetThemeSettings() {
+    applyTheme('dark');
+    applyContrast(100);
+    applyBackgroundWarmth(50);
+    updateThemeControls();
+  }
+  
+  // Setup event listeners for theme controls
+  function setupThemeEventListeners() {
+    // Settings button
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsCloseBtn = document.getElementById('settings-close-btn');
+    
+    // Theme toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    // Contrast slider
+    const contrastSlider = document.getElementById('contrast-slider');
+    
+    // Background slider
+    const backgroundSlider = document.getElementById('background-slider');
+    
+    // Reset button
+    const resetBtn = document.getElementById('reset-settings');
+    
+    // Open settings modal
+    if (settingsBtn && settingsModal) {
+      settingsBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('hidden');
+        updateThemeControls();
+      });
+    }
+    
+    // Close settings modal
+    const closeModal = () => {
+      if (settingsModal) {
+        settingsModal.classList.add('hidden');
+      }
+    };
+    
+    if (settingsOverlay) {
+      settingsOverlay.addEventListener('click', closeModal);
+    }
+    
+    if (settingsCloseBtn) {
+      settingsCloseBtn.addEventListener('click', closeModal);
+    }
+    
+    // Handle ESC key to close modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && settingsModal && !settingsModal.classList.contains('hidden')) {
+        closeModal();
+      }
+    });
+    
+    // Theme toggle handler
+    if (themeToggle) {
+      themeToggle.addEventListener('change', (e) => {
+        const newTheme = e.target.checked ? 'light' : 'dark';
+        applyTheme(newTheme);
+      });
+    }
+    
+    // Contrast slider handler
+    if (contrastSlider) {
+      contrastSlider.addEventListener('input', (e) => {
+        const contrast = parseInt(e.target.value, 10);
+        applyContrast(contrast);
+      });
+    }
+    
+    // Background slider handler
+    if (backgroundSlider) {
+      backgroundSlider.addEventListener('input', (e) => {
+        const warmth = parseInt(e.target.value, 10);
+        applyBackgroundWarmth(warmth);
+      });
+    }
+    
+    // Reset button handler
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        resetThemeSettings();
+      });
+    }
+  }
+
   // ======= Initialize =======
   elements.newLabelColor.value = generateRandomColor();
   initializeGroupsHeader();
   refreshTreeUI();
+  
+  // Initialize theme system
+  initializeTheme();
+  setupThemeEventListeners();
   
   // Initialize empty state event listeners on page load
   attachEmptyStateEventListeners();
