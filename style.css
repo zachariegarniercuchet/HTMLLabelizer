@@ -482,6 +482,15 @@
       color: var(--accent);   /* highlight only arrow on hover */
     }
 
+    /* Light theme navigation buttons - more grey, less dark */
+    :root[data-theme="light"] .nav-btn {
+      color: #8a8a8a !important; /* Light grey instead of dark */
+    }
+
+    :root[data-theme="light"] .nav-btn:hover {
+      color: var(--accent) !important; /* Keep the accent color on hover */
+    }
+
     /* Tree Structure */
     .label-tree {
       margin-top: 16px;
@@ -543,6 +552,16 @@
     .tree-expand-btn:hover {
       background-color: var(--hover);
       color: var(--text);
+    }
+
+    /* Light theme expand buttons - more grey, less dark */
+    :root[data-theme="light"] .tree-expand-btn {
+      color: #8a8a8a !important; /* Light grey instead of dark */
+    }
+
+    :root[data-theme="light"] .tree-expand-btn:hover {
+      background-color: var(--hover) !important;
+      color: #666666 !important; /* Darker grey on hover */
     }
 
     .tree-expand-btn.collapsed::before {
@@ -1276,6 +1295,17 @@
       font-weight: bold;
     }
 
+    /* Light theme label delete buttons - more grey, less red */
+    :root[data-theme="light"] manual_label .delete-btn {
+      background: #8a8a8a !important; /* Light grey instead of red */
+      color: white !important;
+      border: none !important;
+    }
+
+    :root[data-theme="light"] manual_label .delete-btn:hover {
+      background: #e74c3c !important; /* Red on hover to indicate danger */
+    }
+
     .inline-edit-input {
       background: var(--bg);
       color: var(--text);
@@ -1463,15 +1493,31 @@
   transition: background-color 0.2s;
 }
 
-.view-toggle:hover {
-  background: #5a91e6;
-}
+    .view-toggle:hover {
+      background: #5a91e6;
+    }
 
-.view-toggle.active {
-  background: #4c7ce5;
-}
+    .view-toggle.active {
+      background: #4c7ce5;
+    }
 
-.html-header-controls {
+    /* Light theme view toggle button - better contrast */
+    :root[data-theme="light"] .view-toggle {
+      background: var(--accent) !important;
+      color: white !important;
+      border: 1px solid var(--accent) !important;
+    }
+
+    :root[data-theme="light"] .view-toggle:hover {
+      background: #1557b8 !important;
+      border-color: #1557b8 !important;
+    }
+
+    :root[data-theme="light"] .view-toggle.active {
+      background: var(--accent-2) !important;
+      border-color: var(--accent-2) !important;
+      color: white !important;
+    }.html-header-controls {
   display: flex;
   align-items: center;
   gap: 1rem;
