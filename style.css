@@ -152,6 +152,7 @@
     :root[data-theme="light"] #add-root-label:hover {
       background: #1557b8 !important;
       border-color: #1557b8 !important;
+      color: white !important;
     }
 
     :root[data-theme="light"] .apply-btn,
@@ -165,6 +166,45 @@
     :root[data-theme="light"] .apply-all-btn:hover {
       background: #0f5f26 !important;
       border-color: #0f5f26 !important;
+      color: white !important;
+    }
+
+    /* Save buttons in forms and inline editors */
+    :root[data-theme="light"] .save-btn,
+    :root[data-theme="light"] .save-btn.green {
+      background: var(--accent-2) !important;
+      border-color: var(--accent-2) !important;
+      color: white !important;
+    }
+
+    :root[data-theme="light"] .save-btn:hover,
+    :root[data-theme="light"] .save-btn.green:hover {
+      background: #0f5f26 !important;
+      border-color: #0f5f26 !important;
+      color: white !important;
+    }
+
+    /* Ensure all action buttons with colored backgrounds have white text */
+    :root[data-theme="light"] button[style*="background"] {
+      color: white !important;
+    }
+
+    /* Tree action buttons - keep original colors but ensure proper text contrast */
+    :root[data-theme="light"] .tree-action-btn.add:hover,
+    :root[data-theme="light"] .tree-action-btn.edit:hover,
+    :root[data-theme="light"] .tree-action-btn.delete:hover {
+      color: white !important;
+    }
+
+    /* Inline editor buttons (including "Add option" for dropdowns) */
+    :root[data-theme="light"] .inline-editor button {
+      color: white !important;
+    }
+
+    /* Additional safety for any missed buttons in forms/modals */
+    :root[data-theme="light"] .param-form button,
+    :root[data-theme="light"] .dropdown-section button {
+      color: white !important;
     }
 
     /* Clear button needs better contrast in light mode */
@@ -711,37 +751,54 @@
     }
 
     /* Gold parameter styling (Group ID) */
-    .tree-item.param-gold {
-      color: #FFD700;
+    .tree-item.param-gold,
+    .tree-item.param-gold .tree-label {
+      color: #FFD700 !important;
       font-weight: 600;
     }
 
     /* Light theme gold parameter - more readable */
-    :root[data-theme="light"] .tree-item.param-gold {
-      color: #B8860B; /* Dark goldenrod - much more readable on light backgrounds */
+    :root[data-theme="light"] .tree-item.param-gold,
+    :root[data-theme="light"] .tree-item.param-gold .tree-label {
+      color: #B8860B !important; /* Dark goldenrod - much more readable on light backgrounds */
     }
-    .tree-icon.param-regular::before { /* This doesn't work */
+
+    /* Gold parameter icon (circle) styling */
+    .tree-icon.param-gold::before {
       content: '◦';
-      color: var(#FFD700);
+      color: #FFD700;
       font-size: 12px;
     }
 
+    :root[data-theme="light"] .tree-icon.param-gold::before {
+      color: #B8860B; /* Match the text color in light mode */
+    }
+
+
+
+
 /* Silver parameter styling (Group Attributes) */
-.tree-item.param-silver {
-  color: #C0C0C0;
+.tree-item.param-silver,
+.tree-item.param-silver .tree-label {
+  color: #C0C0C0 !important;
   font-weight: 500;
 }
 
-.tree-icon.param-regular::before { /* This doesn't work */
-      content: '◦';
-      color: var(#C0C0C0);
-      font-size: 12px;
-    }
+/* Light theme silver parameter - more readable */
+:root[data-theme="light"] .tree-item.param-silver,
+:root[data-theme="light"] .tree-item.param-silver .tree-label {
+  color: #808080 !important; /* Darker grey for light mode readability */
+}
 
-.tree-icon.param-regular::before { /* This doesn't work */
+/* Silver parameter icon (circle) styling */
+.tree-icon.param-silver::before {
   content: '◦';
-  color: var(--accent);
+  color: #C0C0C0;
   font-size: 12px;
+}
+
+:root[data-theme="light"] .tree-icon.param-silver::before {
+  color: #808080; /* Match the text color in light mode */
 }
 
 /* Group section styling in forms */
@@ -1220,7 +1277,7 @@
 
 .gold-label::before {
   content: '◦ ';
-  color :#FFD700;
+  color: #FFD700;
 }
 
 /* Light theme gold label - more readable */
