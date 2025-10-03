@@ -5310,7 +5310,7 @@ window.addEventListener('click', (event) => {
   const BACKGROUND_STORAGE_KEY = 'htmlLabelizer_background';
   
   // Theme state
-  let currentTheme = 'dark';
+  let currentTheme = 'light';
   let textContrast = 100;
   let backgroundWarmth = 50;
   
@@ -5502,7 +5502,7 @@ window.addEventListener('click', (event) => {
   
   // Reset to default settings
   function resetThemeSettings() {
-    applyTheme('dark');
+    applyTheme('light');
     applyContrast(100);
     applyBackgroundWarmth(50);
     updateThemeControls();
