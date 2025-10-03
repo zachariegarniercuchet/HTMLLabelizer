@@ -939,6 +939,21 @@
       color: white;
     }
 
+    /* Light theme parameter menu close button - more grey, less dark */
+    :root[data-theme="light"] .param-close-btn {
+      color: #8a8a8a !important; /* Light grey instead of dark */
+    }
+
+    :root[data-theme="light"] .param-close-btn:hover {
+      background: var(--hover) !important;
+      color: #666666 !important; /* Darker grey on hover */
+    }
+
+    :root[data-theme="light"] .param-close-btn:active {
+      background: var(--danger) !important;
+      color: white !important; /* Keep red active state */
+    }
+
     .param-form {
       display: flex;
       flex-direction: column;
