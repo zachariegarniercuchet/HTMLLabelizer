@@ -653,8 +653,8 @@ function promptAddSublabel(parentPath, container) {
     saveBtn.textContent = "Save";
     saveBtn.className = "save-btn green";
 
-    // Handle save
-    saveBtn.onclick = () => {
+    // Handle save function
+    const handleSave = () => {
         const name = input.value.trim();
         if (!name) return;
 
@@ -665,6 +665,17 @@ function promptAddSublabel(parentPath, container) {
         const parentNodeId = parentPath.join(".");
         expandedNodes.add(parentNodeId);
         renderTree();
+        }
+    };
+
+    // Handle save on button click
+    saveBtn.onclick = handleSave;
+
+    // Handle save on Enter key press
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSave();
         }
     };
 
