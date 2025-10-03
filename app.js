@@ -1212,97 +1212,7 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
   nameInput.focus();
 }
 
-// ======= Groups Display Management =======
-function refreshGroupsDisplay() {
-  const groupsList = document.getElementById('groups-list');
-  if (!groupsList) return;
-  
-  groupsList.innerHTML = '';
-  
-  // Collect all active groups from the HTML content
-  updateActiveGroupsFromDOM();
-  
-  if (activeGroups.size === 0) {
-    groupsList.innerHTML = '<p>No active groups</p>';
-    return;
-  }
-  
-  activeGroups.forEach((groupData, groupId) => {
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'group-item';
-    
-    const header = document.createElement('div');
-    header.className = 'group-header';
-    header.innerHTML = `
-      <span class="group-title">${groupData.labelName} - ${groupId}</span>
-      <button class="modify-btn" data-group-id="${groupId}">Modify</button>
-    `;
-    
-    const attributesDiv = document.createElement('div');
-    attributesDiv.className = 'group-attributes';
-    
-    groupData.groupAttributes.forEach((attrDef, attrName) => {
-      const attrDiv = document.createElement('div');
-      attrDiv.className = 'group-attribute';
-      
-      let displayValue = groupData.currentValues?.get(attrName) || attrDef.default || '';
-      if (attrDef.type === 'checkbox') {
-        displayValue = displayValue === 'true' ? '✓' : '✗';
-      }
-      
-      attrDiv.innerHTML = `<span>${attrName}:</span> <span>${displayValue}</span>`;
-      attributesDiv.appendChild(attrDiv);
-    });
-    
-    groupDiv.appendChild(header);
-    groupDiv.appendChild(attributesDiv);
-    groupsList.appendChild(groupDiv);
-  });
-  
-  // Attach event listeners for modify buttons
-  groupsList.querySelectorAll('.modify-btn').forEach(btn => {
-    btn.onclick = () => showGroupEditModal(btn.dataset.groupId);
-  });
-}
-
-function updateActiveGroupsFromDOM() {
-  activeGroups.clear();
-  
-  // Scan all labeled elements in HTML content
-  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
-  
-  labelElements.forEach(labelEl => {
-    const labelName = labelEl.getAttribute('labelName');
-    const parent = labelEl.getAttribute('parent') || '';
-    const path = parent ? [parent, labelName] : [labelName];
-    const label = getLabelByPath(path);
-    
-    if (label && label.groupConfig) {
-      const groupIdAttr = label.groupConfig.groupIdAttribute;
-      const groupId = labelEl.getAttribute(groupIdAttr);
-      
-      if (groupId) {
-        if (!activeGroups.has(groupId)) {
-          activeGroups.set(groupId, {
-            labelName: labelName,
-            groupAttributes: label.groupConfig.groupAttributes,
-            currentValues: new Map()
-          });
-        }
-        
-        // Update current values
-        const groupData = activeGroups.get(groupId);
-        label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
-          const currentValue = labelEl.getAttribute(attrName) || attrDef.default;
-          groupData.currentValues.set(attrName, currentValue);
-        });
-      }
-    }
-  });
-}
-
-
-  // ======= Parameter Menu for Labeled Text =======
+// ======= Parameter Menu for Labeled Text =======
 function showParameterMenu(labelElement, x, y) {
   hideContextMenu();
   hideParameterMenu();
@@ -2043,69 +1953,7 @@ function toggleGroupsSection() {
   }
 }
 
-function collectActiveGroups() {
-  const groups = new Map();
-  
-  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
-  
-  labelElements.forEach(labelEl => {
-    const labelName = labelEl.getAttribute('labelName');
-    const parent = labelEl.getAttribute('parent') || '';
-    const path = parent ? [parent, labelName] : [labelName];
-    const label = getLabelByPath(path);
-    
-    if (label && label.groupConfig && label.groupConfig.groupIdAttribute) {
-      const groupIdAttr = label.groupConfig.groupIdAttribute;
-      const groupId = labelEl.getAttribute(groupIdAttr);
-      
-      // Show ALL labels that have a gold attribute (group ID), even if groupId is empty
-      if (labelEl.hasAttribute(groupIdAttr)) {
-        const groupKey = `${labelName}_${groupId || 'undefined'}`;
-        
-        if (!groups.has(groupKey)) {
-          const values = new Map();
-          
-          // For silver attributes, find the first occurrence across all elements with this group ID
-          label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
-            let firstValue = attrDef.default || '';
-            
-            // Find first occurrence of this attribute for this group
-            const allElementsWithSameGroup = Array.from(labelElements).filter(el => {
-              const elLabelName = el.getAttribute('labelName');
-              const elParent = el.getAttribute('parent') || '';
-              const elGroupId = el.getAttribute(groupIdAttr);
-              
-              return elLabelName === labelName && 
-                     elParent === parent && 
-                     elGroupId === groupId;
-            });
-            
-            // Look for first non-empty value
-            for (const el of allElementsWithSameGroup) {
-              const value = el.getAttribute(attrName);
-              if (value !== null && value.trim() !== '') {
-                firstValue = value;
-                break;
-              }
-            }
-            
-            values.set(attrName, firstValue);
-          });
-          
-          groups.set(groupKey, {
-            labelName,
-            groupId: groupId || 'undefined',
-            groupIdAttr,
-            groupAttributes: label.groupConfig.groupAttributes,
-            values
-          });
-        }
-      }
-    }
-  });
-  
-  return groups;
-}
+
 
 function toggleGroupEdit(groupDiv, groupKey) {
   const isEditing = groupDiv.dataset.editing === 'true';
@@ -2489,8 +2337,6 @@ function applySourceChanges() {
     console.log("HTMLLabelizer schema found - rebuilding label tree from document");
     labels.clear();
     buildLabelsFromSchema(schema);
-    // 3. Parse existing manual_label elements and populate group attributes
-    populateGroupAttributesFromExistingLabels(doc);
 
     refreshTreeUI();
   } else {
@@ -2505,16 +2351,7 @@ function applySourceChanges() {
   
 }
 
-// Replace the populateGroupAttributesFromExistingLabels function with this:
-function populateGroupAttributesFromExistingLabels(doc) {
-  // Don't modify the document here - just extract group info
-  // The actual syncing will happen when the user interacts with groups
-  
-  // This function should only be used during initial parsing
-  // to preserve existing group attribute values if they exist
-}
 
-// The correct extractExistingLabels function is defined above - this duplicate has been removed
 
 // Update collectActiveGroups to handle empty/undefined group IDs:
 function collectActiveGroups() {
@@ -3928,37 +3765,7 @@ function cloneFormattingHierarchy(originalTextNode, newTextNode) {
   return currentNode;
 }
 
-function buildStructureMap(advancedLabel) {
-  const map = [];
-  let currentOffset = 0;
-  
-  Array.from(advancedLabel.childNodes).forEach(child => {
-    if (child.nodeType === Node.TEXT_NODE) {
-      const text = child.textContent;
-      if (text) {
-        map.push({
-          start: currentOffset,
-          end: currentOffset + text.length,
-          labelInfo: null // Just text, no label
-        });
-        currentOffset += text.length;
-      }
-    } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'MANUAL_LABEL') {
-      const labelText = getCleanTextFromElement(child);
-      map.push({
-        start: currentOffset,
-        end: currentOffset + labelText.length,
-        labelInfo: {
-          element: child,
-          text: labelText
-        }
-      });
-      currentOffset += labelText.length;
-    }
-  });
-  
-  return map;
-}
+
 
 function createSingleLabel(labelInfo, content) {
   const labelElement = document.createElement("manual_label");
@@ -3993,79 +3800,7 @@ function createSingleLabel(labelInfo, content) {
   return labelElement;
 }
 
-function extractFormattedContentPortion(originalContent, startOffset, endOffset, fullText) {
-  // This function extracts a portion of formatted content while preserving HTML structure
-  
-  if (startOffset === 0 && endOffset === fullText.length) {
-    // If we need the entire content, return a clone
-    return originalContent.cloneNode(true);
-  }
-  
-  // Create a range to extract the specific portion
-  const tempDiv = document.createElement('div');
-  tempDiv.appendChild(originalContent.cloneNode(true));
-  
-  // Find the start and end positions within the formatted content
-  const walker = document.createTreeWalker(
-    tempDiv,
-    NodeFilter.SHOW_TEXT,
-    null,
-    false
-  );
-  
-  let currentOffset = 0;
-  let startNode = null;
-  let startNodeOffset = 0;
-  let endNode = null;
-  let endNodeOffset = 0;
-  
-  let textNode;
-  while (textNode = walker.nextNode()) {
-    const nodeText = textNode.textContent;
-    const nodeLength = nodeText.length;
-    
-    // Check if start position is in this node
-    if (startNode === null && currentOffset + nodeLength > startOffset) {
-      startNode = textNode;
-      startNodeOffset = startOffset - currentOffset;
-    }
-    
-    // Check if end position is in this node
-    if (currentOffset + nodeLength >= endOffset) {
-      endNode = textNode;
-      endNodeOffset = endOffset - currentOffset;
-      break;
-    }
-    
-    currentOffset += nodeLength;
-  }
-  
-  if (!startNode || !endNode) {
-    // Fallback to simple text node if we can't find the positions
-    const extractedText = fullText.substring(startOffset, endOffset);
-    return document.createTextNode(extractedText);
-  }
-  
-  try {
-    // Create a range within the temporary div
-    const range = document.createRange();
-    range.setStart(startNode, startNodeOffset);
-    range.setEnd(endNode, endNodeOffset);
-    
-    // Extract the contents - but we need better handling for split formatting
-    const extractedFragment = range.extractContents();
-    
-    // Handle split formatting by preserving incomplete opening/closing tags
-    const processedFragment = handleSplitFormattingInExtraction(extractedFragment, startNode, endNode, startNodeOffset, endNodeOffset);
-    
-    return processedFragment;
-  } catch (e) {
-    console.warn('Could not extract formatted portion, falling back to text:', e);
-    // Fallback to simple text node
-    const extractedText = fullText.substring(startOffset, endOffset);
-    return document.createTextNode(extractedText);
-  }
-}
+
 
 function handleSplitFormattingInExtraction(fragment, startNode, endNode, startOffset, endOffset) {
   // This function handles cases where formatting elements are split across extraction boundaries
@@ -5193,6 +4928,11 @@ function navigateToPreviousMatch() {
       isSourceView = false;
       elements.viewToggle.textContent = 'View Source';
       elements.viewToggle.classList.remove('active');
+      
+      // Clear advanced content section
+      elements.advancedContent.innerHTML = '';
+      clearSearchOverlays();
+      
       renderHtmlContent();
       refreshTreeUI();
       elements.downloadBtn.disabled = true;
@@ -5405,8 +5145,7 @@ window.addEventListener('resize', updateSearchOverlayPositions);
 
 
 elements.advancedContent.addEventListener('input', () => {
-  const searchText = lements.advancedContent.textContent.trim().replace(/×/g, '');
-  e
+  const searchText = elements.advancedContent.textContent.trim().replace(/×/g, '');
   
   // Clear existing timeout
   clearTimeout(searchTimeout);
