@@ -262,8 +262,175 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     
     // Preserve case of parameter name
     label.params.set(paramName, paramValue);
+    
+    // Update all existing HTML elements with the new parameter
+    updateExistingElementsWithParameter(labelPath, paramName, paramValue);
+    
     refreshTreeUI();
     return true;
+  }
+
+  // Helper function to update all existing HTML elements with a new parameter
+  function updateExistingElementsWithParameter(labelPath, paramName, paramValue) {
+    const labelName = labelPath[labelPath.length - 1];
+    const parentName = labelPath.length > 1 ? labelPath[labelPath.length - 2] : '';
+    
+    // Get the default value based on parameter type
+    let defaultValue = '';
+    if (typeof paramValue === 'object' && paramValue.type) {
+      switch (paramValue.type) {
+        case 'dropdown':
+          defaultValue = paramValue.default || (paramValue.options && paramValue.options[0]) || '';
+          break;
+        case 'checkbox':
+          defaultValue = paramValue.default ? 'true' : 'false';
+          break;
+        case 'string':
+        default:
+          defaultValue = paramValue.default || '';
+          break;
+      }
+    } else {
+      defaultValue = paramValue || '';
+    }
+    
+    console.log(`Updating existing elements: ${labelName} (parent: ${parentName}) with parameter ${paramName} = ${defaultValue}`);
+    
+    // Find all HTML elements with this label
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    let updatedCount = 0;
+    
+    allLabelElements.forEach(element => {
+      const elLabelName = element.getAttribute('labelName');
+      const elParent = element.getAttribute('parent') || '';
+      
+      if (elLabelName === labelName && elParent === parentName) {
+        // Only add the parameter if it doesn't already exist
+        if (!element.hasAttribute(paramName)) {
+          element.setAttribute(paramName, defaultValue);
+          updatedCount++;
+        }
+      }
+    });
+    
+    if (updatedCount > 0) {
+      updateCurrentHtmlFromDOM();
+      console.log(`Updated ${updatedCount} existing elements with parameter ${paramName}`);
+      
+      // Show a brief notification to the user
+      showParameterUpdateNotification(updatedCount, paramName, labelName);
+    }
+  }
+
+  // Helper function to remove a parameter from existing HTML elements
+  function removeParameterFromExistingElements(labelPath, paramName) {
+    const labelName = labelPath[labelPath.length - 1];
+    const parentName = labelPath.length > 1 ? labelPath[labelPath.length - 2] : '';
+    
+    console.log(`Removing parameter ${paramName} from existing elements: ${labelName} (parent: ${parentName})`);
+    
+    // Find all HTML elements with this label
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    let updatedCount = 0;
+    
+    allLabelElements.forEach(element => {
+      const elLabelName = element.getAttribute('labelName');
+      const elParent = element.getAttribute('parent') || '';
+      
+      if (elLabelName === labelName && elParent === parentName) {
+        if (element.hasAttribute(paramName)) {
+          element.removeAttribute(paramName);
+          updatedCount++;
+        }
+      }
+    });
+    
+    if (updatedCount > 0) {
+      updateCurrentHtmlFromDOM();
+      console.log(`Removed parameter ${paramName} from ${updatedCount} existing elements`);
+    }
+    
+    return updatedCount;
+  }
+
+  // Show a brief notification when parameters are updated
+  function showParameterUpdateNotification(count, paramName, labelName) {
+    // Remove any existing notification
+    const existingNotification = document.querySelector('.parameter-update-notification');
+    if (existingNotification) {
+      existingNotification.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = 'parameter-update-notification';
+    notification.innerHTML = `
+      <span class="notification-icon">✓</span>
+      <span class="notification-text">Updated ${count} existing "${labelName}" element${count !== 1 ? 's' : ''} with parameter "${paramName}"</span>
+    `;
+    
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #20c997, #17a2b8);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      max-width: 400px;
+      line-height: 1.4;
+      animation: slideInRight 0.3s ease-out;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+    
+    // Add animation CSS if not already present
+    if (!document.querySelector('#parameter-notification-styles')) {
+      const style = document.createElement('style');
+      style.id = 'parameter-notification-styles';
+      style.textContent = `
+        @keyframes slideInRight {
+          from { 
+            transform: translateX(100%); 
+            opacity: 0; 
+          }
+          to { 
+            transform: translateX(0); 
+            opacity: 1; 
+          }
+        }
+        
+        .parameter-update-notification .notification-icon {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.animation = 'slideInRight 0.3s ease-out reverse';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.remove();
+          }
+        }, 300);
+      }
+    }, 4000);
   }
 
   function getLabelByPath(path) {
@@ -590,9 +757,124 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     const label = getLabelByPath(labelPath);
     if (!label) return false;
     
+    // Remove parameter from existing HTML elements
+    const removedCount = removeParameterFromExistingElements(labelPath, paramName);
+    
+    // Remove from label definition
     label.params.delete(paramName);
+    
+    if (removedCount > 0) {
+      // Show notification
+      showParameterRemovalNotification(removedCount, paramName, labelPath[labelPath.length - 1]);
+    }
+    
     refreshTreeUI();
     return true;
+  }
+
+  // Show notification when entire groups are deleted
+  function showGroupDeletionNotification(groupIdRemovedCount, groupAttrsRemovedCount, totalParametersRemoved, labelName) {
+    // Remove any existing notification
+    const existingNotification = document.querySelector('.parameter-update-notification');
+    if (existingNotification) {
+      existingNotification.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = 'parameter-update-notification';
+    
+    const totalElementsAffected = Math.max(groupIdRemovedCount, groupAttrsRemovedCount);
+    const elementText = totalElementsAffected === 1 ? 'element' : 'elements';
+    const paramText = totalParametersRemoved === 1 ? 'parameter' : 'parameters';
+    
+    notification.innerHTML = `
+      <span class="notification-icon">🗑️</span>
+      <span class="notification-text">Deleted group for "${labelName}" - removed ${totalParametersRemoved} ${paramText} from ${totalElementsAffected} ${elementText}</span>
+    `;
+    
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #dc3545, #c82333);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      max-width: 420px;
+      line-height: 1.4;
+      animation: slideInRight 0.3s ease-out;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds (longer for group deletions)
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.animation = 'slideInRight 0.3s ease-out reverse';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.remove();
+          }
+        }, 300);
+      }
+    }, 5000);
+  }
+
+  // Show notification when parameters are removed
+  function showParameterRemovalNotification(count, paramName, labelName) {
+    // Remove any existing notification
+    const existingNotification = document.querySelector('.parameter-update-notification');
+    if (existingNotification) {
+      existingNotification.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = 'parameter-update-notification';
+    notification.innerHTML = `
+      <span class="notification-icon">🗑️</span>
+      <span class="notification-text">Removed parameter "${paramName}" from ${count} existing "${labelName}" element${count !== 1 ? 's' : ''}</span>
+    `;
+    
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #dc3545, #c82333);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      max-width: 400px;
+      line-height: 1.4;
+      animation: slideInRight 0.3s ease-out;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.animation = 'slideInRight 0.3s ease-out reverse';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.remove();
+          }
+        }, 300);
+      }
+    }, 4000);
   }
 
   // ======= Tree UI Management =======
@@ -889,21 +1171,51 @@ function deleteGroup(labelPath) {
   const label = getLabelByPath(labelPath);
   if (!label || !label.groupConfig) return;
 
-  // Remove the group ID parameter
-  label.params.delete(label.groupConfig.groupIdAttribute);
+  const groupIdAttribute = label.groupConfig.groupIdAttribute;
+  const groupAttributes = Array.from(label.groupConfig.groupAttributes.keys());
+  
+  // Remove the group ID parameter from existing HTML elements
+  const groupIdRemovedCount = removeParameterFromExistingElements(labelPath, groupIdAttribute);
+  
+  // Remove all group attributes from existing HTML elements
+  let totalGroupAttrsRemoved = 0;
+  groupAttributes.forEach(attrName => {
+    totalGroupAttrsRemoved += removeParameterFromExistingElements(labelPath, attrName);
+  });
+  
+  // Remove the group ID parameter from label definition
+  label.params.delete(groupIdAttribute);
   
   // Remove group config (this also removes all group attributes)
   label.groupConfig = null;
 
+  // Show notification about removed parameters
+  if (groupIdRemovedCount > 0 || totalGroupAttrsRemoved > 0) {
+    const labelName = labelPath[labelPath.length - 1];
+    showGroupDeletionNotification(groupIdRemovedCount, totalGroupAttrsRemoved, groupAttributes.length + 1, labelName);
+  }
+
   refreshTreeUI();
+  refreshGroupsDisplay(); // Refresh groups display since groups have been removed
 }
 
 function deleteGroupAttribute(labelPath, attrName) {
   const label = getLabelByPath(labelPath);
   if (!label || !label.groupConfig) return;
 
+  // Remove group attribute from existing HTML elements
+  const removedCount = removeParameterFromExistingElements(labelPath, attrName);
+  
+  // Remove from label definition
   label.groupConfig.groupAttributes.delete(attrName);
+  
+  if (removedCount > 0) {
+    const labelName = labelPath[labelPath.length - 1];
+    showParameterRemovalNotification(removedCount, attrName, labelName);
+  }
+
   refreshTreeUI();
+  refreshGroupsDisplay(); // Refresh groups display since group attributes have changed
 }
 
 /**
@@ -1127,9 +1439,15 @@ function promptAddParameter(labelPath, container) {
       };
       // Add as regular parameter too
       addParameter(labelPath, paramName, paramValue);
+      // Refresh groups display since a new group ID has been created
+      setTimeout(() => refreshGroupsDisplay(), 100);
     } else if (hasGroupId && groupAttrCheckbox.checked) {
       // Add as group attribute
       label.groupConfig.groupAttributes.set(paramName, paramValue);
+      // Update existing elements with the new group attribute
+      updateExistingElementsWithParameter(labelPath, paramName, paramValue);
+      // Refresh groups display since new group attributes have been added
+      setTimeout(() => refreshGroupsDisplay(), 100);
     } else {
       // Add as regular parameter
       addParameter(labelPath, paramName, paramValue);
@@ -1295,9 +1613,13 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
       // Remove old attribute if name changed
       if (newAttrName !== attrName) {
         label.groupConfig.groupAttributes.delete(attrName);
+        // Remove old attribute from existing HTML elements
+        removeParameterFromExistingElements(labelPath, attrName);
       }
       // Add new/updated attribute
       label.groupConfig.groupAttributes.set(newAttrName, newAttrValue);
+      // Update existing HTML elements with the new/updated group attribute
+      updateExistingElementsWithParameter(labelPath, newAttrName, newAttrValue);
     }
 
     inlineEditor.remove();
