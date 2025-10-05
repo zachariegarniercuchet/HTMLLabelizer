@@ -324,7 +324,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 
 function refreshTreeUI() {
   renderTree();
-  updateLabelOptions();
+  // Don't automatically update label options - let context menu handle this contextually
   updateStats();
   
   // Ensure groups header has expand button after any tree updates
@@ -2208,20 +2208,116 @@ function updateGroupInDocument(labelName, oldGroupId, newValues, newGroupId) {
     return result;
   }
 
-  function updateLabelOptions() {
+  // Get only parent/root labels (labels that have no parent path)
+  function getParentLabelsOnly(labelMap) {
+    const result = [];
+    labelMap.forEach((label, name) => {
+      const fullPath = [name];
+      const displayName = name;
+      result.push({ path: fullPath, label, displayName });
+    });
+    return result;
+  }
+
+  // Get only child labels of a specific parent
+  function getChildLabelsOnly(parentLabelName) {
+    const result = [];
+    
+    // Find the parent label
+    if (labels.has(parentLabelName)) {
+      const parentLabel = labels.get(parentLabelName);
+      const parentPath = [parentLabelName];
+      
+      // Get all sublabels recursively
+      const childLabels = getAllLabelsRecursive(parentLabel.sublabels, parentPath);
+      result.push(...childLabels);
+    }
+    
+    return result;
+  }
+
+  // Smart context detection function
+  function detectLabelingContext(range) {
+    if (!range) return { type: 'all', parentLabel: null };
+    
+    let currentNode = range.startContainer;
+    
+    // If we're in a text node, check its parent elements
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      currentNode = currentNode.parentNode;
+    }
+    
+    // Walk up the DOM tree to find if we're inside a manual_label
+    const containingLabel = getContainingManualLabel(currentNode);
+    
+    if (containingLabel) {
+      // We're inside a manual_label, so we should show only child labels
+      const parentLabelName = containingLabel.getAttribute('labelname');
+      console.log('Selection is inside manual_label:', parentLabelName);
+      
+      return {
+        type: 'children',
+        parentLabel: parentLabelName,
+        parentElement: containingLabel
+      };
+    } else {
+      // We're in plain text, so we should show only parent labels
+      console.log('Selection is in plain text, showing parent labels only');
+      
+      return {
+        type: 'parents',
+        parentLabel: null,
+        parentElement: null
+      };
+    }
+  }
+
+  function updateLabelOptions(context = null) {
     elements.labelOptions.innerHTML = "";
 
-    const allLabels = getAllLabelsRecursive(labels);
+    let availableLabels = [];
+    let headerText = "Select a label";
 
-    if (allLabels.length === 0) {
+    if (context) {
+      switch (context.type) {
+        case 'parents':
+          availableLabels = getParentLabelsOnly(labels);
+          headerText = "Select a parent label";
+          break;
+        case 'children':
+          availableLabels = getChildLabelsOnly(context.parentLabel);
+          headerText = `Select a sublabel of "${context.parentLabel}"`;
+          break;
+        default:
+          availableLabels = getAllLabelsRecursive(labels);
+          break;
+      }
+    } else {
+      // Fallback to all labels
+      availableLabels = getAllLabelsRecursive(labels);
+    }
+
+    // Update the context menu header
+    const contextHeader = elements.contextMenu.querySelector('h4');
+    if (contextHeader) {
+      contextHeader.textContent = headerText;
+    }
+
+    if (availableLabels.length === 0) {
       const noLabels = document.createElement("div");
       noLabels.className = "no-labels";
-      noLabels.textContent = "No labels defined";
+      
+      if (context && context.type === 'children') {
+        noLabels.textContent = `No sublabels defined for "${context.parentLabel}"`;
+      } else {
+        noLabels.textContent = "No labels defined";
+      }
+      
       elements.labelOptions.appendChild(noLabels);
       return;
     }
 
-    allLabels.forEach(({ path, label, displayName }) => {
+    availableLabels.forEach(({ path, label, displayName }) => {
       const option = document.createElement("button");
       option.className = "label-option";
       option.textContent = displayName;
@@ -2785,6 +2881,24 @@ function updateStats() {
     elements.contextMenu.style.top = `${y}px`;
     elements.contextMenu.classList.remove('hidden');
     
+    // Smart context detection - determine what labels to show
+    let contextualRange = null;
+    
+    if (multiSelectionMode && multiSelections.length > 0) {
+      // Use the first selection for context detection in multi-selection mode
+      contextualRange = multiSelections[0].range;
+    } else if (currentSelection) {
+      contextualRange = currentSelection.range;
+    } else if (currentAdvancedMouseSelection) {
+      contextualRange = currentAdvancedMouseSelection.range;
+    } else if (currentSearchSelection) {
+      contextualRange = currentSearchSelection.range;
+    }
+    
+    // Detect the labeling context and update label options accordingly
+    const context = detectLabelingContext(contextualRange);
+    updateLabelOptions(context);
+    
     // Make the context menu draggable by its header
     const contextHeader = elements.contextMenu.querySelector('h4');
     if (contextHeader) {
@@ -2794,6 +2908,8 @@ function updateStats() {
 
   function hideContextMenu() {
     elements.contextMenu.classList.add('hidden');
+    // Reset to show all labels when context menu is hidden
+    updateLabelOptions();
   }
 
   function clearAllSelections() {
@@ -2909,11 +3025,186 @@ function getContainingManualLabel(node) {
 
 
 // ======= Multi-Selection Functions =======
+
+// Function to show temporary message for multi-selection validation
+function showTemporaryMessage(message, duration = 10000) {
+  // Remove any existing temporary message
+  const existingMessage = document.querySelector('.temp-validation-message');
+  if (existingMessage) {
+    existingMessage.remove();
+  }
+
+  // Create temporary message element
+  const messageElement = document.createElement('div');
+  messageElement.className = 'temp-validation-message';
+  
+  // Create icon and content
+  const icon = document.createElement('span');
+  icon.innerHTML = '⚠️';
+  icon.style.marginRight = '8px';
+  
+  const content = document.createElement('span');
+  content.textContent = message;
+  
+  messageElement.appendChild(icon);
+  messageElement.appendChild(content);
+  
+  messageElement.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #ff6b35, #f39c12);
+    color: white;
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    z-index: 10000;
+    max-width: 400px;
+    line-height: 1.4;
+    animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+  `;
+
+  // Add animation CSS if not already present
+  if (!document.querySelector('#temp-message-styles')) {
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'temp-message-styles';
+    styleSheet.textContent = `
+      @keyframes slideInRight {
+        from { 
+          transform: translateX(100%) scale(0.8); 
+          opacity: 0; 
+        }
+        to { 
+          transform: translateX(0) scale(1); 
+          opacity: 1; 
+        }
+      }
+      @keyframes slideOutRight {
+        from { 
+          transform: translateX(0) scale(1); 
+          opacity: 1; 
+        }
+        to { 
+          transform: translateX(100%) scale(0.8); 
+          opacity: 0; 
+        }
+      }
+      .temp-validation-message:hover {
+        transform: scale(1.02);
+        transition: transform 0.2s ease;
+      }
+    `;
+    document.head.appendChild(styleSheet);
+  }
+
+  document.body.appendChild(messageElement);
+
+  // Make message clickable to dismiss early
+  messageElement.style.cursor = 'pointer';
+  messageElement.addEventListener('click', () => {
+    if (messageElement.parentNode) {
+      messageElement.style.animation = 'slideOutRight 0.3s ease-in forwards';
+      setTimeout(() => {
+        if (messageElement.parentNode) {
+          messageElement.remove();
+        }
+      }, 300);
+    }
+  });
+
+  // Auto-remove after duration
+  const timeoutId = setTimeout(() => {
+    if (messageElement.parentNode) {
+      messageElement.style.animation = 'slideOutRight 0.3s ease-in forwards';
+      setTimeout(() => {
+        if (messageElement.parentNode) {
+          messageElement.remove();
+        }
+      }, 300);
+    }
+  }, duration);
+
+  // Store timeout id for potential early clearing
+  messageElement.timeoutId = timeoutId;
+}
+
+// Function to validate multi-selection compatibility
+function validateMultiSelectionCompatibility(newRange, newContainer) {
+  if (multiSelections.length === 0) {
+    return { compatible: true };
+  }
+
+  try {
+    // Get the labeling context for the new selection
+    const newContext = detectLabelingContext(newRange);
+    
+    // Get the labeling context for the first existing selection (they should all be the same)
+    const firstSelection = multiSelections[0];
+    const firstContext = detectLabelingContext(firstSelection.range);
+
+    console.log('Multi-selection compatibility check:');
+    console.log('New context:', newContext);
+    console.log('Existing context:', firstContext);
+
+    // Check if both selections are in the same type of context
+    if (newContext.type !== firstContext.type) {
+      return {
+        compatible: false,
+        reason: `Cannot mix ${newContext.type === 'parents' ? 'plain text' : 'nested'} selections with ${firstContext.type === 'parents' ? 'plain text' : 'nested'} selections.`
+      };
+    }
+
+    // If both are in 'children' context, check if they have the same parent label type
+    if (newContext.type === 'children' && firstContext.type === 'children') {
+      if (newContext.parentLabel !== firstContext.parentLabel) {
+        return {
+          compatible: false,
+          reason: `Cannot mix selections from different parent labels. Current selections are from "${firstContext.parentLabel}", but new selection is from "${newContext.parentLabel}".`
+        };
+      }
+    }
+
+    // Check if both selections are in the same content area (HTML vs Advanced)
+    const newIsAdvanced = elements.advancedContent.contains(newContainer) || elements.advancedContent === newContainer;
+    const firstIsAdvanced = firstSelection.isAdvanced;
+
+    if (newIsAdvanced !== firstIsAdvanced) {
+      return {
+        compatible: false,
+        reason: 'Cannot mix selections from HTML content and Advanced content areas.'
+      };
+    }
+
+    console.log('✓ Multi-selection compatibility check passed');
+    return { compatible: true };
+    
+  } catch (error) {
+    console.error('Error in multi-selection compatibility check:', error);
+    return {
+      compatible: false,
+      reason: 'Unable to validate selection compatibility due to an error.'
+    };
+  }
+}
+
 function addToMultiSelection(range, container) {
   // Validate each selection
   const validation = isValidSelection(range);
   if (!validation.valid) {
     alert("Invalid Selection: " + validation.reason);
+    return false;
+  }
+
+  // Check compatibility with existing selections
+  const compatibility = validateMultiSelectionCompatibility(range, container);
+  if (!compatibility.compatible) {
+    showTemporaryMessage(compatibility.reason);
     return false;
   }
 
@@ -3004,6 +3295,16 @@ function clearMultiSelectionHighlights() {
   // Remove all overlay elements
   const overlays = document.querySelectorAll('.multi-selection-overlay');
   overlays.forEach(overlay => overlay.remove());
+  
+  // Also clear any temporary validation messages
+  const tempMessage = document.querySelector('.temp-validation-message');
+  if (tempMessage) {
+    // Clear any pending timeout
+    if (tempMessage.timeoutId) {
+      clearTimeout(tempMessage.timeoutId);
+    }
+    tempMessage.remove();
+  }
 }
 
 // Update overlays on scroll/resize
@@ -5011,7 +5312,9 @@ document.addEventListener('mouseup', (e) => {
       if (multiSelectionMode && ctrlPressed) {
         // Add to multi-selection
         if (addToMultiSelection(range, container)) {
-          console.log(`Added selection ${multiSelections.length}: "${range.toString().trim()}"`);
+          console.log(`✓ Added selection ${multiSelections.length}: "${range.toString().trim()}"`);
+        } else {
+          console.log(`✗ Rejected selection: "${range.toString().trim()}" (compatibility check failed)`);
         }
         // Clear the visual selection but keep our stored ranges
         selection.removeAllRanges();
