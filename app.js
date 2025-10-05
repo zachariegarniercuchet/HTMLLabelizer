@@ -285,6 +285,275 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     return null;
   }
 
+  // Helper function to count affected HTML elements
+  function countAffectedElements(labelPath) {
+    const labelName = labelPath[labelPath.length - 1];
+    const parentName = labelPath.length > 1 ? labelPath[labelPath.length - 2] : '';
+    
+    // Get the label being deleted to find all its sublabels
+    const labelToDelete = getLabelByPath(labelPath);
+    let labelsToCheck = [];
+    
+    // Add the main label to check
+    labelsToCheck.push({
+      name: labelName,
+      parentName: parentName
+    });
+    
+    // Add all sublabels recursively
+    if (labelToDelete && labelToDelete.sublabels) {
+      const sublabels = getAllSublabelNames(labelToDelete.sublabels, labelPath);
+      labelsToCheck.push(...sublabels.map(sl => ({
+        name: sl.name,
+        parentName: sl.parentName
+      })));
+    }
+    
+    let totalDirectCount = 0;
+    let childrenCount = 0;
+    
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    
+    // Count elements for each label that will be removed
+    labelsToCheck.forEach(labelInfo => {
+      allLabelElements.forEach(element => {
+        const elLabelName = element.getAttribute('labelName');
+        const elParent = element.getAttribute('parent') || '';
+        
+        // Count direct matches
+        if (elLabelName === labelInfo.name && elParent === labelInfo.parentName) {
+          totalDirectCount++;
+          
+          // Count nested children within this element (only for the main label)
+          if (labelInfo.name === labelName && labelInfo.parentName === parentName) {
+            const nestedChildren = element.querySelectorAll('manual_label');
+            childrenCount += nestedChildren.length;
+          }
+        }
+      });
+    });
+    
+    // Count sublabels in the tree that would be affected
+    let sublabelCount = 0;
+    if (labelToDelete) {
+      function countSublabelsRecursive(labelMap) {
+        labelMap.forEach((sublabel) => {
+          sublabelCount++;
+          countSublabelsRecursive(sublabel.sublabels);
+        });
+      }
+      countSublabelsRecursive(labelToDelete.sublabels);
+    }
+    
+    return { 
+      directCount: totalDirectCount, 
+      childrenCount, 
+      sublabelCount 
+    };
+  }
+
+  // Helper function to get all sublabel names recursively
+  function getAllSublabelNames(labelMap, currentPath = []) {
+    const allNames = [];
+    
+    labelMap.forEach((label, name) => {
+      const fullPath = [...currentPath, name];
+      allNames.push({
+        name: name,
+        parentName: currentPath.length > 0 ? currentPath[currentPath.length - 1] : '',
+        fullPath: fullPath
+      });
+      
+      // Recursively get sublabels
+      if (label.sublabels && label.sublabels.size > 0) {
+        const sublabelNames = getAllSublabelNames(label.sublabels, fullPath);
+        allNames.push(...sublabelNames);
+      }
+    });
+    
+    return allNames;
+  }
+
+  // Helper function to remove all matching labels and their sublabels from HTML
+  function removeLabelFromHtml(labelPath) {
+    const labelName = labelPath[labelPath.length - 1];
+    const parentName = labelPath.length > 1 ? labelPath[labelPath.length - 2] : '';
+    
+    // Get the label being deleted to find all its sublabels
+    const labelToDelete = getLabelByPath(labelPath);
+    let labelsToRemove = [];
+    
+    // Add the main label to remove
+    labelsToRemove.push({
+      name: labelName,
+      parentName: parentName,
+      fullPath: labelPath
+    });
+    
+    // Add all sublabels recursively
+    if (labelToDelete && labelToDelete.sublabels) {
+      const sublabels = getAllSublabelNames(labelToDelete.sublabels, labelPath);
+      labelsToRemove.push(...sublabels);
+    }
+    
+    console.log('Labels to remove from HTML:', labelsToRemove);
+    
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    let removedCount = 0;
+    
+    // Convert NodeList to array to avoid issues when removing elements
+    const elementsArray = Array.from(allLabelElements);
+    
+    // Remove elements for each label in our removal list
+    labelsToRemove.forEach(labelInfo => {
+      elementsArray.forEach(element => {
+        // Skip if element was already removed
+        if (!element.parentNode) return;
+        
+        const elLabelName = element.getAttribute('labelName');
+        const elParent = element.getAttribute('parent') || '';
+        
+        if (elLabelName === labelInfo.name && elParent === labelInfo.parentName) {
+          console.log(`Removing HTML element: ${elLabelName} (parent: ${elParent})`);
+          
+          // Extract the content and replace the label element with it
+          const fragment = document.createDocumentFragment();
+          while (element.firstChild) {
+            // Skip delete buttons
+            if (element.firstChild.className === 'delete-btn') {
+              element.removeChild(element.firstChild);
+              continue;
+            }
+            fragment.appendChild(element.firstChild);
+          }
+          
+          element.parentNode.replaceChild(fragment, element);
+          removedCount++;
+        }
+      });
+    });
+    
+    // Update the HTML after removing elements
+    if (removedCount > 0) {
+      updateCurrentHtmlFromDOM();
+      console.log(`Removed ${removedCount} label elements from HTML`);
+    }
+    
+    return removedCount;
+  }
+
+  // Enhanced delete confirmation dialog
+  function showDeleteConfirmation(labelPath, callback) {
+    const labelName = labelPath[labelPath.length - 1];
+    const counts = countAffectedElements(labelPath);
+    
+    // Create custom confirmation dialog
+    const overlay = document.createElement('div');
+    overlay.className = 'delete-confirmation-overlay';
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'delete-confirmation-dialog';
+    
+    // Header section
+    const header = document.createElement('div');
+    header.className = 'delete-confirmation-header';
+    
+    const title = document.createElement('h3');
+    title.textContent = 'Delete label';
+    
+    // Body section
+    const body = document.createElement('div');
+    body.className = 'delete-confirmation-body';
+    
+    const message = document.createElement('div');
+    
+    let messageHtml = `<p>Are you sure you want to delete <strong>${labelName}</strong>?</p>`;
+    
+    if (counts.directCount > 0) {
+      const totalElementsText = counts.directCount === 1 ? 'element' : 'elements';
+      messageHtml += `<div class="warning-box">
+        <strong>⚠️ Impact on HTML content:</strong><br>
+        This will remove <strong>${counts.directCount}</strong> labeled ${totalElementsText} from your document (including all sublabel instances).
+      </div>`;
+    }
+    
+    if (counts.childrenCount > 0) {
+      messageHtml += `<div class="danger-box">
+        Additionally, <strong>${counts.childrenCount}</strong> nested label${counts.childrenCount !== 1 ? 's' : ''} inside those elements will be removed.
+      </div>`;
+    }
+    
+    if (counts.sublabelCount > 0) {
+      messageHtml += `<div class="info-box">
+        <strong>${counts.sublabelCount}</strong> sublabel definition${counts.sublabelCount !== 1 ? 's' : ''} will be removed from the label tree.
+      </div>`;
+    }
+    
+    if (counts.directCount === 0 && counts.childrenCount === 0) {
+      messageHtml += `<div class="no-impact-box">
+        <strong>No HTML content will be affected</strong> (no instances found in the document).
+      </div>`;
+    }
+    
+    messageHtml += `<p class="cannot-undo"><strong>This action cannot be undone.</strong></p>`;
+    
+    message.innerHTML = messageHtml;
+    
+    // Footer section with buttons
+    const footer = document.createElement('div');
+    footer.className = 'delete-confirmation-footer';
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.className = 'delete-confirmation-cancel-btn';
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = `Delete ${labelName}`;
+    deleteBtn.className = 'delete-confirmation-delete-btn';
+    
+    // Event handlers
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+    
+    deleteBtn.addEventListener('click', () => {
+      document.body.removeChild(overlay);
+      callback(true);
+    });
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+    
+    // Close on Escape key
+    const escapeHandler = (e) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(overlay);
+        document.removeEventListener('keydown', escapeHandler);
+      }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    
+    footer.appendChild(cancelBtn);
+    footer.appendChild(deleteBtn);
+    
+    body.appendChild(message);
+    
+    header.appendChild(title);
+    dialog.appendChild(header);
+    dialog.appendChild(body);
+    dialog.appendChild(footer);
+    overlay.appendChild(dialog);
+    
+    document.body.appendChild(overlay);
+    
+    // Focus the delete button for keyboard navigation
+    deleteBtn.focus();
+  }
+
   function deleteLabel(labelPath) {
     if (labelPath.length === 0) return false;
     
@@ -303,8 +572,14 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     }
     
     if (current.has(labelName)) {
+      // Remove from HTML first
+      removeLabelFromHtml(labelPath);
+      
+      // Remove from labels tree
       current.delete(labelName);
       refreshTreeUI();
+      updateStats();
+      refreshGroupsDisplay();
       return true;
     }
     
@@ -416,9 +691,11 @@ function renderTreeLevel(labelMap, currentPath, level, container) {
     deleteBtn.title = 'Delete label';
     deleteBtn.onclick = (e) => {
       e.stopPropagation();
-      if (confirm(`Delete "${name}" and all its children?`)) {
-        deleteLabel(nodePath);
-      }
+      showDeleteConfirmation(nodePath, (confirmed) => {
+        if (confirmed) {
+          deleteLabel(nodePath);
+        }
+      });
     };
     
     actions.appendChild(addParamBtn);
