@@ -2112,12 +2112,12 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
       }
 
       // Check each option
-      for (const item of items) {
-        if (!validNameRegex.test(item)) {
-          alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
-          return;
-        }
-      }
+      //for (const item of items) {
+      //  if (!validNameRegex.test(item)) {
+      //    alert(`Invalid option "${item}". Use only letters, numbers, and underscores (no spaces or special characters).`);
+      //    return;
+      //  }
+      //}
 
       paramValue = {
         type: "dropdown",
