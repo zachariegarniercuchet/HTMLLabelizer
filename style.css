@@ -1431,15 +1431,17 @@
 
 
 .inline-editor {
-  margin: 6px 0 6px 20px;
+  margin: 6px 12px 6px 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 12px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
   background: var(--card-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
+  width: calc(100% - 12px);
+  box-sizing: border-box;
 }
 
 .inline-editor input,
@@ -1476,6 +1478,92 @@
 .inline-editor .save-btn:hover {
   filter: brightness(1.15);
   background: #1ea87d;
+}
+
+/* Inline editor sections */
+.inline-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inline-editor-section {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.inline-editor-section:last-child {
+  margin-bottom: 0;
+}
+
+.inline-editor-label {
+  display: block;
+  font-size: 13px;
+  color: var(--sub);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+/* Default value container - fixed positioning */
+.default-value-container {
+  width: 100%;
+  min-height: 40px; /* Reserve space to prevent layout shifts */
+}
+
+/* Dropdown section - stable layout */
+.dropdown-section {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.dropdown-section.hidden {
+  display: none;
+}
+
+.dropdown-values {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dropdown-values input {
+  width: 100% !important;
+  min-width: auto !important;
+}
+
+/* Button container - fixed at bottom */
+.inline-editor-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+}
+
+.inline-editor .cancel-btn {
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.inline-editor .cancel-btn:hover {
+  background: var(--hover);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 

@@ -1219,6 +1219,66 @@ function deleteGroupAttribute(labelPath, attrName) {
 }
 
 /**
+ * Update the Group ID attribute name in both the label configuration and all existing HTML elements
+ */
+function updateGroupIdAttributeName(labelPath, oldAttributeName, newAttributeName) {
+  const label = getLabelByPath(labelPath);
+  if (!label || !label.groupConfig || label.groupConfig.groupIdAttribute !== oldAttributeName) {
+    console.error('Cannot update Group ID attribute: invalid label or configuration');
+    return;
+  }
+
+  console.log(`Updating Group ID attribute from "${oldAttributeName}" to "${newAttributeName}"`);
+
+  // Update all existing HTML elements that use this Group ID attribute
+  const labelName = labelPath[labelPath.length - 1];
+  const parentName = labelPath.length > 1 ? labelPath[labelPath.length - 2] : '';
+  
+  const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+  let updatedCount = 0;
+
+  allLabelElements.forEach(element => {
+    const elLabelName = element.getAttribute('labelName');
+    const elParent = element.getAttribute('parent') || '';
+    
+    // Check if this element matches our label
+    if (elLabelName === labelName && elParent === parentName) {
+      // Check if element has the old Group ID attribute
+      if (element.hasAttribute(oldAttributeName)) {
+        const groupIdValue = element.getAttribute(oldAttributeName);
+        
+        // Remove old attribute and add new one with same value
+        element.removeAttribute(oldAttributeName);
+        element.setAttribute(newAttributeName, groupIdValue);
+        updatedCount++;
+        
+        console.log(`Updated element: ${oldAttributeName}="${groupIdValue}" → ${newAttributeName}="${groupIdValue}"`);
+      }
+    }
+  });
+
+  // Update the label configuration
+  label.groupConfig.groupIdAttribute = newAttributeName;
+
+  // Remove the old parameter from the label's params Map
+  label.params.delete(oldAttributeName);
+
+  console.log(`Updated ${updatedCount} elements and label configuration`);
+  
+  if (updatedCount > 0) {
+    // Update the HTML content
+    updateCurrentHtmlFromDOM();
+    
+    // Show notification
+    showParameterUpdateNotification(updatedCount, `Group ID (${oldAttributeName} → ${newAttributeName})`, labelName);
+  }
+
+  // Refresh displays
+  refreshTreeUI();
+  refreshGroupsDisplay();
+}
+
+/**
  * Close all open inline editors without saving
  */
 function closeAllInlineEditors() {
@@ -1230,51 +1290,86 @@ function promptAddSublabel(parentPath, container) {
     // Close any existing inline editors first
     closeAllInlineEditors();
     
-    // Create inline input row
+    // Create inline editor container
     const inlineEditor = document.createElement("div");
     inlineEditor.className = "inline-editor";
 
+    // Input section
+    const inputSection = document.createElement("div");
+    inputSection.className = "inline-editor-section";
+    
+    const label = document.createElement("label");
+    label.className = "inline-editor-label";
+    label.textContent = "Sublabel Name";
+    
     const input = document.createElement("input");
     input.type = "text";
-    input.placeholder = "Sublabel name";
+    input.placeholder = "Enter sublabel name";
+
+    inputSection.appendChild(label);
+    inputSection.appendChild(input);
+
+    // Buttons section
+    const buttonsSection = document.createElement("div");
+    buttonsSection.className = "inline-editor-buttons";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.className = "cancel-btn";
 
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "Save";
     saveBtn.className = "save-btn green";
 
+    buttonsSection.appendChild(cancelBtn);
+    buttonsSection.appendChild(saveBtn);
+
     // Handle save function
     const handleSave = () => {
         const name = input.value.trim();
-        if (!name) return;
+        if (!name) {
+            alert("Sublabel name cannot be empty.");
+            return;
+        }
 
         const color = generateRandomColor();
         if (addLabel(name, color, parentPath)) {
-        inlineEditor.remove(); // remove editor
-        // Expand parent node
-        const parentNodeId = parentPath.join(".");
-        expandedNodes.add(parentNodeId);
-        renderTree();
+            inlineEditor.remove();
+            // Expand parent node
+            const parentNodeId = parentPath.join(".");
+            expandedNodes.add(parentNodeId);
+            renderTree();
         }
     };
 
-    // Handle save on button click
-    saveBtn.onclick = handleSave;
+    // Handle cancel function
+    const handleCancel = () => {
+        inlineEditor.remove();
+    };
 
-    // Handle save on Enter key press
+    // Event listeners
+    saveBtn.onclick = handleSave;
+    cancelBtn.onclick = handleCancel;
+
+    // Handle Enter key to save, Escape to cancel
     input.onkeydown = (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             handleSave();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            handleCancel();
         }
     };
 
-    inlineEditor.appendChild(input);
-    inlineEditor.appendChild(saveBtn);
+    // Assemble editor
+    inlineEditor.appendChild(inputSection);
+    inlineEditor.appendChild(buttonsSection);
 
     // Insert inline editor below the parent node
     container.appendChild(inlineEditor);
     input.focus();
-    }
+}
 
 function promptAddParameter(labelPath, container) {
   // Close any existing inline editors first
@@ -1287,41 +1382,77 @@ function promptAddParameter(labelPath, container) {
   const inlineEditor = document.createElement("div");
   inlineEditor.className = "inline-editor";
 
-  // Name
+  // Name section
+  const nameSection = document.createElement("div");
+  nameSection.className = "inline-editor-section";
+  
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "inline-editor-label";
+  nameLabel.textContent = "Parameter Name";
+  
   const nameInput = document.createElement("input");
   nameInput.type = "text";
-  nameInput.placeholder = "Parameter name";
+  nameInput.placeholder = "Enter parameter name";
 
-  // Type selector
+  nameSection.appendChild(nameLabel);
+  nameSection.appendChild(nameInput);
+
+  // Type section
+  const typeSection = document.createElement("div");
+  typeSection.className = "inline-editor-section";
+  
+  const typeLabel = document.createElement("label");
+  typeLabel.className = "inline-editor-label";
+  typeLabel.textContent = "Parameter Type";
+
   const typeSelect = document.createElement("select");
   ["string", "dropdown", "checkbox"].forEach(t => {
     const opt = document.createElement("option");
     opt.value = t;
-    opt.textContent = t;
+    opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
     typeSelect.appendChild(opt);
   });
 
-  // Dynamic default value container
+  typeSection.appendChild(typeLabel);
+  typeSection.appendChild(typeSelect);
+
+  // Default value section
+  const defaultValueSection = document.createElement("div");
+  defaultValueSection.className = "inline-editor-section";
+  
+  const defaultValueLabel = document.createElement("label");
+  defaultValueLabel.className = "inline-editor-label";
+  defaultValueLabel.textContent = "Default Value";
+
   const defaultValueContainer = document.createElement("div");
   defaultValueContainer.className = "default-value-container";
+
+  defaultValueSection.appendChild(defaultValueLabel);
+  defaultValueSection.appendChild(defaultValueContainer);
 
   // Dropdown values section
   const dropdownSection = document.createElement("div");
   dropdownSection.className = "dropdown-section hidden";
 
-  const valuesList = document.createElement("div");
-  valuesList.className = "dropdown-values";
+  const dropdownLabel = document.createElement("div");
+  dropdownLabel.className = "inline-editor-label";
+  dropdownLabel.textContent = "Dropdown Options";
 
   const addValueBtn = document.createElement("button");
-  addValueBtn.textContent = "+ Add option";
+  addValueBtn.textContent = "+ Add Option";
   addValueBtn.type = "button";
+  addValueBtn.style.marginBottom = "8px";
   addValueBtn.onclick = () => {
     const itemInput = document.createElement("input");
     itemInput.type = "text";
-    itemInput.placeholder = "Option";
+    itemInput.placeholder = "Enter option";
     valuesList.appendChild(itemInput);
   };
 
+  const valuesList = document.createElement("div");
+  valuesList.className = "dropdown-values";
+
+  dropdownSection.appendChild(dropdownLabel);
   dropdownSection.appendChild(addValueBtn);
   dropdownSection.appendChild(valuesList);
 
@@ -1355,10 +1486,20 @@ function promptAddParameter(labelPath, container) {
   groupAttrSection.appendChild(groupAttrCheckbox);
   groupAttrSection.appendChild(groupAttrLabel);
 
-  // Save button
+  // Buttons section
+  const buttonsSection = document.createElement("div");
+  buttonsSection.className = "inline-editor-buttons";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.className = "cancel-btn";
+
   const saveBtn = document.createElement("button");
   saveBtn.textContent = "Save";
   saveBtn.className = "save-btn green";
+
+  buttonsSection.appendChild(cancelBtn);
+  buttonsSection.appendChild(saveBtn);
 
   const validNameRegex = /^[A-Za-z0-9_]+$/;
 
@@ -1376,7 +1517,12 @@ function promptAddParameter(labelPath, container) {
       input.type = "checkbox";
       defaultValueContainer.appendChild(input);
     } else if (type === "dropdown") {
-      // No default value input for dropdown
+      const info = document.createElement("div");
+      info.textContent = "First option will be the default value";
+      info.style.fontSize = "12px";
+      info.style.color = "var(--sub)";
+      info.style.fontStyle = "italic";
+      defaultValueContainer.appendChild(info);
     }
   }
 
@@ -1397,7 +1543,8 @@ function promptAddParameter(labelPath, container) {
     }
   };
 
-  saveBtn.onclick = () => {
+  // Handle save function
+  const handleSave = () => {
     const paramName = nameInput.value.trim();
     if (!paramName) {
       alert("Parameter name cannot be empty.");
@@ -1417,10 +1564,15 @@ function promptAddParameter(labelPath, container) {
         .map(i => i.value.trim())
         .filter(v => v);
 
+      if (items.length === 0) {
+        alert("Please add at least one option for dropdown.");
+        return;
+      }
+
       paramValue = {
         type: "dropdown",
         options: items,
-        default: items.length > 0 ? items[0] : ""
+        default: items[0]
       };
     } else if (paramType === "checkbox") {
       const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
@@ -1459,14 +1611,34 @@ function promptAddParameter(labelPath, container) {
     renderTree();
   };
 
+  // Handle cancel function
+  const handleCancel = () => {
+    inlineEditor.remove();
+  };
+
+  // Event listeners
+  saveBtn.onclick = handleSave;
+  cancelBtn.onclick = handleCancel;
+
+  // Handle Enter key to save, Escape to cancel
+  nameInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+    }
+  };
+
   // Assemble the editor
-  inlineEditor.appendChild(nameInput);
-  inlineEditor.appendChild(typeSelect);
+  inlineEditor.appendChild(nameSection);
+  inlineEditor.appendChild(typeSection);
+  inlineEditor.appendChild(defaultValueSection);
   inlineEditor.appendChild(dropdownSection);
-  inlineEditor.appendChild(defaultValueContainer);
   inlineEditor.appendChild(groupIdSection);
   inlineEditor.appendChild(groupAttrSection);
-  inlineEditor.appendChild(saveBtn);
+  inlineEditor.appendChild(buttonsSection);
 
   container.appendChild(inlineEditor);
   nameInput.focus();
@@ -1491,29 +1663,83 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
     defaultVal = attrValue || "";
   }
 
-  // Name input
+  // Info message for group attribute
+  //const infoMsg = document.createElement("div");
+  //infoMsg.className = "group-section silver-section";
+  //infoMsg.style.fontSize = "12px";
+  //infoMsg.style.fontStyle = "italic";
+  //infoMsg.style.marginBottom = "12px";
+  //infoMsg.textContent = "⚙️ Editing a group attribute. Changes will sync across all elements in the same group.";
+  //inlineEditor.appendChild(infoMsg);
+
+  // Name section
+  const nameSection = document.createElement("div");
+  nameSection.className = "inline-editor-section";
+  
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "inline-editor-label";
+  nameLabel.textContent = "Group Attribute Name";
+  
   const nameInput = document.createElement("input");
   nameInput.type = "text";
   nameInput.value = attrName;
-  nameInput.placeholder = "Group attribute name";
+  nameInput.placeholder = "Enter group attribute name";
 
-  // Type selector
+  nameSection.appendChild(nameLabel);
+  nameSection.appendChild(nameInput);
+
+  // Type section
+  const typeSection = document.createElement("div");
+  typeSection.className = "inline-editor-section";
+  
+  const typeLabel = document.createElement("label");
+  typeLabel.className = "inline-editor-label";
+  typeLabel.textContent = "Attribute Type";
+
   const typeSelect = document.createElement("select");
   ["string", "dropdown", "checkbox"].forEach(t => {
     const opt = document.createElement("option");
     opt.value = t;
-    opt.textContent = t;
+    opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
     if (t === paramType) opt.selected = true;
     typeSelect.appendChild(opt);
   });
 
-  // Default value container
+  typeSection.appendChild(typeLabel);
+  typeSection.appendChild(typeSelect);
+
+  // Default value section
+  const defaultValueSection = document.createElement("div");
+  defaultValueSection.className = "inline-editor-section";
+  
+  const defaultValueLabel = document.createElement("label");
+  defaultValueLabel.className = "inline-editor-label";
+  defaultValueLabel.textContent = "Default Value";
+
   const defaultValueContainer = document.createElement("div");
   defaultValueContainer.className = "default-value-container";
 
-  // Dropdown section
+  defaultValueSection.appendChild(defaultValueLabel);
+  defaultValueSection.appendChild(defaultValueContainer);
+
+  // Dropdown values section
   const dropdownSection = document.createElement("div");
   dropdownSection.className = "dropdown-section" + (paramType === "dropdown" ? "" : " hidden");
+
+  const dropdownLabel = document.createElement("div");
+  dropdownLabel.className = "inline-editor-label";
+  dropdownLabel.textContent = "Dropdown Options";
+
+  const addValueBtn = document.createElement("button");
+  addValueBtn.textContent = "+ Add Option";
+  addValueBtn.type = "button";
+  addValueBtn.style.marginBottom = "8px";
+  addValueBtn.onclick = () => {
+    const itemInput = document.createElement("input");
+    itemInput.type = "text";
+    itemInput.placeholder = "Enter option";
+    valuesList.appendChild(itemInput);
+  };
 
   const valuesList = document.createElement("div");
   valuesList.className = "dropdown-values";
@@ -1526,18 +1752,26 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
     valuesList.appendChild(itemInput);
   });
 
-  const addValueBtn = document.createElement("button");
-  addValueBtn.textContent = "+ Add option";
-  addValueBtn.type = "button";
-  addValueBtn.onclick = () => {
-    const itemInput = document.createElement("input");
-    itemInput.type = "text";
-    itemInput.placeholder = "Option";
-    valuesList.appendChild(itemInput);
-  };
-
+  dropdownSection.appendChild(dropdownLabel);
   dropdownSection.appendChild(addValueBtn);
   dropdownSection.appendChild(valuesList);
+
+  // Buttons section
+  const buttonsSection = document.createElement("div");
+  buttonsSection.className = "inline-editor-buttons";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.className = "cancel-btn";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "Save";
+  saveBtn.className = "save-btn green";
+
+  buttonsSection.appendChild(cancelBtn);
+  buttonsSection.appendChild(saveBtn);
+
+  const validNameRegex = /^[A-Za-z0-9_]+$/;
 
   // Render default input function
   function renderDefaultInput(type, current = "") {
@@ -1554,6 +1788,13 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
       input.type = "checkbox";
       input.checked = current === true || current === "true";
       defaultValueContainer.appendChild(input);
+    } else if (type === "dropdown") {
+      const info = document.createElement("div");
+      info.textContent = "First option will be the default value";
+      info.style.fontSize = "12px";
+      info.style.color = "var(--sub)";
+      info.style.fontStyle = "italic";
+      defaultValueContainer.appendChild(info);
     }
   }
 
@@ -1573,17 +1814,11 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
     }
   };
 
-  // Save button
-  const saveBtn = document.createElement("button");
-  saveBtn.textContent = "Save";
-  saveBtn.className = "save-btn green";
-
-  const validNameRegex = /^[A-Za-z0-9_]+$/;
-
-  saveBtn.onclick = () => {
+  // Handle save function
+  const handleSave = () => {
     const newAttrName = nameInput.value.trim();
     if (!newAttrName || !validNameRegex.test(newAttrName)) {
-      alert("Invalid group attribute name.");
+      alert("Invalid group attribute name. Use only letters, numbers, and underscores.");
       return;
     }
 
@@ -1595,10 +1830,15 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
         .map(i => i.value.trim())
         .filter(v => v);
 
+      if (items.length === 0) {
+        alert("Please add at least one option for dropdown.");
+        return;
+      }
+
       newAttrValue = {
         type: "dropdown",
         options: items,
-        default: items.length > 0 ? items[0] : ""
+        default: items[0]
       };
     } else if (newParamType === "checkbox") {
       const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
@@ -1628,12 +1868,32 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
     renderTree();
   };
 
+  // Handle cancel function
+  const handleCancel = () => {
+    inlineEditor.remove();
+  };
+
+  // Event listeners
+  saveBtn.onclick = handleSave;
+  cancelBtn.onclick = handleCancel;
+
+  // Handle Enter key to save, Escape to cancel
+  nameInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+    }
+  };
+
   // Assemble editor
-  inlineEditor.appendChild(nameInput);
-  inlineEditor.appendChild(typeSelect);
+  inlineEditor.appendChild(nameSection);
+  inlineEditor.appendChild(typeSection);
+  inlineEditor.appendChild(defaultValueSection);
   inlineEditor.appendChild(dropdownSection);
-  inlineEditor.appendChild(defaultValueContainer);
-  inlineEditor.appendChild(saveBtn);
+  inlineEditor.appendChild(buttonsSection);
 
   container.appendChild(inlineEditor);
   nameInput.focus();
@@ -1670,37 +1930,90 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     defaultVal = oldParamValue || "";
   }
 
-  // Name input (disabled if it's the group ID)
+  // Info message if editing group ID
+  //if (isGroupId) {
+  //  const infoMsg = document.createElement("div");
+  //  infoMsg.className = "group-section gold-section";
+  //  infoMsg.style.fontSize = "12px";
+  //  infoMsg.style.fontStyle = "italic";
+  //  infoMsg.style.marginBottom = "12px";
+  //  infoMsg.textContent = "🔑 Editing the Group ID parameter. Renaming will update all grouped elements.";
+  //  inlineEditor.appendChild(infoMsg);
+  //}
+
+  // Name section
+  const nameSection = document.createElement("div");
+  nameSection.className = "inline-editor-section";
+  
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "inline-editor-label";
+  nameLabel.textContent = "Parameter Name";
+  
   const nameInput = document.createElement("input");
   nameInput.type = "text";
   nameInput.value = oldParamName;
-  nameInput.placeholder = "Parameter name";
-  if (isGroupId) {
-    nameInput.disabled = true;
-    nameInput.title = "Cannot rename group ID parameter. Delete the group first.";
-  }
+  nameInput.placeholder = "Enter parameter name";
 
-  // Type selector
+  nameSection.appendChild(nameLabel);
+  nameSection.appendChild(nameInput);
+
+  // Type section
+  const typeSection = document.createElement("div");
+  typeSection.className = "inline-editor-section";
+  
+  const typeLabel = document.createElement("label");
+  typeLabel.className = "inline-editor-label";
+  typeLabel.textContent = "Parameter Type";
+
   const typeSelect = document.createElement("select");
   ["string", "dropdown", "checkbox"].forEach(t => {
     const opt = document.createElement("option");
     opt.value = t;
-    opt.textContent = t;
+    opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
     if (t === paramType) opt.selected = true;
     typeSelect.appendChild(opt);
   });
 
-  // Dynamic default value container
+  typeSection.appendChild(typeLabel);
+  typeSection.appendChild(typeSelect);
+
+  // Default value section
+  const defaultValueSection = document.createElement("div");
+  defaultValueSection.className = "inline-editor-section";
+  
+  const defaultValueLabel = document.createElement("label");
+  defaultValueLabel.className = "inline-editor-label";
+  defaultValueLabel.textContent = "Default Value";
+
   const defaultValueContainer = document.createElement("div");
   defaultValueContainer.className = "default-value-container";
+
+  defaultValueSection.appendChild(defaultValueLabel);
+  defaultValueSection.appendChild(defaultValueContainer);
 
   // Dropdown values section
   const dropdownSection = document.createElement("div");
   dropdownSection.className = "dropdown-section" + (paramType === "dropdown" ? "" : " hidden");
 
+  const dropdownLabel = document.createElement("div");
+  dropdownLabel.className = "inline-editor-label";
+  dropdownLabel.textContent = "Dropdown Options";
+
+  const addValueBtn = document.createElement("button");
+  addValueBtn.textContent = "+ Add Option";
+  addValueBtn.type = "button";
+  addValueBtn.style.marginBottom = "8px";
+  addValueBtn.onclick = () => {
+    const itemInput = document.createElement("input");
+    itemInput.type = "text";
+    itemInput.placeholder = "Enter option";
+    valuesList.appendChild(itemInput);
+  };
+
   const valuesList = document.createElement("div");
   valuesList.className = "dropdown-values";
 
+  // Populate existing options
   options.forEach(optVal => {
     const itemInput = document.createElement("input");
     itemInput.type = "text";
@@ -1708,18 +2021,26 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     valuesList.appendChild(itemInput);
   });
 
-  const addValueBtn = document.createElement("button");
-  addValueBtn.textContent = "+ Add option";
-  addValueBtn.type = "button";
-  addValueBtn.onclick = () => {
-    const itemInput = document.createElement("input");
-    itemInput.type = "text";
-    itemInput.placeholder = "Option";
-    valuesList.appendChild(itemInput);
-  };
-
+  dropdownSection.appendChild(dropdownLabel);
   dropdownSection.appendChild(addValueBtn);
   dropdownSection.appendChild(valuesList);
+
+  // Buttons section
+  const buttonsSection = document.createElement("div");
+  buttonsSection.className = "inline-editor-buttons";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.className = "cancel-btn";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "Save";
+  saveBtn.className = "save-btn green";
+
+  buttonsSection.appendChild(cancelBtn);
+  buttonsSection.appendChild(saveBtn);
+
+  const validNameRegex = /^[A-Za-z0-9_]+$/;
 
   // Render default value input depending on type
   function renderDefaultInput(type, options = [], current = "") {
@@ -1737,7 +2058,12 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
       input.checked = current === true || current === "true";
       defaultValueContainer.appendChild(input);
     } else if (type === "dropdown") {
-      // No default value input for dropdown
+      const info = document.createElement("div");
+      info.textContent = "First option will be the default value";
+      info.style.fontSize = "12px";
+      info.style.color = "var(--sub)";
+      info.style.fontStyle = "italic";
+      defaultValueContainer.appendChild(info);
     }
   }
 
@@ -1758,24 +2084,8 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     }
   };
 
-  // Info message if editing group ID
-  if (isGroupId) {
-    const infoMsg = document.createElement("div");
-    infoMsg.className = "group-section gold-section";
-    infoMsg.style.fontSize = "12px";
-    infoMsg.style.fontStyle = "italic";
-    infoMsg.textContent = "⚠️ Editing the Group ID parameter. Name cannot be changed.";
-    inlineEditor.appendChild(infoMsg);
-  }
-
-  // Save button
-  const saveBtn = document.createElement("button");
-  saveBtn.textContent = "Save";
-  saveBtn.className = "save-btn green";
-
-  const validNameRegex = /^[A-Za-z0-9_]+$/;
-
-  saveBtn.onclick = () => {
+  // Handle save function
+  const handleSave = () => {
     const paramName = nameInput.value.trim();
     if (!paramName) {
       alert("Parameter name cannot be empty.");
@@ -1796,6 +2106,11 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
         .map(i => i.value.trim())
         .filter(v => v);
 
+      if (items.length === 0) {
+        alert("Please add at least one option for dropdown.");
+        return;
+      }
+
       // Check each option
       for (const item of items) {
         if (!validNameRegex.test(item)) {
@@ -1807,7 +2122,7 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
       paramValue = {
         type: "dropdown",
         options: items,
-        default: items.length > 0 ? items[0] : ""
+        default: items[0]
       };
     } else if (paramType === "checkbox") {
       const checkboxEl = defaultValueContainer.querySelector("input[type='checkbox']");
@@ -1817,9 +2132,15 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
       paramValue = { type: "string", default: inputEl ? inputEl.value.trim() : "" };
     }
 
-    // Delete old parameter if name changed (and it's not the group ID)
-    if (paramName !== oldParamName && !isGroupId) {
-      deleteParameter(labelPath, oldParamName);
+    // Handle parameter name changes
+    if (paramName !== oldParamName) {
+      if (isGroupId) {
+        // Special handling for Group ID renaming
+        updateGroupIdAttributeName(labelPath, oldParamName, paramName);
+      } else {
+        // Regular parameter renaming
+        deleteParameter(labelPath, oldParamName);
+      }
     }
 
     // Save the parameter
@@ -1831,12 +2152,32 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
     renderTree();
   };
 
+  // Handle cancel function
+  const handleCancel = () => {
+    inlineEditor.remove();
+  };
+
+  // Event listeners
+  saveBtn.onclick = handleSave;
+  cancelBtn.onclick = handleCancel;
+
+  // Handle Enter key to save, Escape to cancel
+  nameInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+    }
+  };
+
   // Assemble the editor
-  inlineEditor.appendChild(nameInput);
-  inlineEditor.appendChild(typeSelect);
+  inlineEditor.appendChild(nameSection);
+  inlineEditor.appendChild(typeSection);
+  inlineEditor.appendChild(defaultValueSection);
   inlineEditor.appendChild(dropdownSection);
-  inlineEditor.appendChild(defaultValueContainer);
-  inlineEditor.appendChild(saveBtn);
+  inlineEditor.appendChild(buttonsSection);
 
   container.appendChild(inlineEditor);
   nameInput.focus();
