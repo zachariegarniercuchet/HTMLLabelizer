@@ -9,6 +9,12 @@
   let sourceViewModified = false;
   const labels = new Map(); // name -> {color, type, sublabels, params}
   const activeGroups = new Map(); // groupId -> { labelName, groupAttributes: Map }
+  // ======= Timer State =======
+  let timerRunning = false;
+  let timerStartTs = null; // timestamp when started (ms)
+  let accumulatedMs = 0; // milliseconds accumulated when paused/stopped
+  let timerIntervalId = null;
+  let meta = {}; // store metadata loaded/saved with schema (e.g., time)
   // ======= COMPLETE SEPARATION OF SELECTION TYPES =======
   let currentSelection = null; // For user mouse selections in HTML content
   let currentSearchSelection = null; // For search matches in HTML content - ONLY used by Apply button
@@ -66,6 +72,77 @@
     navigatePrevious: document.getElementById('navigate-previous'),
     navigateNext: document.getElementById('navigate-next')
   };
+
+  // Timer UI elements (may be undefined until DOM ready)
+  elements.toggleTimerBtn = document.getElementById('toggle-timer');
+  elements.timerDisplay = document.getElementById('timer-display');
+
+  // ======= Timer Helper Functions =======
+  function formatMsToHMS(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+  }
+
+  function updateTimerDisplay() {
+    if (!elements.timerDisplay) return;
+    const ms = getCurrentAccumulatedMs();
+    elements.timerDisplay.textContent = formatMsToHMS(ms);
+  }
+
+  function getCurrentAccumulatedMs() {
+    if (timerRunning && timerStartTs) {
+      return accumulatedMs + (Date.now() - timerStartTs);
+    }
+    return accumulatedMs;
+  }
+
+  function startTimer() {
+    if (timerRunning) return;
+    timerStartTs = Date.now();
+    timerRunning = true;
+    timerIntervalId = setInterval(updateTimerDisplay, 250);
+    if (elements.toggleTimerBtn) {
+      elements.toggleTimerBtn.textContent = 'Stop';
+      elements.toggleTimerBtn.classList.add('active');
+    }
+  }
+
+  function stopTimer() {
+    if (!timerRunning) return;
+    // accumulate
+    accumulatedMs = getCurrentAccumulatedMs();
+    timerRunning = false;
+    timerStartTs = null;
+    if (timerIntervalId) {
+      clearInterval(timerIntervalId);
+      timerIntervalId = null;
+    }
+    updateTimerDisplay();
+    if (elements.toggleTimerBtn) {
+      elements.toggleTimerBtn.textContent = 'Start';
+      elements.toggleTimerBtn.classList.remove('active');
+    }
+  }
+
+  function toggleTimer() {
+    if (timerRunning) {
+      stopTimer();
+    } else {
+      startTimer();
+    }
+  }
+
+  // Wire up timer buttons if present
+  if (elements.toggleTimerBtn) {
+    elements.toggleTimerBtn.addEventListener('click', toggleTimer);
+  }
+
+  // When downloading or saving, ensure meta.time is updated from current timer
+  // prepareHtmlForDownload will read meta and include it, so ensure it's up-to-date
+  // Also stop the timer on save to preserve final time (optional)
 
   
 
@@ -3403,7 +3480,33 @@ function applySourceChanges() {
   if (schema) {
     console.log("HTMLLabelizer schema found - rebuilding label tree from document");
     labels.clear();
-    buildLabelsFromSchema(schema);
+    // If schema is in the new shape { labeltree: ..., meta: {...} }
+    if (schema.labeltree) {
+      buildLabelsFromSchema(schema.labeltree);
+      meta = schema.meta || {};
+    } else {
+      // Backwards compatible: schema was the labeltree itself
+      buildLabelsFromSchema(schema);
+      meta = {};
+    }
+
+    // If meta contains a time value, load it into the timer
+    if (meta.time) {
+      // Expecting time in milliseconds or as HH:MM:SS - try to parse
+      const t = meta.time;
+      let ms = 0;
+      if (typeof t === 'number') ms = t;
+      else if (typeof t === 'string' && /^\d+:\d{2}:\d{2}$/.test(t)) {
+        const parts = t.split(':').map(Number);
+        ms = ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
+      }
+      accumulatedMs = isNaN(ms) ? 0 : ms;
+      updateTimerDisplay();
+    } else {
+      meta = meta || {};
+      accumulatedMs = 0;
+      updateTimerDisplay();
+    }
 
     refreshTreeUI();
   } else {
@@ -6006,6 +6109,8 @@ function navigateToPreviousMatch() {
       elements.downloadBtn.disabled = false;
       elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
+      // Enable timer button when file is loaded
+      if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
 
       
     } catch (error) {
@@ -6056,6 +6161,8 @@ function navigateToPreviousMatch() {
       elements.downloadBtn.disabled = false;
       elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
+      // Enable timer button when file is loaded
+      if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
 
     } catch (error) {
       alert('Error reading HTML file');
@@ -6075,8 +6182,23 @@ function navigateToPreviousMatch() {
     deleteButtons.forEach(button => button.remove());
 
     // 2. Build JSON schema from your current labels tree
-    const schema = buildSchemaFromLabels(labels);
-    const schemaJson = JSON.stringify(schema, null, 2);
+    const labeltree = buildSchemaFromLabels(labels);
+
+    // Update meta.time with current timer (milliseconds)
+    try {
+      if (!meta || typeof meta !== 'object') meta = {};
+      const currentMs = getCurrentAccumulatedMs();
+      meta.time = currentMs; // store as number (ms)
+    } catch (e) {
+      console.warn('Could not update meta.time before download', e);
+    }
+
+    const schemaWrapper = {
+      labeltree: labeltree,
+      meta: meta || {}
+    };
+
+    const schemaJson = JSON.stringify(schemaWrapper, null, 2);
 
     // 3. Find existing HTMLLabelizer comment
     let found = false;
@@ -6205,11 +6327,19 @@ function navigateToPreviousMatch() {
       elements.advancedContent.innerHTML = '';
       clearSearchOverlays();
       
+      // Reset timer
+      stopTimer(); // Stop timer if running
+      accumulatedMs = 0; // Reset accumulated time
+      meta = {}; // Clear metadata
+      updateTimerDisplay();
+      
       renderHtmlContent();
       refreshTreeUI();
       elements.downloadBtn.disabled = true;
       elements.saveAsBtn.disabled = true;
       elements.viewToggle.disabled = true;
+      // Disable timer button when no file is loaded
+      if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = true;
       refreshGroupsDisplay();
     }
   });
@@ -6875,6 +7005,9 @@ window.addEventListener('click', (event) => {
   
   // Initialize empty state event listeners on page load
   attachEmptyStateEventListeners();
+  // Initialize timer UI
+  updateTimerDisplay();
+  if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = true; // Disabled until file is loaded
   
   console.log('Enhanced HTML Labelizer ready!');
 

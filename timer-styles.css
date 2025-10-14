@@ -1,0 +1,83 @@
+/* Timer Controls Styling */
+.timer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.timer-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px;
+}
+
+.timer-btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--accent);
+}
+
+.timer-btn.active {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.timer-btn.active:hover {
+  background: #ff5252;
+  border-color: #ff5252;
+}
+
+.timer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.timer-display {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sub);
+  min-width: 80px;
+  text-align: center;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* Light theme adjustments */
+:root[data-theme="light"] .timer-btn {
+  background: #f5f5f5;
+  border-color: #dadce0;
+  color: #1a1a1a;
+}
+
+:root[data-theme="light"] .timer-btn:hover:not(:disabled) {
+  background: #e8e8e8;
+  border-color: #6aa3ff;
+}
+
+:root[data-theme="light"] .timer-btn.active {
+  background: #ff6b6b;
+  border-color: #ff6b6b;
+  color: white;
+}
+
+:root[data-theme="light"] .timer-btn.active:hover {
+  background: #ff5252;
+  border-color: #ff5252;
+}
+
+:root[data-theme="light"] .timer-display {
+  background: white;
+  border-color: #dadce0;
+  color: #5f6368;
+}

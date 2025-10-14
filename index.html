@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HTML Labelizer</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="timer-styles.css">
 </head>
 <body>
   <div class="app-header">
@@ -34,6 +35,10 @@
                 <button id="view-toggle" class="view-toggle" disabled>View Source</button>
             </div>
             <span class="filename" id="current-filename"></span>
+          </div>
+          <div class="timer-controls">
+            <button id="toggle-timer" class="timer-btn" title="Start/Stop timer" disabled>Start</button>
+            <div id="timer-display" class="timer-display" aria-live="polite">00:00:00</div>
           </div>
         </div>
         <div class="card-body">
