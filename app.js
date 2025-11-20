@@ -15,6 +15,8 @@
   let accumulatedMs = 0; // milliseconds accumulated when paused/stopped
   let timerIntervalId = null;
   let meta = {}; // store metadata loaded/saved with schema (e.g., time)
+  let inactivityTimeoutId = null; // Track inactivity timeout
+  const INACTIVITY_TIMEOUT = 60000; // 1 minute in milliseconds
   // ======= COMPLETE SEPARATION OF SELECTION TYPES =======
   let currentSelection = null; // For user mouse selections in HTML content
   let currentSearchSelection = null; // For search matches in HTML content - ONLY used by Apply button
@@ -108,6 +110,8 @@
       elements.toggleTimerBtn.textContent = 'Stop';
       elements.toggleTimerBtn.classList.add('active');
     }
+    // Start inactivity monitoring
+    resetInactivityTimeout();
   }
 
   function stopTimer() {
@@ -125,6 +129,11 @@
       elements.toggleTimerBtn.textContent = 'Start';
       elements.toggleTimerBtn.classList.remove('active');
     }
+    // Clear inactivity timeout
+    if (inactivityTimeoutId) {
+      clearTimeout(inactivityTimeoutId);
+      inactivityTimeoutId = null;
+    }
   }
 
   function toggleTimer() {
@@ -132,6 +141,29 @@
       stopTimer();
     } else {
       startTimer();
+    }
+  }
+
+  // Reset inactivity timeout on labeling activity
+  function resetInactivityTimeout() {
+    // Clear existing timeout
+    if (inactivityTimeoutId) {
+      clearTimeout(inactivityTimeoutId);
+    }
+    // Only set new timeout if timer is running
+    if (timerRunning) {
+      inactivityTimeoutId = setTimeout(() => {
+        stopTimer();
+      }, INACTIVITY_TIMEOUT);
+    }
+  }
+
+  // Auto-start timer on labeling activity
+  function autoStartTimerOnActivity() {
+    if (!timerRunning && currentHtml) {
+      startTimer();
+    } else if (timerRunning) {
+      resetInactivityTimeout();
     }
   }
 
@@ -956,10 +988,70 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
 
   // ======= Tree UI Management =======
 
+// Update the schema comment in the HTML source whenever the label tree changes
+function updateSchemaInSourceView() {
+  if (!currentHtml) return;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(currentHtml, 'text/html');
+
+  // Build JSON schema from current labels tree
+  const labeltree = buildSchemaFromLabels(labels);
+
+  // Update meta.time with current timer
+  try {
+    if (!meta || typeof meta !== 'object') meta = {};
+    const currentMs = getCurrentAccumulatedMs();
+    meta.time = currentMs;
+  } catch (e) {
+    console.warn('Could not update meta.time', e);
+  }
+
+  const schemaWrapper = {
+    labeltree: labeltree,
+    meta: meta || {}
+  };
+
+  const schemaJson = JSON.stringify(schemaWrapper, null, 2);
+
+  // Find existing HTMLLabelizer comment
+  let found = false;
+  const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT, null);
+  let commentNode;
+  while ((commentNode = walker.nextNode())) {
+    if (commentNode.nodeValue && commentNode.nodeValue.trim().startsWith("HTMLLabelizer")) {
+      // Replace old content
+      commentNode.nodeValue = " HTMLLabelizer\n" + schemaJson + "\n";
+      found = true;
+      break;
+    }
+  }
+
+  // If not found, insert before <head>
+  if (!found) {
+    const newComment = doc.createComment(" HTMLLabelizer\n" + schemaJson + "\n");
+    const htmlEl = doc.documentElement;
+    const headEl = htmlEl.querySelector("head");
+    htmlEl.insertBefore(newComment, headEl);
+  }
+
+  // Update currentHtml with the new schema
+  currentHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+
+  // If source view is active, update it too
+  if (isSourceView) {
+    elements.sourceView.value = currentHtml;
+    sourceViewModified = false; // Mark as not modified since we just synced
+  }
+}
+
 function refreshTreeUI() {
   renderTree();
   // Don't automatically update label options - let context menu handle this contextually
   updateStats();
+  
+  // Update schema in HTML source whenever tree changes
+  updateSchemaInSourceView();
   
   // Ensure groups header has expand button after any tree updates
   setTimeout(() => {
@@ -4580,6 +4672,9 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   // Attach event listeners for advanced content
   attachAdvancedLabelEventListeners();
   
+  // Auto-start/reset timer on labeling activity
+  autoStartTimerOnActivity();
+  
   // Note: We don't call updateStats() here because this is purely advanced content
   // Stats will be updated when labels are applied to HTML content via applyAdvancedLabels()
 
@@ -4767,10 +4862,16 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   // Refresh search if there's an active search to maintain highlights and position
   refreshSearchAfterLabeling();
   
+  // Auto-start/reset timer on labeling activity
+  autoStartTimerOnActivity();
+  
   return labelElement;
 }
 
 function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
+  // Auto-start/reset timer on labeling activity
+  autoStartTimerOnActivity();
+  
   // Create the label element
   const labelElement = document.createElement("manual_label");
   labelElement.setAttribute("labelName", labelPath[labelPath.length - 1]);
@@ -5313,6 +5414,9 @@ function applyAdvancedLabels() {
     updateCurrentHtmlFromDOM();
     attachLabelEventListeners();
     updateStats();
+    
+    // Auto-start/reset timer on labeling activity
+    autoStartTimerOnActivity();
     
     // Re-search and navigate to next available match
     setTimeout(() => {
@@ -6487,6 +6591,17 @@ elements.sourceView.addEventListener('keydown', (e) => {
 // ======= Keyboard Event Handlers =======
 // Add these event listeners to handle Ctrl key
 document.addEventListener('keydown', (e) => {
+  // Global Ctrl+S to save file (if not in source view)
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    // Only handle Save As if we're NOT in the source view textarea
+    if (!elements.sourceView.contains(document.activeElement)) {
+      e.preventDefault();
+      saveAsFile();
+      return;
+    }
+    // If in source view, let the sourceView keydown handler handle it
+  }
+  
   if (e.key === 'Control' || e.key === 'Meta') {
     if (!ctrlPressed) {
       ctrlPressed = true;
