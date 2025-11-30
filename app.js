@@ -1131,7 +1131,7 @@ function renderTreeLevel(labelMap, currentPath, level, container) {
     
     const addParamBtn = document.createElement('button');
     addParamBtn.className = 'tree-action-btn edit';
-    addParamBtn.title = 'Add parameter';
+    addParamBtn.title = 'Add attribute';
     addParamBtn.onclick = (e) => {
       e.stopPropagation();
       promptAddParameter(nodePath, treeNode);
