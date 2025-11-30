@@ -1537,7 +1537,7 @@ function promptAddSublabel(parentPath, container) {
 
     // Insert inline editor below the parent node
     container.appendChild(inlineEditor);
-    input.focus();
+    setTimeout(() => input.focus(), 0);
 }
 
 function promptAddParameter(labelPath, container) {
@@ -1810,7 +1810,7 @@ function promptAddParameter(labelPath, container) {
   inlineEditor.appendChild(buttonsSection);
 
   container.appendChild(inlineEditor);
-  nameInput.focus();
+  setTimeout(() => nameInput.focus(), 0);
 }
 
 function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
@@ -2065,7 +2065,7 @@ function promptEditGroupAttribute(labelPath, attrName, attrValue, container) {
   inlineEditor.appendChild(buttonsSection);
 
   container.appendChild(inlineEditor);
-  nameInput.focus();
+  setTimeout(() => nameInput.focus(), 0);
 }
 
 
@@ -2349,7 +2349,7 @@ function promptEditParameter(labelPath, oldParamName, oldParamValue, container) 
   inlineEditor.appendChild(buttonsSection);
 
   container.appendChild(inlineEditor);
-  nameInput.focus();
+  setTimeout(() => nameInput.focus(), 0);
 }
 
 // ======= Parameter Menu for Labeled Text =======
@@ -7107,6 +7107,40 @@ window.addEventListener('click', (event) => {
         resetThemeSettings();
       });
     }
+  }
+
+  // ======= Prevent accidental page reload with unsaved work =======
+  window.addEventListener('beforeunload', (e) => {
+    // Check if there's work that hasn't been saved
+    if (currentHtml && !isWorkSaved()) {
+      // Modern browsers require returnValue to be set
+      e.preventDefault();
+      e.returnValue = ''; // Chrome requires returnValue to be set
+      // Some browsers will show a generic message, not this custom one
+      return 'You have unsaved changes. Are you sure you want to leave?';
+    }
+  });
+
+  // Helper function to check if work is saved
+  function isWorkSaved() {
+    // Work is considered unsaved if:
+    // 1. Source view has been modified but not applied
+    // 2. There are labeled elements in the HTML content (work has been done)
+    // 3. Timer is running (indicates active work)
+    
+    if (sourceViewModified) {
+      return false; // Source view changes not applied
+    }
+    
+    // Check if there are any manual_label elements (work has been done)
+    const hasLabels = elements.htmlContent.querySelectorAll('manual_label').length > 0;
+    
+    // If labels exist and timer has accumulated time, consider it unsaved work
+    if (hasLabels && accumulatedMs > 0) {
+      return false; // There's work that should be saved
+    }
+    
+    return true; // No unsaved work detected
   }
 
   // ======= Initialize =======
