@@ -1062,8 +1062,57 @@ function refreshTreeUI() {
 }
 
 function renderTree() {
+  // Preserve any open inline editors before clearing the tree
+  const inlineEditors = elements.labelTree.querySelectorAll('.inline-editor');
+  const preservedEditors = [];
+  
+  inlineEditors.forEach(editor => {
+    // Store the editor and its parent's data-path to re-insert it later
+    const parent = editor.parentElement;
+    if (parent && parent.classList.contains('tree-node')) {
+      const treeItem = parent.querySelector('.tree-item');
+      if (treeItem && treeItem.dataset.path) {
+        preservedEditors.push({
+          editor: editor.cloneNode(true),
+          path: treeItem.dataset.path,
+          focusedElement: document.activeElement && editor.contains(document.activeElement) ? document.activeElement.tagName : null,
+          focusedIndex: document.activeElement && editor.contains(document.activeElement) ? 
+            Array.from(editor.querySelectorAll('input, select, button')).indexOf(document.activeElement) : -1
+        });
+      }
+    }
+  });
+  
   elements.labelTree.innerHTML = '';
   renderTreeLevel(labels, [], 0, elements.labelTree);
+  
+  // Re-insert preserved inline editors
+  preservedEditors.forEach(({editor, path, focusedElement, focusedIndex}) => {
+    const treeItems = elements.labelTree.querySelectorAll('.tree-item');
+    for (const treeItem of treeItems) {
+      if (treeItem.dataset.path === path) {
+        const treeNode = treeItem.closest('.tree-node');
+        if (treeNode) {
+          // Remove any new inline editor that might have been created
+          const existingEditor = treeNode.querySelector('.inline-editor');
+          if (existingEditor) {
+            existingEditor.remove();
+          }
+          
+          treeNode.appendChild(editor);
+          
+          // Restore focus if an element was focused
+          if (focusedIndex >= 0) {
+            const focusableElements = editor.querySelectorAll('input, select, button');
+            if (focusableElements[focusedIndex]) {
+              setTimeout(() => focusableElements[focusedIndex].focus(), 0);
+            }
+          }
+        }
+        break;
+      }
+    }
+  });
 }
 
 function renderTreeLevel(labelMap, currentPath, level, container) {
