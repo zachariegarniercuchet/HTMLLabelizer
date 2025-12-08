@@ -38,6 +38,14 @@
             <span class="filename" id="current-filename"></span>
           </div>
           <div class="timer-controls">
+            <button id="page-saver-btn" class="page-saver-btn" title="Page Savers" disabled>🔖</button>
+            <div id="page-saver-menu" class="page-saver-menu">
+              <button id="new-page-saver" class="page-saver-new">+ New</button>
+              <div class="page-saver-divider"></div>
+              <div id="page-saver-list" class="page-saver-list">
+                <!-- Page savers list will be populated here -->
+              </div>
+            </div>
             <button id="toggle-timer" class="timer-btn" title="Start/Stop timer" disabled>Start</button>
             <div id="timer-display" class="timer-display" aria-live="polite">00:00:00</div>
           </div>

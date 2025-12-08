@@ -4,6 +4,7 @@
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  position: relative; /* Needed for absolute positioning of page-saver-menu */
 }
 
 .timer-btn {
@@ -80,4 +81,271 @@
   background: white;
   border-color: #dadce0;
   color: #5f6368;
+}
+
+/* Bookmark Button and Menu Styling */
+.page-saver-btn {
+  padding: 6px 12px;
+  font-size: 16px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-saver-btn:hover:not(:disabled) {
+  background: var(--accent-2);
+  transform: translateY(-1px);
+}
+
+.page-saver-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--card);
+}
+
+.page-saver-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  min-width: 240px;
+  max-height: 400px;
+  overflow: hidden;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+}
+
+.page-saver-menu.show {
+  display: flex;
+}
+
+.page-saver-new {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-saver-new:hover {
+  background: var(--hover);
+  color: var(--accent-2);
+}
+
+/* Light theme - make New button more visible with WHITE text on dark background */
+:root[data-theme="light"] .page-saver-new {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+:root[data-theme="light"] .page-saver-new:hover {
+  background: #404040 !important;
+  color: #ffffff !important;
+}
+
+.page-saver-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+.page-saver-list {
+  padding: 8px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.page-saver-empty {
+  padding: 20px 16px;
+  text-align: center;
+  color: var(--sub);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.page-saver-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 12px;
+}
+
+.page-saver-item::before {
+  content: '🔖';
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.page-saver-item:hover {
+  background: var(--hover);
+}
+
+.page-saver-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-saver-delete {
+  padding: 4px 8px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  background: transparent;
+  color: var(--sub);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+  opacity: 0;
+}
+
+.page-saver-item:hover .page-saver-delete {
+  opacity: 1;
+}
+
+.page-saver-delete:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.page-saver-delete:active {
+  background: var(--danger);
+  color: white;
+}
+
+/* Light theme delete button - white/light color for visibility */
+:root[data-theme="light"] .page-saver-delete {
+  color: #ffffff;
+  font-weight: bold;
+  background: #666666;
+  opacity: 1;
+}
+
+:root[data-theme="light"] .page-saver-delete:hover {
+  background: #888888;
+  color: #ffffff;
+}
+
+:root[data-theme="light"] .page-saver-delete:active {
+  background: var(--danger);
+  color: white;
+}
+
+/* Bookmark Element in HTML Content */
+htmllabelizer_bookmark {
+  display: inline-block;
+  padding: 3px 8px;
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border);
+}
+
+htmllabelizer_bookmark:hover {
+  background: var(--accent-2);
+  transform: translateY(-1px);
+}
+
+htmllabelizer_bookmark.page-saver-highlight {
+  animation: bookmarkPulse 2s ease-in-out;
+  background: var(--success);
+}
+
+@keyframes bookmarkPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Bookmark name menu now uses the existing .param-menu classes from style.css */
+
+
+
+:root[data-theme="light"] .page-saver-delete {
+  color: #d93025;
+}
+
+:root[data-theme="light"] .page-saver-delete:hover {
+  background: #d93025;
+  color: white;
+}
+
+:root[data-theme="light"] htmllabelizer_bookmark {
+  background: linear-gradient(135deg, #1a73e8, #137333);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.35);
+}
+
+:root[data-theme="light"] htmllabelizer_bookmark.page-saver-highlight {
+  background: linear-gradient(135deg, #f9ab00, #ea4335);
+}
+
+:root[data-theme="light"] .bookmark-name-menu {
+  background: white;
+  border-color: rgba(26, 115, 232, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(26, 115, 232, 0.2);
+}
+
+:root[data-theme="light"] .bookmark-menu-title {
+  background: linear-gradient(135deg, rgba(26, 115, 232, 0.15), rgba(19, 115, 51, 0.15));
+  border-bottom-color: rgba(26, 115, 232, 0.2);
+}
+
+:root[data-theme="light"] .bookmark-menu-input {
+  background: #f8f9fa;
+  border-color: #dadce0;
+}
+
+:root[data-theme="light"] .bookmark-menu-input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+  background: white;
+}
+
+:root[data-theme="light"] .bookmark-menu-btn.cancel {
+  background: #e8eaed;
+  color: #5f6368;
+}
+
+:root[data-theme="light"] .bookmark-menu-btn.cancel:hover {
+  background: #dadce0;
+  color: #202124;
+}
+
+:root[data-theme="light"] .bookmark-menu-btn.create {
+  background: linear-gradient(135deg, #1a73e8, #137333);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+}
+
+:root[data-theme="light"] .bookmark-menu-btn.create:hover {
+  background: linear-gradient(135deg, #1557b0, #0d5a28);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
 }

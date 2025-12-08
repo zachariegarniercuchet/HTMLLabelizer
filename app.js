@@ -17,6 +17,10 @@
   let meta = {}; // store metadata loaded/saved with schema (e.g., time)
   let inactivityTimeoutId = null; // Track inactivity timeout
   const INACTIVITY_TIMEOUT = 60000; // 1 minute in milliseconds
+  // ======= Page Saver State =======
+  let pageSavers = new Map(); // id -> { name, position }
+  let pageSaverPlacementMode = false;
+  let pageSaverMenuOpen = false;
   // ======= COMPLETE SEPARATION OF SELECTION TYPES =======
   let currentSelection = null; // For user mouse selections in HTML content
   let currentSearchSelection = null; // For search matches in HTML content - ONLY used by Apply button
@@ -78,6 +82,12 @@
   // Timer UI elements (may be undefined until DOM ready)
   elements.toggleTimerBtn = document.getElementById('toggle-timer');
   elements.timerDisplay = document.getElementById('timer-display');
+  
+  // Page Saver UI elements
+  elements.pageSaverBtn = document.getElementById('page-saver-btn');
+  elements.pageSaverMenu = document.getElementById('page-saver-menu');
+  elements.pageSaverList = document.getElementById('page-saver-list');
+  elements.newPageSaverBtn = document.getElementById('new-page-saver');
 
   // ======= Timer Helper Functions =======
   function formatMsToHMS(ms) {
@@ -3874,6 +3884,9 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
 
     elements.htmlContent.innerHTML = doc.body.innerHTML;
     
+    // Extract page savers after rendering
+    extractPageSavers();
+    
     // Update filename display
     if (elements.currentFilename) {
       elements.currentFilename.textContent = currentFileName || '';
@@ -6228,6 +6241,294 @@ function navigateToPreviousMatch() {
 
 // Duplicate clearSearchHighlights function removed - now using clearSearchOverlays
 
+  // ======= Page Saver Functions =======
+  
+  function extractPageSavers() {
+    pageSavers.clear();
+    const saverElements = elements.htmlContent.querySelectorAll('htmllabelizer_bookmark');
+    saverElements.forEach(el => {
+      const id = el.getAttribute('id');
+      if (id) {
+        pageSavers.set(id, {
+          name: id,
+          element: el
+        });
+      }
+    });
+    refreshPageSaverMenu();
+  }
+  
+  function refreshPageSaverMenu() {
+    if (!elements.pageSaverList) return;
+    
+    elements.pageSaverList.innerHTML = '';
+    
+    if (pageSavers.size === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.className = 'page-saver-empty';
+      emptyMsg.textContent = 'No bookmarks yet';
+      elements.pageSaverList.appendChild(emptyMsg);
+      return;
+    }
+    
+    pageSavers.forEach((saver, id) => {
+      const item = document.createElement('div');
+      item.className = 'page-saver-item';
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'page-saver-name';
+      nameSpan.textContent = saver.name;
+      nameSpan.onclick = (e) => {
+        e.stopPropagation();
+        navigateToPageSaver(id);
+        closePageSaverMenu();
+      };
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'page-saver-delete';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deletePageSaver(id);
+      };
+      
+      item.appendChild(nameSpan);
+      item.appendChild(deleteBtn);
+      elements.pageSaverList.appendChild(item);
+    });
+  }
+  
+  function navigateToPageSaver(id) {
+    const saver = pageSavers.get(id);
+    if (!saver || !saver.element) return;
+    
+    // Scroll to the element
+    saver.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Highlight temporarily
+    saver.element.classList.add('page-saver-highlight');
+    setTimeout(() => {
+      saver.element.classList.remove('page-saver-highlight');
+    }, 2000);
+  }
+  
+  function deletePageSaver(id) {
+    const saver = pageSavers.get(id);
+    if (!saver || !saver.element) return;
+    
+    // Remove from DOM
+    saver.element.remove();
+    
+    // Remove from map
+    pageSavers.delete(id);
+    
+    // Update UI
+    refreshPageSaverMenu();
+    updateCurrentHtmlFromDOM();
+  }
+  
+  function startPageSaverPlacementMode() {
+    pageSaverPlacementMode = true;
+    elements.htmlContent.style.cursor = 'crosshair';
+    closePageSaverMenu();
+    
+    // Show instruction message
+    showTemporaryMessage('Click anywhere in the HTML content to place a page saver bookmark', 5000);
+  }
+  
+  function placePageSaver(event) {
+    if (!pageSaverPlacementMode) return;
+    
+    // Prevent default to avoid text selection
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Store click position for later use
+    const clickX = event.clientX;
+    const clickY = event.clientY;
+    const clickTarget = event.target;
+    
+    // Generate unique name
+    let counter = 1;
+    let defaultName = `bookmark_${counter}`;
+    while (pageSavers.has(defaultName)) {
+      counter++;
+      defaultName = `bookmark_${counter}`;
+    }
+    
+    // Show styled menu for bookmark name
+    showBookmarkNameMenu(clickX, clickY, defaultName, (customName) => {
+      if (!customName) {
+        exitPageSaverPlacementMode();
+        return;
+      }
+      
+      // Validate name
+      if (pageSavers.has(customName)) {
+        showTemporaryMessage('A bookmark with this name already exists. Please choose a different name.', 4000);
+        exitPageSaverPlacementMode();
+        return;
+      }
+      
+      // Create the bookmark element
+      const saverElement = document.createElement('htmllabelizer_bookmark');
+      saverElement.setAttribute('id', customName);
+      saverElement.textContent = '🔖';
+      
+      // Find insertion point based on click position
+      const range = document.caretRangeFromPoint(clickX, clickY);
+      if (range) {
+        range.insertNode(saverElement);
+      } else {
+        // Fallback: append to clicked element
+        if (clickTarget && clickTarget !== elements.htmlContent) {
+          clickTarget.appendChild(saverElement);
+        } else {
+          elements.htmlContent.appendChild(saverElement);
+        }
+      }
+      
+      // Add to map
+      pageSavers.set(customName, {
+        name: customName,
+        element: saverElement
+      });
+      
+      // Update UI and HTML
+      refreshPageSaverMenu();
+      updateCurrentHtmlFromDOM();
+      exitPageSaverPlacementMode();
+      
+      showTemporaryMessage(`Bookmark "${customName}" created!`, 3000);
+    });
+  }
+  
+  function showBookmarkNameMenu(x, y, defaultName, callback) {
+    // Remove any existing bookmark menu
+    const existingMenu = document.getElementById('bookmark-name-menu');
+    if (existingMenu) existingMenu.remove();
+    
+    // Create menu container - using exact param-menu structure
+    const menu = document.createElement('div');
+    menu.id = 'bookmark-name-menu';
+    menu.className = 'param-menu'; // Use same class as parameter menu
+    
+    // Position the menu
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    
+    // Create menu title (h4 like param-menu)
+    const title = document.createElement('h4');
+    title.textContent = 'Create Bookmark';
+    
+    // Create form section (matching param-form structure)
+    const formSection = document.createElement('div');
+    formSection.className = 'param-form';
+    
+    // Create parameter row (matching param-row structure)
+    const paramRow = document.createElement('div');
+    paramRow.className = 'param-row';
+    
+    const label = document.createElement('label');
+    label.textContent = 'Bookmark ID';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultName;
+    input.placeholder = 'Enter bookmark ID';
+    
+    paramRow.appendChild(label);
+    paramRow.appendChild(input);
+    formSection.appendChild(paramRow);
+    
+    // Create buttons section (matching param-menu-actions structure)
+    const buttonsSection = document.createElement('div');
+    buttonsSection.className = 'param-menu-actions';
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'cancel-btn';
+    cancelBtn.textContent = 'Cancel';
+    
+    const createBtn = document.createElement('button');
+    createBtn.className = 'save-btn';
+    createBtn.textContent = 'Create';
+    
+    buttonsSection.appendChild(cancelBtn);
+    buttonsSection.appendChild(createBtn);
+    
+    // Assemble menu
+    menu.appendChild(title);
+    menu.appendChild(formSection);
+    menu.appendChild(buttonsSection);
+    
+    // Event handlers
+    const handleCreate = () => {
+      const name = input.value.trim();
+      menu.remove();
+      callback(name);
+    };
+    
+    const handleCancel = () => {
+      menu.remove();
+      callback(null);
+    };
+    
+    createBtn.onclick = handleCreate;
+    cancelBtn.onclick = handleCancel;
+    
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCreate();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+      }
+    };
+    
+    // Add to document
+    document.body.appendChild(menu);
+    
+    // Adjust position if menu goes off screen
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = (window.innerWidth - rect.width - 20) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = (window.innerHeight - rect.height - 20) + 'px';
+    }
+    
+    // Focus input and select text
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+  }
+  
+  function exitPageSaverPlacementMode() {
+    pageSaverPlacementMode = false;
+    elements.htmlContent.style.cursor = '';
+  }
+  
+  function togglePageSaverMenu() {
+    if (!elements.pageSaverMenu) return;
+    
+    pageSaverMenuOpen = !pageSaverMenuOpen;
+    
+    if (pageSaverMenuOpen) {
+      elements.pageSaverMenu.classList.add('show');
+    } else {
+      elements.pageSaverMenu.classList.remove('show');
+    }
+  }
+  
+  function closePageSaverMenu() {
+    pageSaverMenuOpen = false;
+    if (elements.pageSaverMenu) {
+      elements.pageSaverMenu.classList.remove('show');
+    }
+  }
+
   // ======= Event Listeners =======
   
   // File loading
@@ -6257,6 +6558,7 @@ function navigateToPreviousMatch() {
       elements.viewToggle.classList.remove('active');
       
       extractExistingLabels(currentHtml);
+      extractPageSavers();
       renderHtmlContent();
       refreshGroupsDisplay(); // Update groups display after parsing
       elements.downloadBtn.disabled = false;
@@ -6264,6 +6566,8 @@ function navigateToPreviousMatch() {
       elements.viewToggle.disabled = false;
       // Enable timer button when file is loaded
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
+      // Enable page saver button when file is loaded
+      if (elements.pageSaverBtn) elements.pageSaverBtn.disabled = false;
 
       
     } catch (error) {
@@ -6310,12 +6614,15 @@ function navigateToPreviousMatch() {
       elements.viewToggle.classList.remove('active');
 
       extractExistingLabels(currentHtml);
+      extractPageSavers();
       renderHtmlContent();
       elements.downloadBtn.disabled = false;
       elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
       // Enable timer button when file is loaded
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
+      // Enable page saver button when file is loaded
+      if (elements.pageSaverBtn) elements.pageSaverBtn.disabled = false;
 
     } catch (error) {
       alert('Error reading HTML file');
@@ -7206,6 +7513,46 @@ window.addEventListener('click', (event) => {
   // Initialize timer UI
   updateTimerDisplay();
   if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = true; // Disabled until file is loaded
+  
+  // ======= Page Saver Event Listeners =======
+  if (elements.pageSaverBtn) {
+    elements.pageSaverBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePageSaverMenu();
+    });
+  }
+  
+  if (elements.newPageSaverBtn) {
+    elements.newPageSaverBtn.addEventListener('click', () => {
+      startPageSaverPlacementMode();
+    });
+  }
+  
+  // Click handler for placing page savers
+  elements.htmlContent.addEventListener('click', (e) => {
+    if (pageSaverPlacementMode) {
+      placePageSaver(e);
+    }
+  });
+  
+  // Close page saver menu when clicking elsewhere
+  document.addEventListener('click', (e) => {
+    if (pageSaverMenuOpen && 
+        elements.pageSaverBtn && 
+        elements.pageSaverMenu &&
+        !elements.pageSaverBtn.contains(e.target) && 
+        !elements.pageSaverMenu.contains(e.target)) {
+      closePageSaverMenu();
+    }
+  });
+  
+  // Escape key to exit placement mode
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pageSaverPlacementMode) {
+      exitPageSaverPlacementMode();
+      showTemporaryMessage('Page saver placement cancelled', 2000);
+    }
+  });
   
   console.log('Enhanced HTML Labelizer ready!');
 
