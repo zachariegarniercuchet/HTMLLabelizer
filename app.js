@@ -2494,6 +2494,7 @@ function showParameterMenu(labelElement, x, y) {
           const filtered = filterSuggestions(allSuggestions, inputValue);
           
           if (suggestionDropdown) suggestionDropdown.remove();
+          suggestionDropdown = null; // Always clear the reference
           
           if (filtered.length > 0 && inputValue.length > 0) {
             suggestionDropdown = createSuggestionDropdown(input, filtered);
@@ -2548,6 +2549,7 @@ function showParameterMenu(labelElement, x, y) {
         const filtered = filterSuggestions(allSuggestions, inputValue);
         
         if (suggestionDropdown) suggestionDropdown.remove();
+        suggestionDropdown = null; // Always clear the reference
         
         if (filtered.length > 0 && inputValue.length > 0) {
           suggestionDropdown = createSuggestionDropdown(input, filtered);
@@ -2841,6 +2843,7 @@ function handleSuggestionKeydown(event, input, dropdown) {
   switch (event.key) {
     case 'ArrowDown':
       event.preventDefault();
+      if (items.length === 0) return true; // No items to navigate
       if (highlighted) highlighted.classList.remove('highlighted');
       
       currentIndex = (currentIndex + 1) % items.length;
@@ -2849,6 +2852,7 @@ function handleSuggestionKeydown(event, input, dropdown) {
       
     case 'ArrowUp':
       event.preventDefault();
+      if (items.length === 0) return true; // No items to navigate
       if (highlighted) highlighted.classList.remove('highlighted');
       
       currentIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
@@ -2857,8 +2861,12 @@ function handleSuggestionKeydown(event, input, dropdown) {
       
     case 'Enter':
       event.preventDefault();
-      if (highlighted) {
+      // Only use suggestion if there are actually items in the dropdown
+      // Otherwise, keep the user's typed value
+      if (items.length > 0 && highlighted) {
         input.value = highlighted.textContent;
+        dropdown.remove();
+      } else if (dropdown) {
         dropdown.remove();
       }
       return true;
@@ -6816,9 +6824,13 @@ function navigateToPreviousMatch() {
   });
 
   // Enter key for adding labels
-  elements.newLabelName.addEventListener('keypress', (e) => {
+  elements.newLabelName.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      elements.addRootLabel.click();
+      e.preventDefault(); // Prevent default to avoid autocomplete interference
+      // Use setTimeout to ensure autocomplete is dismissed first
+      setTimeout(() => {
+        elements.addRootLabel.click();
+      }, 0);
     }
   });
 
