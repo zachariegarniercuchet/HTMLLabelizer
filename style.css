@@ -1352,7 +1352,7 @@
     }
 
     /* Manual Labels */
-    manual_label {
+    manual_label, auto_label {
       position: relative;
       display: inline;
       padding: 2px 6px;
@@ -1364,11 +1364,11 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    manual_label:hover {
+    manual_label:hover, auto_label:hover {
       opacity: 0.8;
     }
 
-    manual_label .delete-btn {
+    manual_label .delete-btn, auto_label .delete-btn {
       position: absolute;
       top: -8px;
       right: -8px;
@@ -1387,13 +1387,15 @@
     }
 
     /* Light theme label delete buttons - more grey, less red */
-    :root[data-theme="light"] manual_label .delete-btn {
+    :root[data-theme="light"] manual_label .delete-btn, 
+    :root[data-theme="light"] auto_label .delete-btn {
       background: #8a8a8a !important; /* Light grey instead of red */
       color: white !important;
       border: none !important;
     }
 
-    :root[data-theme="light"] manual_label .delete-btn:hover {
+    :root[data-theme="light"] manual_label .delete-btn:hover, 
+    :root[data-theme="light"] auto_label .delete-btn:hover {
       background: #e74c3c !important; /* Red on hover to indicate danger */
     }
 

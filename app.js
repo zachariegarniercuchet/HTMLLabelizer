@@ -415,8 +415,8 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     
     console.log(`Updating existing elements: ${labelName} (parent: ${parentName}) with parameter ${paramName} = ${defaultValue}`);
     
-    // Find all HTML elements with this label
-    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    // Find all HTML elements with this label (both manual and auto labels)
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     let updatedCount = 0;
     
     allLabelElements.forEach(element => {
@@ -448,8 +448,8 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     
     console.log(`Removing parameter ${paramName} from existing elements: ${labelName} (parent: ${parentName})`);
     
-    // Find all HTML elements with this label
-    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    // Find all HTML elements with this label (both manual and auto labels)
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     let updatedCount = 0;
     
     allLabelElements.forEach(element => {
@@ -598,7 +598,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     let totalDirectCount = 0;
     let childrenCount = 0;
     
-    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     
     // Count elements for each label that will be removed
     labelsToCheck.forEach(labelInfo => {
@@ -684,7 +684,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     
     console.log('Labels to remove from HTML:', labelsToRemove);
     
-    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+    const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     let removedCount = 0;
     
     // Convert NodeList to array to avoid issues when removing elements
@@ -1420,7 +1420,7 @@ function updateGroupIdAttributeName(labelPath, oldAttributeName, newAttributeNam
   const labelName = labelPath[labelPath.length - 1];
   const parentName = labelPath.length > 1 ? labelPath[labelPath.length - 2] : '';
   
-  const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+  const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   let updatedCount = 0;
 
   allLabelElements.forEach(element => {
@@ -2614,8 +2614,8 @@ function showParameterMenu(labelElement, x, y) {
   
   if (!label || !label.groupConfig) return;
   
-  // Find all elements with the same group ID
-  const allLabelElements = elements.htmlContent.querySelectorAll('manual_label');
+  // Find all elements with the same group ID (both manual and auto labels)
+  const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   const sameGroupElements = Array.from(allLabelElements).filter(el => {
     const elLabelName = el.getAttribute('labelName');
     const elParent = el.getAttribute('parent') || '';
@@ -2726,8 +2726,8 @@ function saveParameters() {
 function collectParameterSuggestions(labelName, parent, paramName) {
   const suggestions = new Set();
   
-  // Find all mentions with same label and parent
-  const mentions = elements.htmlContent.querySelectorAll('manual_label');
+  // Find all mentions with same label and parent (both manual and auto labels)
+  const mentions = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   mentions.forEach(mention => {
     const mentionLabel = mention.getAttribute('labelName');
     const mentionParent = mention.getAttribute('parent') || '';
@@ -3035,7 +3035,7 @@ function toggleGroupFilter(groupKey, labelName, groupId, groupIdAttr) {
 
 // Apply group filter to HTML content
 function applyGroupFilter(labelName, groupId, groupIdAttr) {
-  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   
   labelElements.forEach(labelEl => {
     const elLabelName = labelEl.getAttribute('labelName');
@@ -3056,7 +3056,7 @@ function applyGroupFilter(labelName, groupId, groupIdAttr) {
 function clearGroupFilter() {
   if (activeGroupFilter) {
     // Remove all filter classes from labels
-    const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+    const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     labelElements.forEach(labelEl => {
       labelEl.classList.remove('group-filter-highlight', 'group-filter-dimmed');
     });
@@ -3285,7 +3285,7 @@ function toggleGroupEdit(groupDiv, groupKey) {
 }
 
 function updateGroupInDocument(labelName, oldGroupId, newValues, newGroupId) {
-  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   
   labelElements.forEach(labelEl => {
     const elLabelName = labelEl.getAttribute('labelName');
@@ -3644,7 +3644,7 @@ function applySourceChanges() {
 function collectActiveGroups() {
   const groups = new Map();
   
-  const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+  const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   
   labelElements.forEach(labelEl => {
     const labelName = labelEl.getAttribute('labelName');
@@ -3830,7 +3830,7 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(currentHtml, 'text/html');
 
-    const mentions = doc.querySelectorAll('manual_label');
+    const mentions = doc.querySelectorAll('manual_label, auto_label');
 
     mentions.forEach(mention => {
       const labelName = mention.getAttributeNames()[0];
@@ -3923,7 +3923,7 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
   }
 
   function attachLabelEventListeners() {
-    const labelElements = elements.htmlContent.querySelectorAll('manual_label');
+    const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     labelElements.forEach(labelElement => {
       const deleteBtn = labelElement.querySelector('.delete-btn');
       if (deleteBtn) {
@@ -4015,7 +4015,7 @@ function extractLabelContentWithFormatting(labelElement) {
 
 
 function updateStats() {
-    const manualLabels = elements.htmlContent.querySelectorAll('manual_label');
+    const manualLabels = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     elements.totalMentions.textContent = manualLabels.length;
     
     // Count total label types (including sublabels)
@@ -4110,8 +4110,8 @@ function isValidSelection(range) {
     // Check for manual_label boundaries
     for (let node of nodesInRange) {
       if (node.nodeType === Node.ELEMENT_NODE) {
-        // Check if we're crossing a manual_label boundary
-        if (node.tagName === 'MANUAL_LABEL') {
+        // Check if we're crossing a manual_label or auto_label boundary
+        if (node.tagName === 'MANUAL_LABEL' || node.tagName === 'AUTO_LABEL') {
           // If the range starts or ends inside this manual_label, but not completely contained
           const rangeStartsInside = node.contains(startContainer) || node === startContainer;
           const rangeEndsInside = node.contains(endContainer) || node === endContainer;
@@ -4152,8 +4152,8 @@ function isValidSelection(range) {
     tempDiv.appendChild(rangeContents);
     
     // Look for opening tags without closing tags or vice versa
-    const openTags = (tempDiv.innerHTML.match(/<manual_label[^>]*>/g) || []).length;
-    const closeTags = (tempDiv.innerHTML.match(/<\/manual_label>/g) || []).length;
+    const openTags = (tempDiv.innerHTML.match(/<(manual_label|auto_label)[^>]*>/g) || []).length;
+    const closeTags = (tempDiv.innerHTML.match(/<\/(manual_label|auto_label)>/g) || []).length;
     
     if (openTags !== closeTags) {
       return {
@@ -4173,11 +4173,12 @@ function isValidSelection(range) {
   }
 }
 
-// Helper function to find containing manual_label
+// Helper function to find containing manual_label or auto_label
 function getContainingManualLabel(node) {
   let current = node;
   while (current && current !== elements.htmlContent && current !== elements.advancedContent) {
-    if (current.nodeType === Node.ELEMENT_NODE && current.tagName === 'MANUAL_LABEL') {
+    if (current.nodeType === Node.ELEMENT_NODE && 
+        (current.tagName === 'MANUAL_LABEL' || current.tagName === 'AUTO_LABEL')) {
       return current;
     }
     current = current.parentNode;
@@ -4710,7 +4711,7 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
 }
 
 function attachAdvancedLabelEventListeners() {
-  const labelElements = elements.advancedContent.querySelectorAll('manual_label');
+  const labelElements = elements.advancedContent.querySelectorAll('manual_label, auto_label');
   labelElements.forEach(labelElement => {
     const deleteBtn = labelElement.querySelector('.delete-btn');
     if (deleteBtn) {
@@ -5495,15 +5496,15 @@ function isFullyLabeled() {
 }
 
 function getRootLabels() {
-  // Get all manual_label elements that are not nested inside other labels
-  const allLabels = elements.advancedContent.querySelectorAll('manual_label');
+  // Get all manual_label and auto_label elements that are not nested inside other labels
+  const allLabels = elements.advancedContent.querySelectorAll('manual_label, auto_label');
   const rootLabels = [];
   
   allLabels.forEach(label => {
     let isNested = false;
     let parent = label.parentElement;
     while (parent && parent !== elements.advancedContent) {
-      if (parent.tagName === 'MANUAL_LABEL') {
+      if (parent.tagName === 'MANUAL_LABEL' || parent.tagName === 'AUTO_LABEL') {
         isNested = true;
         break;
       }
@@ -5629,8 +5630,8 @@ function addDeleteButtonToLabel(labelElement) {
   deleteBtn.textContent = "×";
   labelElement.appendChild(deleteBtn);
   
-  // Also add delete buttons to any nested labels
-  const nestedLabels = labelElement.querySelectorAll('manual_label');
+  // Also add delete buttons to any nested labels (both manual and auto)
+  const nestedLabels = labelElement.querySelectorAll('manual_label, auto_label');
   nestedLabels.forEach(nestedLabel => {
     if (!nestedLabel.querySelector('.delete-btn')) {
       const nestedDeleteBtn = document.createElement("button");
