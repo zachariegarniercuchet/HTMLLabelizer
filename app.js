@@ -35,6 +35,7 @@
   
   // ======= Group Display State =======
   let expandedGroups = new Set(); // Track expanded groups
+  let expandedLabelGroups = new Set(); // Track expanded label groups in Active Groups section
   let groupsSectionExpanded = true; // Track if entire groups section is expanded
   let activeGroupFilter = null; // Track active group filter
 
@@ -66,7 +67,8 @@
     paramMenuTitle: document.getElementById('param-menu-title'),
     paramForm: document.getElementById('param-form'),
     totalMentions: document.getElementById('total-mentions'),
-    labelTypes: document.getElementById('label-types'),
+    totalLabels: document.getElementById('total-labels'),
+    parentLabelsStats: document.getElementById('parent-labels-stats'),
     sourceView: document.getElementById('source-view'),
     viewToggle: document.getElementById('view-toggle'),
     dropZone: document.getElementById('drop-zone'),
@@ -2839,6 +2841,89 @@ function handleSuggestionKeydown(event, input, dropdown) {
 }
 
 // ======= Group Display functions =======
+
+// Organize active groups by label hierarchy
+function organizeGroupsByLabelHierarchy(activeGroups) {
+  const organized = new Map(); // labelPath -> groups array
+  
+  activeGroups.forEach((groupData, groupKey) => {
+    const { labelName } = groupData;
+    
+    // Find the label in the label tree to get its full path
+    const labelInfo = findLabelInTree(labelName);
+    
+    if (labelInfo) {
+      const pathKey = labelInfo.path.join('/');
+      
+      if (!organized.has(pathKey)) {
+        organized.set(pathKey, {
+          labelName: labelName,
+          path: labelInfo.path,
+          parentPath: labelInfo.parentPath,
+          label: labelInfo.label,
+          groups: []
+        });
+      }
+      
+      organized.get(pathKey).groups.push({ groupKey, groupData });
+    }
+  });
+  
+  return organized;
+}
+
+// Helper function to find a label in the tree and return its path info
+function findLabelInTree(labelName, currentMap = labels, currentPath = [], parentPath = []) {
+  for (const [name, label] of currentMap) {
+    const path = [...currentPath, name];
+    
+    if (name === labelName) {
+      return { path, parentPath: currentPath, label };
+    }
+    
+    // Search in sublabels
+    if (label.sublabels && label.sublabels.size > 0) {
+      const found = findLabelInTree(labelName, label.sublabels, path, currentPath);
+      if (found) return found;
+    }
+  }
+  
+  return null;
+}
+
+// Build hierarchical structure for display
+function buildLabelGroupHierarchy(organizedGroups) {
+  const hierarchy = new Map(); // parent label -> children labels
+  const rootLabels = [];
+  
+  organizedGroups.forEach((labelData, pathKey) => {
+    if (labelData.parentPath.length === 0) {
+      // Root label
+      rootLabels.push(labelData);
+    } else {
+      // Child label - add to parent
+      const parentKey = labelData.parentPath.join('/');
+      if (!hierarchy.has(parentKey)) {
+        hierarchy.set(parentKey, []);
+      }
+      hierarchy.get(parentKey).push(labelData);
+    }
+  });
+  
+  return { rootLabels, hierarchy };
+}
+
+// Toggle label group expansion
+function toggleLabelGroupExpansion(labelPath) {
+  const pathKey = labelPath.join('/');
+  if (expandedLabelGroups.has(pathKey)) {
+    expandedLabelGroups.delete(pathKey);
+  } else {
+    expandedLabelGroups.add(pathKey);
+  }
+  refreshGroupsDisplay();
+}
+
 function refreshGroupsDisplay() {
   const groupsList = document.getElementById('groups-list');
   if (!groupsList) return;
@@ -2859,144 +2944,251 @@ function refreshGroupsDisplay() {
     return;
   }
   
-  activeGroups.forEach((groupData, groupKey) => {
-    const { labelName, groupId, groupIdAttr, groupAttributes, values } = groupData;
-    
-    // Create group node container
-    const groupNode = document.createElement('div');
-    groupNode.className = 'tree-node';
-    
-    // Create main group item (similar to tree-item)
-    const groupItem = document.createElement('div');
-    groupItem.className = 'tree-item level-0 group-item';
-    groupItem.dataset.editing = 'false';
-    
-    // Expand/collapse button - only show if group has attributes
-    const expandBtn = document.createElement('button');
-    if (groupAttributes.size === 0) {
-      expandBtn.className = 'tree-expand-btn no-children';
-    } else {
-      expandBtn.className = `tree-expand-btn ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
-      expandBtn.onclick = (e) => {
-        e.stopPropagation();
-        toggleGroupExpansion(groupKey);
-      };
-    }
-    
-    // Get label color for the colored circle icon
-    const label = getLabelByPath([labelName]);
-    const labelColor = label ? label.color : '#6aa3ff';
-    
-    // Group icon - colored circle instead of folder
-    const icon = document.createElement('div');
-    icon.className = 'tree-color-indicator';
-    icon.style.backgroundColor = labelColor;
-    icon.style.border = '1px solid var(--border)';
-    icon.style.width = '12px';
-    icon.style.height = '12px';
-    icon.style.borderRadius = '50%';
-    icon.style.marginRight = '10px';
-    icon.style.flexShrink = '0';
-    
-    // Group title and gold parameter (group ID)
-    const titleSpan = document.createElement('div');
-    titleSpan.className = 'tree-label';
-    titleSpan.textContent = `${labelName} - `;
-    
-    // Add the group ID as an editable element
-    const groupIdSpan = document.createElement('span');
-    groupIdSpan.className = 'tree-param-value group-id-value';
-    groupIdSpan.dataset.paramName = groupIdAttr;
-    groupIdSpan.textContent = groupId === 'undefined' ? '' : groupId;
-    titleSpan.appendChild(groupIdSpan);
-    
-    // Actions (modify button - always show if there are attributes or group ID to modify)
-    const actions = document.createElement('div');
-    actions.className = 'tree-actions';
-    
-    // Always show modify button (for both group ID and attributes)
-    const modifyBtn = document.createElement('button');
-    modifyBtn.className = 'tree-action-btn edit';
-    modifyBtn.title = 'Modify group ID and attributes';
-    modifyBtn.onclick = (e) => {
+  // Organize groups by label hierarchy
+  const organizedGroups = organizeGroupsByLabelHierarchy(activeGroups);
+  const { rootLabels, hierarchy } = buildLabelGroupHierarchy(organizedGroups);
+  
+  // Render hierarchical structure
+  rootLabels.forEach(labelData => {
+    renderLabelGroupLevel(labelData, hierarchy, groupsList, 0);
+  });
+}
+
+// Render a label group and its children recursively
+function renderLabelGroupLevel(labelData, hierarchy, container, level) {
+  const { labelName, path, label, groups } = labelData;
+  const pathKey = path.join('/');
+  const hasChildren = hierarchy.has(pathKey);
+  const isExpanded = expandedLabelGroups.has(pathKey);
+  
+  // Create label group container
+  const labelGroupNode = document.createElement('div');
+  labelGroupNode.className = 'tree-node label-group-node';
+  
+  // Create label header
+  const labelHeader = document.createElement('div');
+  labelHeader.className = `tree-item level-${level} label-group-header`;
+  labelHeader.style.paddingLeft = `${level * 20}px`;
+  
+  // Expand/collapse button for label (if has sublabels with groups)
+  const labelExpandBtn = document.createElement('button');
+  if (hasChildren) {
+    labelExpandBtn.className = `tree-expand-btn ${isExpanded ? 'expanded' : 'collapsed'}`;
+    labelExpandBtn.onclick = (e) => {
       e.stopPropagation();
-      toggleGroupEdit(groupItem, groupKey);
+      toggleLabelGroupExpansion(path);
     };
+  } else {
+    labelExpandBtn.className = 'tree-expand-btn no-children';
+  }
+  
+  // Label color indicator
+  const labelColor = label ? label.color : '#6aa3ff';
+  const icon = document.createElement('div');
+  icon.className = 'tree-color-indicator';
+  icon.style.backgroundColor = labelColor;
+  icon.style.border = '1px solid var(--border)';
+  icon.style.width = '14px';
+  icon.style.height = '14px';
+  icon.style.borderRadius = '3px';
+  icon.style.marginRight = '8px';
+  icon.style.flexShrink = '0';
+  
+  // Label name
+  const labelTitle = document.createElement('div');
+  labelTitle.className = 'tree-label';
+  labelTitle.style.fontWeight = '600';
+  labelTitle.textContent = labelName;
+  
+  // Group count badge
+  const countBadge = document.createElement('span');
+  countBadge.className = 'group-count-badge';
+  countBadge.textContent = groups.length;
+  countBadge.style.cssText = `
+    background: var(--accent);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+  `;
+  labelTitle.appendChild(countBadge);
+  
+  // Assemble label header
+  labelHeader.appendChild(labelExpandBtn);
+  labelHeader.appendChild(icon);
+  labelHeader.appendChild(labelTitle);
+  
+  labelGroupNode.appendChild(labelHeader);
+  
+  // Create children container for groups
+  const groupsContainer = document.createElement('div');
+  groupsContainer.className = 'tree-children expanded'; // Always show groups under label
+  
+  // Render each group under this label
+  groups.forEach(({ groupKey, groupData }) => {
+    const groupNode = renderSingleGroup(groupData, groupKey, level + 1);
+    groupsContainer.appendChild(groupNode);
+  });
+  
+  labelGroupNode.appendChild(groupsContainer);
+  
+  // Create children container for sublabels
+  if (hasChildren) {
+    const sublabelsContainer = document.createElement('div');
+    sublabelsContainer.className = `tree-children ${isExpanded ? 'expanded' : 'collapsed'}`;
     
-    actions.appendChild(modifyBtn);
-    
-    // Add click handler for group filtering
-    groupItem.onclick = (e) => {
-      // Don't trigger if clicking on actions or expand button
-      if (e.target.closest('.tree-actions') || e.target.closest('.tree-expand-btn')) {
-        return;
-      }
-      toggleGroupFilter(groupKey, labelName, groupData.groupId, groupData.groupIdAttr);
-    };
-    
-    // Assemble group header
-    groupItem.appendChild(expandBtn);
-    groupItem.appendChild(icon);
-    groupItem.appendChild(titleSpan);
-    groupItem.appendChild(actions);
-    
-    // Create children container for attributes (only if there are attributes)
-    const childrenDiv = document.createElement('div');
-    if (groupAttributes.size === 0) {
-      childrenDiv.className = 'tree-children collapsed';
-    } else {
-      childrenDiv.className = `tree-children ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
-    }
-    
-    // Add attributes as child items
-    groupAttributes.forEach((attrDef, attrName) => {
-      const attrNode = document.createElement('div');
-      attrNode.className = 'tree-node';
-      
-      const attrItem = document.createElement('div');
-      attrItem.className = 'tree-item level-1 group-attribute-item';
-      
-      // Empty expand button for alignment
-      const attrExpandBtn = document.createElement('button');
-      attrExpandBtn.className = 'tree-expand-btn no-children';
-      
-      // Attribute icon (silver)
-      const attrIcon = document.createElement('div');
-      attrIcon.className = 'tree-icon param param-silver';
-      
-      // Attribute name
-      const attrLabel = document.createElement('div');
-      attrLabel.className = 'tree-label';
-      attrLabel.textContent = attrName;
-      
-      // Attribute value
-      const attrValue = document.createElement('div');
-      attrValue.className = 'tree-param-value';
-      attrValue.dataset.attrName = attrName;
-      
-      const currentValue = values.get(attrName) || attrDef.default || '';
-      
-      if (attrDef.type === 'checkbox') {
-        attrValue.textContent = currentValue === 'true' ? '✓' : '✗';
-      } else {
-        attrValue.textContent = currentValue;
-      }
-      
-      // Assemble attribute item
-      attrItem.appendChild(attrExpandBtn);
-      attrItem.appendChild(attrIcon);
-      attrItem.appendChild(attrLabel);
-      attrItem.appendChild(attrValue);
-      
-      attrNode.appendChild(attrItem);
-      childrenDiv.appendChild(attrNode);
+    hierarchy.get(pathKey).forEach(childLabelData => {
+      renderLabelGroupLevel(childLabelData, hierarchy, sublabelsContainer, level + 1);
     });
     
-    // Assemble complete group
-    groupNode.appendChild(groupItem);
-    groupNode.appendChild(childrenDiv);
-    groupsList.appendChild(groupNode);
+    labelGroupNode.appendChild(sublabelsContainer);
+  }
+  
+  container.appendChild(labelGroupNode);
+}
+
+// Render a single group (doc ID) with its attributes
+function renderSingleGroup(groupData, groupKey, level) {
+  const { labelName, groupId, groupIdAttr, groupAttributes, values } = groupData;
+  
+  // Create group node container
+  const groupNode = document.createElement('div');
+  groupNode.className = 'tree-node';
+  
+  // Create main group item (similar to tree-item)
+  const groupItem = document.createElement('div');
+  groupItem.className = `tree-item level-${level} group-item`;
+  groupItem.dataset.editing = 'false';
+  groupItem.style.paddingLeft = `${level * 20 + 10}px`;
+  
+  // Expand/collapse button - only show if group has attributes
+  const expandBtn = document.createElement('button');
+  if (groupAttributes.size === 0) {
+    expandBtn.className = 'tree-expand-btn no-children';
+  } else {
+    expandBtn.className = `tree-expand-btn ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
+    expandBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleGroupExpansion(groupKey);
+    };
+  }
+  
+  // Get label color for the colored circle icon
+  const label = getLabelByPath([labelName]);
+  const labelColor = label ? label.color : '#6aa3ff';
+  
+  // Group icon - small colored circle
+  const icon = document.createElement('div');
+  icon.className = 'tree-color-indicator';
+  icon.style.backgroundColor = labelColor;
+  icon.style.border = '1px solid var(--border)';
+  icon.style.width = '10px';
+  icon.style.height = '10px';
+  icon.style.borderRadius = '50%';
+  icon.style.marginRight = '8px';
+  icon.style.flexShrink = '0';
+  
+  // Group ID (doc ID)
+  const titleSpan = document.createElement('div');
+  titleSpan.className = 'tree-label';
+  
+  const groupIdSpan = document.createElement('span');
+  groupIdSpan.className = 'tree-param-value group-id-value';
+  groupIdSpan.dataset.paramName = groupIdAttr;
+  groupIdSpan.textContent = groupId === 'undefined' ? '(no ID)' : groupId;
+  groupIdSpan.style.fontWeight = '500';
+  titleSpan.appendChild(groupIdSpan);
+  
+  // Actions (modify button - always show if there are attributes or group ID to modify)
+  const actions = document.createElement('div');
+  actions.className = 'tree-actions';
+  
+  // Always show modify button (for both group ID and attributes)
+  const modifyBtn = document.createElement('button');
+  modifyBtn.className = 'tree-action-btn edit';
+  modifyBtn.title = 'Modify group ID and attributes';
+  modifyBtn.onclick = (e) => {
+    e.stopPropagation();
+    toggleGroupEdit(groupItem, groupKey);
+  };
+  
+  actions.appendChild(modifyBtn);
+  
+  // Add click handler for group filtering
+  groupItem.onclick = (e) => {
+    // Don't trigger if clicking on actions or expand button
+    if (e.target.closest('.tree-actions') || e.target.closest('.tree-expand-btn')) {
+      return;
+    }
+    toggleGroupFilter(groupKey, labelName, groupData.groupId, groupData.groupIdAttr);
+  };
+  
+  // Assemble group header
+  groupItem.appendChild(expandBtn);
+  groupItem.appendChild(icon);
+  groupItem.appendChild(titleSpan);
+  groupItem.appendChild(actions);
+  
+  // Create children container for attributes (only if there are attributes)
+  const childrenDiv = document.createElement('div');
+  if (groupAttributes.size === 0) {
+    childrenDiv.className = 'tree-children collapsed';
+  } else {
+    childrenDiv.className = `tree-children ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
+  }
+  
+  // Add attributes as child items
+  groupAttributes.forEach((attrDef, attrName) => {
+    const attrNode = document.createElement('div');
+    attrNode.className = 'tree-node';
+    
+    const attrItem = document.createElement('div');
+    attrItem.className = `tree-item level-${level + 1} group-attribute-item`;
+    attrItem.style.paddingLeft = `${(level + 1) * 20 + 10}px`;
+    
+    // Empty expand button for alignment
+    const attrExpandBtn = document.createElement('button');
+    attrExpandBtn.className = 'tree-expand-btn no-children';
+    
+    // Attribute icon (silver)
+    const attrIcon = document.createElement('div');
+    attrIcon.className = 'tree-icon param param-silver';
+    
+    // Attribute name
+    const attrLabel = document.createElement('div');
+    attrLabel.className = 'tree-label';
+    attrLabel.textContent = attrName;
+    
+    // Attribute value
+    const attrValue = document.createElement('div');
+    attrValue.className = 'tree-param-value';
+    attrValue.dataset.attrName = attrName;
+    
+    const currentValue = values.get(attrName) || attrDef.default || '';
+    
+    if (attrDef.type === 'checkbox') {
+      attrValue.textContent = currentValue === 'true' ? '✓' : '✗';
+    } else {
+      attrValue.textContent = currentValue;
+    }
+    
+    // Assemble attribute item
+    attrItem.appendChild(attrExpandBtn);
+    attrItem.appendChild(attrIcon);
+    attrItem.appendChild(attrLabel);
+    attrItem.appendChild(attrValue);
+    
+    attrNode.appendChild(attrItem);
+    childrenDiv.appendChild(attrNode);
   });
+  
+  // Assemble complete group
+  groupNode.appendChild(groupItem);
+  groupNode.appendChild(childrenDiv);
+  
+  return groupNode;
 }
 
 // Toggle group expansion
@@ -4027,7 +4219,78 @@ function updateStats() {
       });
     }
     countLabelsRecursive(labels);
-    elements.labelTypes.textContent = totalLabelTypes;
+    
+    if (elements.totalLabels) {
+      elements.totalLabels.textContent = totalLabelTypes;
+    }
+    
+    // Count mentions per parent label (root labels only)
+    const parentLabelCounts = new Map();
+    
+    manualLabels.forEach(labelEl => {
+      const labelName = labelEl.getAttribute('labelName');
+      const parent = labelEl.getAttribute('parent');
+      
+      // Find the root/parent label for this mention
+      let rootLabel = labelName;
+      if (parent) {
+        // If it has a parent, the parent is the root
+        rootLabel = parent;
+      } else {
+        // Check if this label itself is a parent (has sublabels)
+        const label = getLabelByPath([labelName]);
+        if (label && label.sublabels && label.sublabels.size > 0) {
+          rootLabel = labelName;
+        } else {
+          // It's a root label without sublabels
+          rootLabel = labelName;
+        }
+      }
+      
+      parentLabelCounts.set(rootLabel, (parentLabelCounts.get(rootLabel) || 0) + 1);
+    });
+    
+    // Display parent label breakdown
+    if (elements.parentLabelsStats) {
+      elements.parentLabelsStats.innerHTML = '';
+      
+      if (parentLabelCounts.size > 0) {
+        const breakdownTitle = document.createElement('div');
+        breakdownTitle.className = 'stats-breakdown-title';
+        breakdownTitle.textContent = 'Parent Labels Breakdown:';
+        elements.parentLabelsStats.appendChild(breakdownTitle);
+        
+        // Sort by count (descending)
+        const sortedCounts = Array.from(parentLabelCounts.entries())
+          .sort((a, b) => b[1] - a[1]);
+        
+        sortedCounts.forEach(([labelName, count]) => {
+          const label = getLabelByPath([labelName]);
+          const labelColor = label ? label.color : '#6aa3ff';
+          
+          const labelStat = document.createElement('div');
+          labelStat.className = 'parent-label-stat';
+          
+          const colorIndicator = document.createElement('div');
+          colorIndicator.className = 'stat-color-indicator';
+          colorIndicator.style.backgroundColor = labelColor;
+          
+          const labelNameSpan = document.createElement('span');
+          labelNameSpan.className = 'stat-label-name';
+          labelNameSpan.textContent = labelName;
+          
+          const countBadge = document.createElement('span');
+          countBadge.className = 'stat-count-badge';
+          countBadge.textContent = count;
+          
+          labelStat.appendChild(colorIndicator);
+          labelStat.appendChild(labelNameSpan);
+          labelStat.appendChild(countBadge);
+          
+          elements.parentLabelsStats.appendChild(labelStat);
+        });
+      }
+    }
 }
 
   // ======= Selection and Labeling =======
