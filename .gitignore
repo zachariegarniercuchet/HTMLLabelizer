@@ -1,6 +1,6 @@
 test/
 private/
-js/
+labelizer/js/
 .github/
 annotation/
 package.json
