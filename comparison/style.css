@@ -6,6 +6,7 @@
 
 /* HTML Content Display */
 .html-content {
+  position: relative; /* Constrain absolutely positioned children (like JH5439 spans) */
   max-height: calc(100vh - 40px - 200px);
   overflow-y: auto;
   padding: 16px;
