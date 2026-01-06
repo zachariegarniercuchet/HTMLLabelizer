@@ -4,6 +4,26 @@
    (Shared styles are in ../shared/)
    ============================================== */
 
+/* HTML Content Display */
+.html-content {
+  max-height: calc(100vh - 40px - 200px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  line-height: 1.8;
+  user-select: text;
+  cursor: text;
+  transition: background 0.3s ease;
+}
+
+/* Light theme HTML content */
+:root[data-theme="light"] .html-content {
+  background: var(--html-content-bg, #ffffff);
+  border: 1px solid var(--border);
+}
+
 /* Main Layout - Two Column Comparison */
 .comparison-layout {
   padding: 20px;
@@ -250,4 +270,44 @@ manual_label:hover, auto_label:hover {
 
 .param-row select {
   cursor: pointer;
+}
+
+/* ==============================================
+   SOURCE VIEW STYLES
+   Read-only source view for documents A and B
+   ============================================== */
+
+.source-view {
+  display: none; /* Hidden by default, toggled by JS */
+  height: calc(100vh - 40px - 200px); /* Match html-content height */
+  min-height: 300px;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  /* Use the same background as html-content to respect user's luminosity settings */
+  background: var(--html-content-bg, var(--bg));
+  color: var(--text);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre;
+  resize: vertical; /* User can resize */
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: background 0.3s ease;
+}
+
+/* Light theme source view - use the dynamic html-content-bg variable */
+:root[data-theme="light"] .source-view {
+  background: var(--html-content-bg, #ffffff);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* Focus effect */
+.source-view:focus {
+  border-color: #6aa3ff;
+  box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
 }

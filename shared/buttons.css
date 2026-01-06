@@ -235,3 +235,51 @@ button:disabled {
 :root[data-theme="light"] button[style*="background"] {
   color: white !important;
 }
+
+/* ==============================================
+   VIEW TOGGLE BUTTON
+   For switching between rendered and source view
+   ============================================== */
+
+.view-toggle {
+  background: #6aa3ff !important;
+  color: white !important;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.75rem !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s !important;
+}
+
+.view-toggle:hover {
+  background: #5a91e6 !important;
+}
+
+.view-toggle.active {
+  background: #4c7ce5 !important;
+}
+
+.view-toggle:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  filter: none !important;
+}
+
+/* Light theme view toggle button - better contrast */
+:root[data-theme="light"] .view-toggle {
+  background: var(--accent) !important;
+  color: white !important;
+  border: 1px solid var(--accent) !important;
+}
+
+:root[data-theme="light"] .view-toggle:hover {
+  background: #1557b8 !important;
+  border-color: #1557b8 !important;
+}
+
+:root[data-theme="light"] .view-toggle.active {
+  background: var(--accent-2) !important;
+  border-color: var(--accent-2) !important;
+  color: white !important;
+}
