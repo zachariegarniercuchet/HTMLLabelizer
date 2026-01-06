@@ -1,0 +1,98 @@
+/* ==============================================
+   SHARED COMMON STYLES
+   Used by both labelizer and comparison tools
+   ============================================== */
+
+/* CSS Variables - Theme System */
+:root {
+  --bg: #0b1020;
+  --muted: #1a2238;
+  --card: #11182d;
+  --card-2: #0e152a;
+  --text: #e7ecff;
+  --text-rgb: 231, 236, 255;
+  --sub: #a6b0d6;
+  --accent: #6aa3ff;
+  --accent-2: #20c997;
+  --danger: #ff6b6b;
+  --warning: #ffd43b;
+  --shadow: 0 12px 30px rgba(0,0,0,.35);
+  --border: #192244;
+  --hover: #1e2a49;
+  --contrast-opacity: 1;
+}
+
+/* Light Theme Variables */
+:root[data-theme="light"] {
+  --bg: #f5f7fa;
+  --muted: #e8ecf0;
+  --card: #f0f4f8;
+  --card-2: #e2e8f0;
+  --text: #1a1a1a;
+  --text-rgb: 26, 26, 26;
+  --sub: #4a5568;
+  --accent: #1a73e8;
+  --accent-2: #137333;
+  --danger: #d93025;
+  --warning: #f9ab00;
+  --shadow: 0 4px 12px rgba(0,0,0,.08);
+  --border: #cbd5e0;
+  --hover: #e2e8f0;
+  --contrast-opacity: 1;
+}
+
+/* Global Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(180deg, var(--bg), #060913 60%);
+  color: var(--text);
+  line-height: 1.6;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Light theme body background */
+:root[data-theme="light"] body {
+  background: linear-gradient(180deg, var(--bg), #e8ecf0 60%);
+}
+
+/* Text Contrast Control */
+.tree-label, .tree-param-value, .card-header .filename, 
+.empty-state p, .stat-label, .no-labels, .html-content,
+.source-view, .context-menu h4, .param-menu h4 {
+  color: rgba(var(--text-rgb), var(--contrast-opacity)) !important;
+}
+
+/* Maintain full opacity for interactive elements */
+.brand h1, button, input, select, textarea, .stat-number,
+.accent-text, .tree-action-btn, .settings-header h3 {
+  color: var(--text) !important;
+}
+
+/* Utility Classes */
+.hidden {
+  display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .comparison-layout,
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

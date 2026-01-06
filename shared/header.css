@@ -1,0 +1,78 @@
+/* ==============================================
+   HEADER STYLES
+   Shared header component styles
+   ============================================== */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: rgba(11,16,32,.75);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(42, 52, 65, 0.6);
+  transition: border-bottom 0.3s ease;
+}
+
+/* Keep header dark in light mode but make it more subtle */
+:root[data-theme="light"] .app-header {
+  background: rgba(11,16,32,.65);
+  border-bottom: 1px solid rgba(58, 68, 81, 0.4);
+}
+
+/* Brand Section */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+}
+
+.logo-img {
+  width: 28px;
+  height: 28px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: #ffffff !important;
+}
+
+/* Header Controls */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* File Input Wrapper */
+.file-input {
+  position: relative;
+}
+
+.file-input input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-input button {
+  border: 1px solid var(--hover);
+  background: var(--muted);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}

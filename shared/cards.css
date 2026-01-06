@@ -1,0 +1,49 @@
+/* ==============================================
+   CARD STYLES
+   Shared card component styles
+   ============================================== */
+
+.card {
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+}
+
+.card-header .title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-header .title h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card-header .filename {
+  color: var(--sub);
+  font-size: 13px;
+}
+
+.card-body {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
+}

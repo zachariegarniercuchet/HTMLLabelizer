@@ -1,0 +1,253 @@
+/* ==============================================
+   COMPARISON TOOL SPECIFIC STYLES
+   Only styles unique to the comparison tool
+   (Shared styles are in ../shared/)
+   ============================================== */
+
+/* Main Layout - Two Column Comparison */
+.comparison-layout {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  min-height: calc(100vh - 70px);
+}
+
+.comparison-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Analysis Modal - Draggable Popup */
+.analysis-modal {
+  position: fixed;
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  min-width: 400px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Default position - will be overridden by JS */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.analysis-modal.hidden {
+  display: none;
+}
+
+.analysis-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+  cursor: move;
+  user-select: none;
+}
+
+.analysis-modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.analysis-close-btn {
+  background: none !important;
+  border: none !important;
+  color: var(--sub) !important;
+  font-size: 24px !important;
+  cursor: pointer !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  padding: 0 !important;
+}
+
+.analysis-close-btn:hover {
+  background: var(--hover) !important;
+  color: var(--text) !important;
+}
+
+.analysis-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Analysis Details */
+.analysis-details {
+  padding: 16px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+/* ==============================================
+   LABEL VIEWING STYLES (Read-Only)
+   Copied from labelizer/style.css
+   ============================================== */
+
+/* Manual Labels - Copied from labelizer */
+manual_label, auto_label {
+  position: relative;
+  display: inline;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 500;
+  margin: 0 2px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+manual_label:hover, auto_label:hover {
+  opacity: 0.8;
+}
+
+/* NOTE: Delete button styling removed for read-only view */
+/* In labelizer: manual_label .delete-btn, auto_label .delete-btn { ... } */
+
+/* Parameter Menu - Exact copy from labelizer/style.css lines 940-1100 */
+.param-menu {
+  position: fixed;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  z-index: 1001;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.param-menu.hidden {
+  display: none;
+}
+
+.param-menu h4 {
+  color: var(--accent);
+  font-size: 14px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  padding: 4px 0 8px 0;
+  margin: -4px 0 12px 0;
+}
+
+.param-menu h4:hover {
+  cursor: grab;
+}
+
+.param-menu h4:active {
+  cursor: grabbing;
+}
+
+.param-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.param-close-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.param-close-btn:active {
+  background: var(--danger);
+  color: white;
+}
+
+/* Light theme parameter menu close button */
+:root[data-theme="light"] .param-close-btn {
+  color: #8a8a8a !important;
+}
+
+:root[data-theme="light"] .param-close-btn:hover {
+  background: var(--hover) !important;
+  color: #666666 !important;
+}
+
+:root[data-theme="light"] .param-close-btn:active {
+  background: var(--danger) !important;
+  color: white !important;
+}
+
+.param-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.param-row label {
+  min-width: 80px;
+  font-size: 13px;
+  color: var(--sub);
+  font-weight: 500;
+}
+
+/* Gold label styling for group ID parameters */
+.param-row label.gold-label {
+  color: #FFD700;
+  font-weight: 700;
+}
+
+.param-row input,
+.param-row select {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--hover);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.param-row input:focus,
+.param-row select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(106, 163, 255, 0.2);
+}
+
+.param-row select {
+  cursor: pointer;
+}

@@ -1,0 +1,237 @@
+/* ==============================================
+   BUTTON STYLES
+   Shared button component styles
+   ============================================== */
+
+button {
+  border: 1px solid var(--hover);
+  background: var(--muted);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+
+button:hover {
+  filter: brightness(1.15);
+  background: var(--hover);
+}
+
+/* Light theme button adjustments */
+:root[data-theme="light"] button {
+  background: #2c3e50;
+  border: 1px solid #34495e;
+  color: #f5f5f5;
+}
+
+:root[data-theme="light"] button:hover {
+  background: #34495e;
+  border-color: var(--accent);
+}
+
+:root[data-theme="light"] button:disabled {
+  background: #95a5a6;
+  border-color: #bdc3c7;
+  color: #ecf0f1;
+}
+
+/* Header buttons always use dark theme styling */
+.app-header button {
+  background: #152043 !important;
+  border: 1px solid #1e2a49 !important;
+  color: #e7ecff !important;
+}
+
+.app-header button:hover {
+  background: #1e2a49 !important;
+  border-color: #6aa3ff !important;
+}
+
+.app-header .settings-btn {
+  background: #6aa3ff !important;
+  border: 1px solid #6aa3ff !important;
+}
+
+.app-header .settings-btn:hover {
+  background: #20c997 !important;
+  border-color: #20c997 !important;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
+/* Settings Button */
+.settings-btn {
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  padding: 8px 12px !important;
+  font-size: 16px !important;
+}
+
+.settings-btn:hover {
+  background: var(--accent-2) !important;
+  border-color: var(--accent-2) !important;
+}
+
+/* Special accent buttons in light mode */
+:root[data-theme="light"] #add-root-label {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] #add-root-label:hover {
+  background: #1557b8 !important;
+  border-color: #1557b8 !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] .apply-btn,
+:root[data-theme="light"] .apply-all-btn {
+  background: var(--accent-2) !important;
+  border-color: var(--accent-2) !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] .apply-btn:hover,
+:root[data-theme="light"] .apply-all-btn:hover {
+  background: #0f5f26 !important;
+  border-color: #0f5f26 !important;
+  color: white !important;
+}
+
+/* Clear button styling */
+:root[data-theme="light"] .clear-btn,
+:root[data-theme="light"] #clear-all,
+:root[data-theme="light"] #clear-advanced-labels {
+  background: #e74c3c !important;
+  border-color: #e74c3c !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] .clear-btn:hover,
+:root[data-theme="light"] #clear-all:hover,
+:root[data-theme="light"] #clear-advanced-labels:hover {
+  background: #c0392b !important;
+  border-color: #c0392b !important;
+}
+
+/* Tree Action Buttons (used in labelizer) */
+.tree-action-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.tree-action-btn.add {
+  background: var(--accent-2);
+  color: white;
+}
+
+.tree-action-btn.add::before {
+  content: '+';
+  font-weight: bold;
+}
+
+.tree-action-btn.delete {
+  background: var(--danger);
+  color: white;
+}
+
+.tree-action-btn.delete::before {
+  content: '×';
+  font-weight: bold;
+}
+
+.tree-action-btn.edit {
+  background: var(--warning);
+  color: black;
+}
+
+.tree-action-btn.edit::before {
+  content: '⚙';
+}
+
+/* Save active state for tree action buttons */
+.tree-action-btn.save-active {
+  background: var(--accent-2) !important;
+  color: white !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Keep original colors for tree action buttons in light mode */
+:root[data-theme="light"] .tree-action-btn.add {
+  background: var(--accent-2) !important;
+  color: white !important;
+  border: none !important;
+}
+
+:root[data-theme="light"] .tree-action-btn.edit {
+  background: var(--warning) !important;
+  color: black !important;
+  border: none !important;
+}
+
+:root[data-theme="light"] .tree-action-btn.delete {
+  background: var(--danger) !important;
+  color: white !important;
+  border: none !important;
+}
+
+:root[data-theme="light"] .tree-action-btn.add:hover,
+:root[data-theme="light"] .tree-action-btn.edit:hover,
+:root[data-theme="light"] .tree-action-btn.delete:hover {
+  color: white !important;
+}
+
+/* Save active button in light mode - override the edit button color */
+:root[data-theme="light"] .tree-action-btn.edit.save-active {
+  background: var(--accent-2) !important;
+  color: white !important;
+  border: none !important;
+}
+
+/* Inline editor buttons (including "Add option" for dropdowns) */
+:root[data-theme="light"] .inline-editor button {
+  color: white !important;
+}
+
+/* Additional safety for any missed buttons in forms/modals */
+:root[data-theme="light"] .param-form button,
+:root[data-theme="light"] .dropdown-section button {
+  color: white !important;
+}
+
+/* Save buttons in forms and inline editors */
+:root[data-theme="light"] .save-btn,
+:root[data-theme="light"] .save-btn.green {
+  background: var(--accent-2) !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] .save-btn:hover,
+:root[data-theme="light"] .save-btn.green:hover {
+  background: #0f5f26 !important;
+  color: white !important;
+}
+
+/* Ensure all action buttons with colored backgrounds have white text */
+:root[data-theme="light"] button[style*="background"] {
+  color: white !important;
+}

@@ -1,0 +1,40 @@
+/* ==============================================
+   STATISTICS STYLES
+   Shared statistics component styles
+   ============================================== */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  background: var(--card-2);
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: background 0.3s ease;
+}
+
+:root[data-theme="light"] .stat-item {
+  background: var(--html-content-bg, #ffffff);
+  border: 1px solid var(--border);
+}
+
+.stat-number {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--accent);
+  display: block;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--sub);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

@@ -1,0 +1,302 @@
+/* ==============================================
+   SETTINGS MODAL STYLES
+   Shared settings modal component
+   ============================================== */
+
+.settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-modal.hidden {
+  display: none;
+}
+
+.settings-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.settings-content {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-30px) scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+}
+
+.settings-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-close-btn {
+  background: none !important;
+  border: none !important;
+  color: var(--sub) !important;
+  font-size: 24px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  padding: 0 !important;
+}
+
+.settings-close-btn:hover {
+  background: var(--hover) !important;
+  color: var(--text) !important;
+}
+
+.settings-body {
+  padding: 24px;
+}
+
+.setting-group {
+  margin-bottom: 32px;
+}
+
+.setting-group:last-child {
+  margin-bottom: 0;
+}
+
+.setting-group h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Theme Toggle */
+.theme-toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.theme-toggle {
+  position: relative;
+  display: inline-block;
+  width: 280px;
+  height: 50px;
+  cursor: pointer;
+}
+
+.theme-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.theme-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid var(--border);
+  transition: all 0.4s;
+  border-radius: 25px;
+}
+
+.theme-slider:before {
+  position: absolute;
+  content: "";
+  height: 38px;
+  width: 80px;
+  left: 4px;
+  bottom: 4px;
+  background: linear-gradient(135deg, #6aa3ff, #4c7ce5);
+  transition: all 0.4s;
+  border-radius: 19px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.theme-toggle input:checked + .theme-slider {
+  background: linear-gradient(90deg, #f0f4f8 0%, #ffffff 100%);
+  border-color: #dadce0;
+}
+
+.theme-toggle input:checked + .theme-slider:before {
+  transform: translateX(188px);
+  background: linear-gradient(135deg, #1a73e8, #137333);
+}
+
+.theme-labels {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  pointer-events: none;
+}
+
+.theme-label-dark, .theme-label-light {
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.4s;
+}
+
+.theme-label-dark {
+  color: #e7ecff;
+}
+
+.theme-label-light {
+  color: #5f6368;
+}
+
+.theme-toggle input:checked ~ .theme-labels .theme-label-dark {
+  color: #9aa0a6;
+}
+
+.theme-toggle input:checked ~ .theme-labels .theme-label-light {
+  color: #1a1a1a;
+}
+
+/* Contrast & Background Sliders */
+.contrast-container,
+.background-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contrast-container label,
+.background-container label {
+  font-size: 14px;
+  color: var(--sub);
+  font-weight: 500;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.slider-label {
+  font-size: 12px;
+  color: var(--sub);
+  font-weight: 500;
+  min-width: 35px;
+  text-align: center;
+}
+
+.contrast-slider,
+.background-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--muted);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.contrast-slider::-webkit-slider-thumb,
+.background-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: all 0.2s ease;
+}
+
+.contrast-slider::-webkit-slider-thumb:hover,
+.background-slider::-webkit-slider-thumb:hover {
+  background: var(--accent-2);
+  transform: scale(1.1);
+}
+
+.contrast-slider::-moz-range-thumb,
+.background-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.contrast-preview,
+.background-preview {
+  padding: 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+  color: var(--text);
+}
+
+/* Reset Button */
+.reset-btn {
+  background: var(--muted) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  padding: 10px 20px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+}
+
+.reset-btn:hover {
+  background: var(--hover) !important;
+  border-color: var(--accent) !important;
+}
