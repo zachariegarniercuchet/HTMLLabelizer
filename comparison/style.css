@@ -45,7 +45,7 @@
   gap: 20px;
 }
 
-/* Analysis Modal - Draggable Popup */
+/* Analysis Modal - Draggable & Resizable Popup */
 .analysis-modal {
   position: fixed;
   background: linear-gradient(180deg, var(--card), var(--card-2));
@@ -54,11 +54,15 @@
   box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 400px;
-  max-width: 600px;
-  max-height: 80vh;
+  width: 85vw;
+  min-height: 250px;
+  height: 80vh;
+  max-width: 95vw;
+  max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  resize: both;
   /* Default position - will be overridden by JS */
   top: 50%;
   left: 50%;
@@ -112,6 +116,55 @@
   padding: 20px;
   overflow-y: auto;
   flex: 1;
+  position: relative;
+}
+
+/* Work in Progress Message */
+.work-in-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  min-height: 180px;
+}
+
+.work-in-progress h3 {
+  color: var(--accent);
+  font-size: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.work-in-progress p {
+  color: var(--sub);
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Resize Handle */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--border) 50%);
+  border-bottom-right-radius: 16px;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--sub);
+  border-bottom: 2px solid var(--sub);
+  opacity: 0.5;
 }
 
 /* Analysis Details */

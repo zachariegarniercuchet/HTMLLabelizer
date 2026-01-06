@@ -24,9 +24,7 @@
     </div>
     <div class="controls">
       <input type="file" id="html-file-input" accept=".html,.htm" multiple style="display:none">
-      <button id="download-report" disabled>Download Report</button>
-      <button id="save-as" disabled>Save As...</button>
-      <button id="view-analysis" disabled>View Analysis</button>
+      <button id="iaa-analysis-btn" class="iaa-analysis-btn" disabled>IAA Analysis</button>
       <button id="clear-all">Clear All</button>
       <button id="settings-btn" class="settings-btn" title="Settings">⚙</button>
     </div>
@@ -130,34 +128,18 @@
     </div>
   </div>
 
-  <!-- Analysis Modal (Draggable) -->
+  <!-- IAA Analysis Modal (Draggable & Resizable) -->
   <div class="analysis-modal hidden" id="analysis-modal">
     <div class="analysis-modal-header" id="analysis-modal-header">
-      <h2>Comparison Analysis</h2>
+      <h2>IAA Analysis</h2>
       <button class="analysis-close-btn" id="analysis-close-btn">×</button>
     </div>
     <div class="analysis-modal-body">
-      <div class="stats-grid">
-        <div class="stat-item">
-          <span class="stat-number" id="agreement-score">0%</span>
-          <div class="stat-label">Agreement Score</div>
-        </div>
-        <div class="stat-item">
-          <span class="stat-number" id="total-labels-a">0</span>
-          <div class="stat-label">Labels in A</div>
-        </div>
-        <div class="stat-item">
-          <span class="stat-number" id="total-labels-b">0</span>
-          <div class="stat-label">Labels in B</div>
-        </div>
-        <div class="stat-item">
-          <span class="stat-number" id="common-labels">0</span>
-          <div class="stat-label">Common Labels</div>
-        </div>
+      <div class="work-in-progress">
+        <h3>Work in Progress</h3>
+        <p>Analysis not ready yet.</p>
       </div>
-      <div class="analysis-details" id="analysis-details">
-        <p class="no-data">Load two annotated HTML files to see comparison analysis</p>
-      </div>
+      <div class="resize-handle" id="resize-handle"></div>
     </div>
   </div>
 
