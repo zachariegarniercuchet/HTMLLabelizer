@@ -35,40 +35,41 @@
   <div class="comparison-layout">
     <div class="comparison-side">
       <div class="card">
-        <div class="card-inner">
-          <!-- Front Side -->
-          <div class="card-front">
-            <div class="card-header">
-              <div class="title">
-                <h2>Document A</h2>
-                <span class="filename" id="filename-a"></span>
-              </div>
-              <div class="header-controls">
-                <button class="flip-btn" id="flip-btn-a" title="Show Statistics">📊</button>
-                <button class="view-toggle" id="view-toggle-a" disabled>View Source</button>
-              </div>
-            </div>
-            <div class="card-body">
-              <textarea class="source-view" id="source-view-a" readonly></textarea>
-              <div class="html-content" id="html-content-a">
-                <div class="empty-state drop-zone" id="drop-zone-a">
-                  <h3>No HTML loaded</h3>
-                  <p><a href="#" id="upload-link-a">Upload an HTML File</a> or drag & drop here to start comparing</p>
-                </div>
-              </div>
+        <div class="card-header">
+          <div class="title">
+            <h2>Document A</h2>
+            <span class="filename" id="filename-a"></span>
+          </div>
+          <div class="header-controls">
+            <button class="stats-btn" id="stats-btn-a" title="Show Statistics" disabled>
+              <img src="icons-statistics.png" alt="Statistics" class="stats-icon">
+            </button>
+            <button class="view-toggle" id="view-toggle-a" disabled>View Source</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <textarea class="source-view" id="source-view-a" readonly></textarea>
+          <div class="html-content" id="html-content-a">
+            <div class="empty-state drop-zone" id="drop-zone-a">
+              <h3>No HTML loaded</h3>
+              <p><a href="#" id="upload-link-a">Upload an HTML File</a> or drag & drop here to start comparing</p>
             </div>
           </div>
-          
-          <!-- Back Side (Statistics) -->
-          <div class="card-back">
-            <div class="card-header">
-              <div class="title">
-                <h2>Document A - Statistics</h2>
-                <span class="filename" id="filename-a-back"></span>
+        </div>
+        
+        <!-- Statistics Overlay -->
+        <div class="stats-overlay hidden" id="stats-overlay-a">
+          <div class="stats-modal">
+            <div class="stats-modal-header">
+              <h3>Document A - Statistics</h3>
+              <div class="stats-header-buttons">
+                <button class="stats-download-btn" id="stats-download-a" title="Download Analysis">
+                  <img src="icons-download.png" alt="Download" class="download-icon">
+                </button>
+                <button class="stats-close-btn" id="stats-close-a">×</button>
               </div>
-              <button class="flip-btn" id="flip-btn-a-back" title="Back to Document">◀️</button>
             </div>
-            <div class="card-body">
+            <div class="stats-modal-body">
               <div class="stats-container" id="stats-content-a">
                 <div class="stats-empty">
                   <p>Loading statistics...</p>
@@ -82,40 +83,41 @@
 
     <div class="comparison-side">
       <div class="card">
-        <div class="card-inner">
-          <!-- Front Side -->
-          <div class="card-front">
-            <div class="card-header">
-              <div class="title">
-                <h2>Document B</h2>
-                <span class="filename" id="filename-b"></span>
-              </div>
-              <div class="header-controls">
-                <button class="flip-btn" id="flip-btn-b" title="Show Statistics">📊</button>
-                <button class="view-toggle" id="view-toggle-b" disabled>View Source</button>
-              </div>
-            </div>
-            <div class="card-body">
-              <textarea class="source-view" id="source-view-b" readonly></textarea>
-              <div class="html-content" id="html-content-b">
-                <div class="empty-state drop-zone" id="drop-zone-b">
-                  <h3>No HTML loaded</h3>
-                  <p><a href="#" id="upload-link-b">Upload an HTML File</a> or drag & drop here to start comparing</p>
-                </div>
-              </div>
+        <div class="card-header">
+          <div class="title">
+            <h2>Document B</h2>
+            <span class="filename" id="filename-b"></span>
+          </div>
+          <div class="header-controls">
+            <button class="stats-btn" id="stats-btn-b" title="Show Statistics" disabled>
+              <img src="icons-statistics.png" alt="Statistics" class="stats-icon">
+            </button>
+            <button class="view-toggle" id="view-toggle-b" disabled>View Source</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <textarea class="source-view" id="source-view-b" readonly></textarea>
+          <div class="html-content" id="html-content-b">
+            <div class="empty-state drop-zone" id="drop-zone-b">
+              <h3>No HTML loaded</h3>
+              <p><a href="#" id="upload-link-b">Upload an HTML File</a> or drag & drop here to start comparing</p>
             </div>
           </div>
-          
-          <!-- Back Side (Statistics) -->
-          <div class="card-back">
-            <div class="card-header">
-              <div class="title">
-                <h2>Document B - Statistics</h2>
-                <span class="filename" id="filename-b-back"></span>
+        </div>
+        
+        <!-- Statistics Overlay -->
+        <div class="stats-overlay hidden" id="stats-overlay-b">
+          <div class="stats-modal">
+            <div class="stats-modal-header">
+              <h3>Document B - Statistics</h3>
+              <div class="stats-header-buttons">
+                <button class="stats-download-btn" id="stats-download-b" title="Download Analysis">
+                  <img src="icons-download.png" alt="Download" class="download-icon">
+                </button>
+                <button class="stats-close-btn" id="stats-close-b">×</button>
               </div>
-              <button class="flip-btn" id="flip-btn-b-back" title="Back to Document">◀️</button>
             </div>
-            <div class="card-body">
+            <div class="stats-modal-body">
               <div class="stats-container" id="stats-content-b">
                 <div class="stats-empty">
                   <p>Loading statistics...</p>
