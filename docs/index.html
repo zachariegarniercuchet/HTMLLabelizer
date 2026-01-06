@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation - HTML Labelizer</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-secondary: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --code-bg: #1c2128;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+    }
+
+    .back-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .back-link:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+    }
+
+    h2 {
+      font-size: 1.8rem;
+      margin: 2rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.3rem;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--accent);
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+
+    ul, ol {
+      margin: 1rem 0 1rem 2rem;
+      color: var(--text-secondary);
+    }
+
+    li {
+      margin: 0.5rem 0;
+    }
+
+    code {
+      background: var(--code-bg);
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.9em;
+      color: #ff7b72;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+    }
+
+    .feature-card h4 {
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .alert {
+      background: var(--card);
+      border-left: 4px solid var(--accent);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+
+    .alert-title {
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    .toc {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+    }
+
+    .toc ul {
+      margin-left: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 2rem 1rem;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📚 HTML Labelizer Documentation</h1>
+    <a href="../" class="back-link">← Back to Home</a>
+  </div>
+
+  <div class="container">
+    <div class="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#quick-start">Quick Start</a></li>
+        <li><a href="#features">Key Features</a></li>
+        <li><a href="#hierarchical">Hierarchical Labeling</a></li>
+        <li><a href="#pattern">Pattern-Based Labeling</a></li>
+        <li><a href="#groups">Group Management & Coreference</a></li>
+        <li><a href="#examples">Usage Examples</a></li>
+        <li><a href="#technical">Technical Details</a></li>
+      </ul>
+    </div>
+
+    <section id="quick-start">
+      <h2>🚀 Quick Start</h2>
+      <ol>
+        <li><strong>Open the app:</strong> Navigate to <a href="../labelizer/">the labelizer tool</a></li>
+        <li><strong>Upload your HTML file:</strong> Drag-and-drop or click "Load HTML File"</li>
+        <li><strong>Create labels:</strong> Click "Add Label" to define your annotation schema</li>
+        <li><strong>Apply labels:</strong> Select text in the rendered view and choose a label from the context menu</li>
+        <li><strong>Download:</strong> Export your annotated HTML with embedded schema</li>
+      </ol>
+      
+      <div class="alert">
+        <div class="alert-title">🔒 Privacy First</div>
+        Everything runs locally in your browser — no data is sent to any server.
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>✨ Key Features</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>📋 Hierarchical Labels</h4>
+          <p>Create nested label structures up to 2 levels deep with custom attributes</p>
+        </div>
+        <div class="feature-card">
+          <h4>🎨 Color Coding</h4>
+          <p>Visual distinction with customizable colors for each label type</p>
+        </div>
+        <div class="feature-card">
+          <h4>🔍 Pattern Search</h4>
+          <p>Find and label all occurrences of text patterns automatically</p>
+        </div>
+        <div class="feature-card">
+          <h4>🔗 Coreference</h4>
+          <p>Link related annotations with synchronized attributes</p>
+        </div>
+        <div class="feature-card">
+          <h4>⚡ Real-time Stats</h4>
+          <p>Track annotation progress with live statistics</p>
+        </div>
+        <div class="feature-card">
+          <h4>💾 Export/Import</h4>
+          <p>Save and reload your work with embedded schemas</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="hierarchical">
+      <h2>📋 Hierarchical Labeling</h2>
+      <p>Create nested label structures with custom attributes:</p>
+      
+      <h3>Attribute Types</h3>
+      <ul>
+        <li><strong>String:</strong> Free-text values for flexible annotation</li>
+        <li><strong>Dropdown:</strong> Controlled vocabularies with predefined options</li>
+        <li><strong>Checkbox:</strong> Boolean flags for binary properties</li>
+      </ul>
+
+      <h3>Example Structure</h3>
+      <pre><code>mention (parent)
+├── docid (string)
+├── doctype (dropdown: legislation, decision, other)
+├── url (string)
+└── sublabels:
+    ├── title
+    │   └── titletype (dropdown: long title, acronym, short title)
+    ├── reference
+    │   └── reftype (dropdown: neutral, official)
+    └── fragment
+        ├── fragmentid (string)
+        └── fragmenttype (dropdown: section, article, paragraph)</code></pre>
+    </section>
+
+    <section id="pattern">
+      <h2>🔍 Pattern-Based Labeling</h2>
+      <p>The Advanced Labelization panel allows you to find and label multiple occurrences efficiently:</p>
+      
+      <ol>
+        <li>Enter a text pattern in the search field</li>
+        <li>Navigate through matches with Previous/Next buttons</li>
+        <li>Select portions of the match and apply labels</li>
+        <li>Use "Apply" for the current match or "Apply All" for all occurrences</li>
+      </ol>
+
+      <div class="alert">
+        <div class="alert-title">💡 Pro Tip</div>
+        Build complex nested labels once, then apply to all similar patterns in your document with a single click.
+      </div>
+    </section>
+
+    <section id="groups">
+      <h2>🔗 Group Management & Coreference Resolution</h2>
+      <p>Link related annotations together to represent the same entity mentioned multiple times:</p>
+      
+      <h3>How it Works</h3>
+      <ul>
+        <li><strong>Group ID:</strong> Use the same identifier (e.g., <code>docid</code>) for related mentions</li>
+        <li><strong>Group Attributes:</strong> Designate which attributes should sync across all group members</li>
+        <li><strong>Active Groups Panel:</strong> View all coreference groups in real-time</li>
+        <li><strong>Automatic Sync:</strong> Changes to group attributes propagate to all linked labels</li>
+      </ul>
+
+      <h3>Example Use Case</h3>
+      <p>If a document references "IRPA", "the Act", and "Immigration and Refugee Protection Act", 
+      you can give all three the same <code>docid="irpa"</code> to indicate they refer to the same legislation.</p>
+    </section>
+
+    <section id="examples">
+      <h2>📖 Usage Examples</h2>
+      
+      <h3>Example 1: Basic Legal Citation</h3>
+      <p><strong>Original text:</strong></p>
+      <pre><code>See Theratechnologies inc. v. 121851 Canada inc., 2015 SCC 18</code></pre>
+      
+      <p><strong>After labeling:</strong></p>
+      <pre><code>&lt;manual_label labelname="mention" docid="scc2015-18" doctype="decision"&gt;
+  &lt;manual_label labelname="title" titletype="case name"&gt;
+    Theratechnologies inc. v. 121851 Canada inc.
+  &lt;/manual_label&gt;, 
+  &lt;manual_label labelname="reference"&gt;
+    2015 SCC 18
+  &lt;/manual_label&gt;
+&lt;/manual_label&gt;</code></pre>
+
+      <h3>Example 2: Coreference</h3>
+      <p>Label multiple references to the same document with a shared <code>docid</code>:</p>
+      <pre><code>&lt;manual_label labelname="mention" docid="irpa"&gt;Immigration and Refugee Protection Act&lt;/manual_label&gt;
+...
+&lt;manual_label labelname="mention" docid="irpa"&gt;IRPA&lt;/manual_label&gt;
+...
+&lt;manual_label labelname="mention" docid="irpa"&gt;the Act&lt;/manual_label&gt;</code></pre>
+    </section>
+
+    <section id="technical">
+      <h2>🔧 Technical Details</h2>
+      
+      <h3>Data Storage</h3>
+      <p>Labels are stored as HTML comments before the <code>&lt;head&gt;</code> tag:</p>
+      <pre><code>&lt;!-- HTMLLabelizer {"labels": [...], "version": "1.0"} --&gt;</code></pre>
+      
+      <h3>Applied Labels</h3>
+      <p>Annotations use custom <code>&lt;manual_label&gt;</code> elements with attributes:</p>
+      <pre><code>&lt;manual_label labelname="mention" docid="example" doctype="legislation"&gt;
+  text content
+&lt;/manual_label&gt;</code></pre>
+
+      <h3>Browser Compatibility</h3>
+      <ul>
+        <li>Chrome/Edge 90+</li>
+        <li>Firefox 88+</li>
+        <li>Safari 14+</li>
+      </ul>
+
+      <h3>No Installation Required</h3>
+      <p>The tool is a static web application that runs entirely in your browser. 
+      No server, no installation, no data transmission.</p>
+    </section>
+
+    <div class="alert">
+      <div class="alert-title">📢 Need Help?</div>
+      Found a bug or have a feature request? Visit the 
+      <a href="https://github.com/zachariegarniercuchet/HTMLLabelizer" target="_blank">GitHub repository</a> 
+      to open an issue or contribute to the project.
+    </div>
+  </div>
+</body>
+</html>

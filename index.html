@@ -3,156 +3,858 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HTML Labelizer</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="timer-styles.css">
+  <title>HTML Labelizer - Semantic HTML Annotation Platform</title>
   <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    :root {
+      --bg: #0b1020;
+      --muted: #1a2238;
+      --card: #11182d;
+      --card-2: #0e152a;
+      --text: #e7ecff;
+      --text-rgb: 231, 236, 255;
+      --sub: #a6b0d6;
+      --accent: #6aa3ff;
+      --accent-2: #20c997;
+      --danger: #ff6b6b;
+      --warning: #ffd43b;
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --border: #192244;
+      --hover: #1e2a49;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f5f7fa;
+      --muted: #e8ecf0;
+      --card: #f0f4f8;
+      --card-2: #e2e8f0;
+      --text: #1a1a1a;
+      --text-rgb: 26, 26, 26;
+      --sub: #4a5568;
+      --accent: #1a73e8;
+      --accent-2: #137333;
+      --danger: #d93025;
+      --warning: #f9ab00;
+      --shadow: 0 4px 12px rgba(0,0,0,.08);
+      --border: #cbd5e0;
+      --hover: #e2e8f0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(180deg, var(--bg), #060913 60%);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease, color 0.3s ease;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    :root[data-theme="light"] body {
+      background: linear-gradient(180deg, var(--bg), #e8ecf0 60%);
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px;
+      background: rgba(11,16,32,.75);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(42, 52, 65, 0.6);
+    }
+
+    :root[data-theme="light"] .app-header {
+      background: rgba(11,16,32,.65);
+      border-bottom: 1px solid rgba(58, 68, 81, 0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: auto;
+    }
+
+    .logo-img {
+      width: 28px;
+      height: 28px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      color: #ffffff !important;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-link {
+      color: #e7ecff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-link:hover {
+      color: #6aa3ff;
+    }
+
+    .github-link {
+      display: flex;
+      align-items: center;
+      padding: 6px;
+      border-radius: 8px;
+      transition: background 0.2s ease;
+    }
+
+    .github-link:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .github-icon {
+      width: 20px;
+      height: 20px;
+      filter: invert(1);
+    }
+
+    :root[data-theme="light"] .github-icon {
+      filter: invert(0);
+    }
+
+    button {
+      border: 1px solid var(--hover);
+      background: var(--muted);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      filter: brightness(1.15);
+      background: var(--hover);
+    }
+
+    .app-header button {
+      background: #152043 !important;
+      border: 1px solid #1e2a49 !important;
+      color: #e7ecff !important;
+    }
+
+    .app-header button:hover {
+      background: #1e2a49 !important;
+      border-color: #6aa3ff !important;
+    }
+
+    .app-header .settings-btn {
+      background: #6aa3ff !important;
+      border: 1px solid #6aa3ff !important;
+    }
+
+    .app-header .settings-btn:hover {
+      background: #20c997 !important;
+      border-color: #20c997 !important;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 80px 40px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .hero-container {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .hero-left {
+      animation: fadeInLeft 0.8s ease-out;
+    }
+
+    @keyframes fadeInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .hero-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      color: var(--text);
+      letter-spacing: -1px;
+    }
+
+    .hero-subtitle {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+
+    .hero-description {
+      font-size: 1.1rem;
+      color: var(--sub);
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .feature-icon {
+      width: 24px;
+      height: 24px;
+      color: var(--accent-2);
+      flex-shrink: 0;
+    }
+
+    .hero-right {
+      animation: fadeInRight 0.8s ease-out;
+    }
+
+    @keyframes fadeInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .cta-card {
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: var(--shadow);
+    }
+
+    .cta-card h3 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .cta-card > p {
+      color: var(--sub);
+      margin-bottom: 32px;
+      font-size: 1.05rem;
+    }
+
+    .cta-button {
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      border-radius: 12px;
+      text-decoration: none;
+      margin-bottom: 16px;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+
+    .cta-button.primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .cta-button.primary:hover {
+      background: #5a91e6;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(106, 163, 255, 0.4);
+    }
+
+    .cta-button.secondary {
+      background: var(--card-2);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .cta-button.secondary:hover {
+      border-color: var(--accent-2);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(32, 201, 151, 0.2);
+    }
+
+    .button-text {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .button-description {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 32px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .site-footer {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 60px 40px 30px;
+      margin-top: 80px;
+    }
+
+    .footer-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .footer-logo {
+      width: 32px;
+      height: 32px;
+    }
+
+    .footer-brand span {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .footer-tagline {
+      color: var(--sub);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .footer-section h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .footer-section ul {
+      list-style: none;
+    }
+
+    .footer-section ul li {
+      margin-bottom: 10px;
+    }
+
+    .footer-section ul li a {
+      color: var(--sub);
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s ease;
+    }
+
+    .footer-section ul li a:hover {
+      color: var(--accent);
+    }
+
+    .social-links {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .social-link {
+      width: 40px;
+      height: 40px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .social-link:hover {
+      background: var(--hover);
+      border-color: var(--accent);
+    }
+
+    .social-icon {
+      width: 20px;
+      height: 20px;
+      filter: invert(1);
+    }
+
+    :root[data-theme="light"] .social-icon {
+      filter: invert(0);
+    }
+
+    .footer-license {
+      color: var(--sub);
+      font-size: 0.9rem;
+    }
+
+    .footer-bottom {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding-top: 30px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--sub);
+      font-size: 0.9rem;
+    }
+
+    .footer-bottom a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .footer-bottom a:hover {
+      color: var(--accent-2);
+    }
+
+    /* Settings Modal */
+    .settings-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .settings-modal.hidden {
+      display: none;
+    }
+
+    .settings-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+    }
+
+    .settings-content {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from { 
+        opacity: 0; 
+        transform: translateY(-30px) scale(0.95); 
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+      }
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+    }
+
+    .settings-header h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .settings-close-btn {
+      background: none !important;
+      border: none !important;
+      color: var(--sub) !important;
+      font-size: 24px !important;
+      cursor: pointer !important;
+      width: 32px !important;
+      height: 32px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 8px !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .settings-close-btn:hover {
+      background: var(--hover) !important;
+      color: var(--text) !important;
+      filter: none !important;
+    }
+
+    .settings-body {
+      padding: 24px;
+    }
+
+    .setting-group h4 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .theme-toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .theme-toggle {
+      position: relative;
+      display: inline-block;
+      width: 280px;
+      height: 50px;
+      cursor: pointer;
+    }
+
+    .theme-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .theme-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+      border: 2px solid var(--border);
+      transition: all 0.4s;
+      border-radius: 25px;
+    }
+
+    .theme-slider:before {
+      position: absolute;
+      content: "";
+      height: 38px;
+      width: 80px;
+      left: 4px;
+      bottom: 4px;
+      background: linear-gradient(135deg, #6aa3ff, #4c7ce5);
+      transition: all 0.4s;
+      border-radius: 19px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .theme-toggle input:checked + .theme-slider {
+      background: linear-gradient(90deg, #f0f4f8 0%, #ffffff 100%);
+      border-color: #dadce0;
+    }
+
+    .theme-toggle input:checked + .theme-slider:before {
+      transform: translateX(188px);
+      background: linear-gradient(135deg, #1a73e8, #137333);
+    }
+
+    .theme-labels {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px;
+      pointer-events: none;
+    }
+
+    .theme-label-dark, .theme-label-light {
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.4s;
+    }
+
+    .theme-label-dark {
+      color: #e7ecff;
+    }
+
+    .theme-label-light {
+      color: #5f6368;
+    }
+
+    .theme-toggle input:checked ~ .theme-labels .theme-label-dark {
+      color: #9aa0a6;
+    }
+
+    .theme-toggle input:checked ~ .theme-labels .theme-label-light {
+      color: #1a1a1a;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-container {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .hero-title {
+        font-size: 2.5rem;
+      }
+
+      .footer-content {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        padding: 40px 20px;
+      }
+
+      .hero-title {
+        font-size: 2rem;
+      }
+
+      .cta-card {
+        padding: 30px 20px;
+      }
+
+      .footer-content {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+
+      .site-footer {
+        padding: 40px 20px 20px;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="app-header">
     <div class="brand">
-      <div class="logo">◉</div>
+      <img src="favicon.png" alt="HTML Labelizer" class="logo-img">
       <h1>HTML Labelizer</h1>
     </div>
     <div class="controls">
-      <div class="file-input">
-        <input type="file" id="html-file-input" accept=".html,.htm" style="display:none">
-        <button type="button" onclick="document.getElementById('html-file-input').click()">Load HTML File</button>
-      </div>
-      <button id="download-html" disabled>Download</button>
-      <button id="save-as" disabled>Save As...</button>
-      <button id="clear-all">Clear All</button>
-      <button id="settings-btn" class="settings-btn" title="Settings">⚙</button> <!-- ⚙️ -->
+      <a href="docs/index.html" class="nav-link">Documentation</a>
+      <a href="https://github.com/zachariegarniercuchet/HTMLLabelizer" target="_blank" class="github-link" title="View on GitHub">
+        <img src="github-mark.svg" alt="GitHub" class="github-icon">
+      </a>
+      <button id="settings-btn" class="settings-btn" title="Settings">⚙</button>
     </div>
   </div>
 
-  <div class="layout">
-    <div class="cards">
-      <div class="card">
-        <div class="card-header">
-          <div class="title">
-            <div class="html-header-controls">
-                <h2>HTML Content</h2>
-                <button id="view-toggle" class="view-toggle" disabled>View Source</button>
-            </div>
-            <span class="filename" id="current-filename"></span>
+  <div class="main-content">
+    <div class="hero-container">
+      <div class="hero-left">
+        <div class="hero-badge">Open Source</div>
+        <h1 class="hero-title">Semantic HTML Annotation Platform</h1>
+        <p class="hero-subtitle">Professional-grade tool for structured document labeling and annotation workflows</p>
+        <p class="hero-description">
+          Accelerate your NLP projects with precision annotation tools. Create hierarchical label schemas, 
+          manage complex document structures, and streamline annotation workflows for machine learning datasets, 
+          legal document analysis, and research corpus preparation.
+        </p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <svg class="feature-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span>Hierarchical label structures</span>
           </div>
-          <div class="timer-controls">
-            <button id="page-saver-btn" class="page-saver-btn" title="Page Savers" disabled>🔖</button>
-            <div id="page-saver-menu" class="page-saver-menu">
-              <button id="new-page-saver" class="page-saver-new">+ New</button>
-              <div class="page-saver-divider"></div>
-              <div id="page-saver-list" class="page-saver-list">
-                <!-- Page savers list will be populated here -->
-              </div>
-            </div>
-            <button id="toggle-timer" class="timer-btn" title="Start/Stop timer" disabled>Start</button>
-            <div id="timer-display" class="timer-display" aria-live="polite">00:00:00</div>
+          <div class="feature-item">
+            <svg class="feature-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span>Pattern-based bulk labeling</span>
           </div>
-        </div>
-        <div class="card-body">
-          <div class="html-content" id="html-content">
-            <div class="empty-state drop-zone" id="drop-zone">
-              <h3>No HTML loaded</h3>
-              <p><a href="#" id="upload-link">Upload an HTML File</a> or drag & drop here to start labeling</p>
-            </div>
+          <div class="feature-item">
+            <svg class="feature-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span>Coreference resolution support</span>
           </div>
-          <textarea class="source-view" id="source-view" placeholder="HTML source will appear here..."></textarea>
         </div>
       </div>
-    </div>
-
-    <div class="cards">
-      <div class="card">
-        <div class="card-header">
-          <div class="title">
-            <h2>Label Manager</h2>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="label-creation-section">
-            <div class="label-input-row">
-              <input type="text" id="new-label-name" placeholder="Label name">
-              <input type="color" id="new-label-color" value="#6aa3ff">
-              <button id="add-root-label">Add Label</button>
-            </div>
-          </div>
+      
+      <div class="hero-right">
+        <div class="cta-card">
+          <h3>Get Started</h3>
+          <p>Choose your workflow</p>
           
-          <div class="label-tree" id="label-tree">
-            <!-- Tree will be populated here -->
-          </div>
-
-          <div class="groups-section" id="groups-section">
-            <h3>Active Groups</h3>
-            <div class="groups-list" id="groups-list">
-              <!-- Groups will be rendered here -->
+          <a href="labelizer/index.html" class="cta-button primary">
+            <span class="button-text">Start Labelizing</span>
+            <span class="button-description">Annotate and structure your documents</span>
+          </a>
+          
+          <a href="comparison/index.html" class="cta-button secondary">
+            <span class="button-text">Inter-Annotator Agreement</span>
+            <span class="button-description">Compare and analyze annotation consistency</span>
+          </a>
+          
+          <div class="stats-row">
+            <div class="stat">
+              <span class="stat-value">100%</span>
+              <span class="stat-label">Client-side</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">Open</span>
+              <span class="stat-label">Source</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">Zero</span>
+              <span class="stat-label">Server Cost</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="title">
-            <div class="advanced-header-controls">
-              <h2>Advanced Labelization</h2>
-            </div>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="advanced-wrapper">
-            <div class="advanced-content" id="advanced-content" contenteditable="true"></div>
-            <div class="advanced-nav-buttons">
-              <button id="navigate-previous" class="nav-btn" title="Previous">▲</button>
-              <button id="navigate-next" class="nav-btn" title="Next">▼</button>
-            </div>
-          </div>
-          <div class="advanced-button-row">
-            <button id="apply-advanced" class="apply-btn">Apply</button>
-            <button id="apply-all-advanced" class="apply-all-btn">Apply All</button>
-            <button id="clear-advanced-labels" class="clear-btn">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="title">
-            <h2>Statistics</h2>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="stats-grid">
-            <div class="stat-item">
-              <span class="stat-number" id="total-mentions">0</span>
-              <div class="stat-label">Total Mentions</div>
-            </div>
-            <div class="stat-item">
-              <span class="stat-number" id="total-labels">0</span>
-              <div class="stat-label">Total Labels</div>
-            </div>
-          </div>
-          <div id="parent-labels-stats" class="parent-labels-breakdown"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Context Menu -->
-  <div class="context-menu hidden" id="context-menu">
-    <h4>Apply Label</h4>
-    <div class="label-options" id="label-options">
-      <!-- Label options will be populated here -->
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <div class="footer-brand">
+          <img src="favicon.png" alt="HTML Labelizer" class="footer-logo">
+          <span>HTML Labelizer</span>
+        </div>
+        <p class="footer-tagline">Professional annotation platform for structured document analysis</p>
+      </div>
+      
+      <div class="footer-section">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="labelizer/index.html">Labelizer Tool</a></li>
+          <li><a href="comparison/index.html">Comparison Tool</a></li>
+          <li><a href="docs/index.html">Documentation</a></li>
+        </ul>
+      </div>
+      
+      <div class="footer-section">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="https://github.com/zachariegarniercuchet/HTMLLabelizer" target="_blank">GitHub Repository</a></li>
+          <li><a href="https://github.com/zachariegarniercuchet/HTMLLabelizer/issues" target="_blank">Report Issues</a></li>
+          <li><a href="https://zachariegarniercuchet.github.io/" target="_blank">About Developer</a></li>
+        </ul>
+      </div>
+      
+      <div class="footer-section">
+        <h4>Connect</h4>
+        <div class="social-links">
+          <a href="https://zachariegarniercuchet.github.io/" target="_blank" class="social-link" title="Personal Website">
+            <img src="mortarboard.png" alt="Personal Website" class="social-icon">
+          </a>
+          <a href="https://github.com/zachariegarniercuchet/HTMLLabelizer" target="_blank" class="social-link" title="GitHub">
+            <img src="github-mark.svg" alt="GitHub" class="social-icon">
+          </a>
+        </div>
+        <p class="footer-license">MIT License © 2024-2026</p>
+      </div>
     </div>
-  </div>
-
-  <!-- Parameter Menu for Labeled Text -->
-  <div class="param-menu hidden" id="param-menu">
-    <h4 id="param-menu-title">Edit Parameters</h4>
-    <div class="param-form" id="param-form">
-      <!-- Parameter inputs will be populated here -->
+    
+    <div class="footer-bottom">
+      <p>Developed by <a href="https://github.com/zachariegarniercuchet" target="_blank">Zacharie Garnier Cuchet</a></p>
     </div>
-  </div>
+  </footer>
 
   <!-- Settings Modal -->
   <div class="settings-modal hidden" id="settings-modal">
@@ -176,44 +878,44 @@
             </label>
           </div>
         </div>
-        
-        <div class="setting-group">
-          <h4>Text Contrast</h4>
-          <div class="contrast-container">
-            <label for="contrast-slider">Adjust text visibility</label>
-            <div class="slider-container">
-              <span class="slider-label">High</span>
-              <input type="range" id="contrast-slider" min="0" max="100" value="100" class="contrast-slider" />
-              <span class="slider-label">Low</span>
-            </div>
-            <div class="contrast-preview" id="contrast-preview">
-              Sample text preview
-            </div>
-          </div>
-        </div>
-        
-        <div class="setting-group">
-          <h4>Background Warmth</h4>
-          <div class="background-container">
-            <label for="background-slider">Adjust background tone</label>
-            <div class="slider-container">
-              <span class="slider-label">Cool</span>
-              <input type="range" id="background-slider" min="0" max="100" value="50" class="background-slider" />
-              <span class="slider-label">Warm</span>
-            </div>
-            <div class="background-preview" id="background-preview">
-              Background preview
-            </div>
-          </div>
-        </div>
-        
-        <div class="setting-group">
-          <button id="reset-settings" class="reset-btn">Reset to Defaults</button>
-        </div>
       </div>
     </div>
   </div>
 
-  <script src="app.js"></script> <!-- <script src="app.js"></script>   |    <script type="module" src="js/core/app.js"></script>-->
+  <script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsCloseBtn = document.getElementById('settings-close-btn');
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      themeToggle.checked = true;
+    }
+
+    themeToggle.addEventListener('change', function() {
+      if (this.checked) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'dark');
+      }
+    });
+
+    settingsBtn.addEventListener('click', () => {
+      settingsModal.classList.remove('hidden');
+    });
+
+    settingsOverlay.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+    });
+
+    settingsCloseBtn.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+    });
+  </script>
 </body>
 </html>

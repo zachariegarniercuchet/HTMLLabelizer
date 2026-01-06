@@ -85,9 +85,9 @@
       margin-right: auto;
     }
 
-    .brand .logo {
-      font-size: 22px;
-      color: #7bb3ff !important; /* Slightly brighter blue for better visibility */
+    .logo-img {
+      width: 28px;
+      height: 28px;
     }
 
     .brand h1 {

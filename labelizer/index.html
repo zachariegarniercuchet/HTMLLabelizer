@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Labelizer</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="timer-styles.css">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+  <div class="app-header">
+    <div class="brand">
+      <img src="../favicon.png" alt="HTML Labelizer" class="logo-img">
+      <h1>HTML Labelizer</h1>
+    </div>
+    <div class="controls">
+      <div class="file-input">
+        <input type="file" id="html-file-input" accept=".html,.htm" style="display:none">
+        <button type="button" onclick="document.getElementById('html-file-input').click()">Load HTML File</button>
+      </div>
+      <button id="download-html" disabled>Download</button>
+      <button id="save-as" disabled>Save As...</button>
+      <button id="clear-all">Clear All</button>
+      <button id="settings-btn" class="settings-btn" title="Settings">⚙</button> <!-- ⚙️ -->
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="title">
+            <div class="html-header-controls">
+                <h2>HTML Content</h2>
+                <button id="view-toggle" class="view-toggle" disabled>View Source</button>
+            </div>
+            <span class="filename" id="current-filename"></span>
+          </div>
+          <div class="timer-controls">
+            <button id="page-saver-btn" class="page-saver-btn" title="Page Savers" disabled>🔖</button>
+            <div id="page-saver-menu" class="page-saver-menu">
+              <button id="new-page-saver" class="page-saver-new">+ New</button>
+              <div class="page-saver-divider"></div>
+              <div id="page-saver-list" class="page-saver-list">
+                <!-- Page savers list will be populated here -->
+              </div>
+            </div>
+            <button id="toggle-timer" class="timer-btn" title="Start/Stop timer" disabled>Start</button>
+            <div id="timer-display" class="timer-display" aria-live="polite">00:00:00</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="html-content" id="html-content">
+            <div class="empty-state drop-zone" id="drop-zone">
+              <h3>No HTML loaded</h3>
+              <p><a href="#" id="upload-link">Upload an HTML File</a> or drag & drop here to start labeling</p>
+            </div>
+          </div>
+          <textarea class="source-view" id="source-view" placeholder="HTML source will appear here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="title">
+            <h2>Label Manager</h2>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="label-creation-section">
+            <div class="label-input-row">
+              <input type="text" id="new-label-name" placeholder="Label name">
+              <input type="color" id="new-label-color" value="#6aa3ff">
+              <button id="add-root-label">Add Label</button>
+            </div>
+          </div>
+          
+          <div class="label-tree" id="label-tree">
+            <!-- Tree will be populated here -->
+          </div>
+
+          <div class="groups-section" id="groups-section">
+            <h3>Active Groups</h3>
+            <div class="groups-list" id="groups-list">
+              <!-- Groups will be rendered here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="title">
+            <div class="advanced-header-controls">
+              <h2>Advanced Labelization</h2>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="advanced-wrapper">
+            <div class="advanced-content" id="advanced-content" contenteditable="true"></div>
+            <div class="advanced-nav-buttons">
+              <button id="navigate-previous" class="nav-btn" title="Previous">▲</button>
+              <button id="navigate-next" class="nav-btn" title="Next">▼</button>
+            </div>
+          </div>
+          <div class="advanced-button-row">
+            <button id="apply-advanced" class="apply-btn">Apply</button>
+            <button id="apply-all-advanced" class="apply-all-btn">Apply All</button>
+            <button id="clear-advanced-labels" class="clear-btn">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="title">
+            <h2>Statistics</h2>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-number" id="total-mentions">0</span>
+              <div class="stat-label">Total Mentions</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="total-labels">0</span>
+              <div class="stat-label">Total Labels</div>
+            </div>
+          </div>
+          <div id="parent-labels-stats" class="parent-labels-breakdown"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu hidden" id="context-menu">
+    <h4>Apply Label</h4>
+    <div class="label-options" id="label-options">
+      <!-- Label options will be populated here -->
+    </div>
+  </div>
+
+  <!-- Parameter Menu for Labeled Text -->
+  <div class="param-menu hidden" id="param-menu">
+    <h4 id="param-menu-title">Edit Parameters</h4>
+    <div class="param-form" id="param-form">
+      <!-- Parameter inputs will be populated here -->
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-modal hidden" id="settings-modal">
+    <div class="settings-overlay" id="settings-overlay"></div>
+    <div class="settings-content">
+      <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="settings-close-btn" id="settings-close-btn">×</button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-group">
+          <h4>Theme</h4>
+          <div class="theme-toggle-container">
+            <label class="theme-toggle">
+              <input type="checkbox" id="theme-toggle" />
+              <span class="theme-slider"></span>
+              <span class="theme-labels">
+                <span class="theme-label-dark">🌙 Dark</span>
+                <span class="theme-label-light">☀️ Light</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <h4>Text Contrast</h4>
+          <div class="contrast-container">
+            <label for="contrast-slider">Adjust text visibility</label>
+            <div class="slider-container">
+              <span class="slider-label">High</span>
+              <input type="range" id="contrast-slider" min="0" max="100" value="100" class="contrast-slider" />
+              <span class="slider-label">Low</span>
+            </div>
+            <div class="contrast-preview" id="contrast-preview">
+              Sample text preview
+            </div>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <h4>Background Warmth</h4>
+          <div class="background-container">
+            <label for="background-slider">Adjust background tone</label>
+            <div class="slider-container">
+              <span class="slider-label">Cool</span>
+              <input type="range" id="background-slider" min="0" max="100" value="50" class="background-slider" />
+              <span class="slider-label">Warm</span>
+            </div>
+            <div class="background-preview" id="background-preview">
+              Background preview
+            </div>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <button id="reset-settings" class="reset-btn">Reset to Defaults</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script> <!-- <script src="app.js"></script>   |    <script type="module" src="js/core/app.js"></script>-->
+</body>
+</html>

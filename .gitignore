@@ -3,3 +3,5 @@ private/
 js/
 .github/
 annotation/
+package.json
+server.js
