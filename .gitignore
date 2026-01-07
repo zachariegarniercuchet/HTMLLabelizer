@@ -5,3 +5,6 @@ labelizer/js/
 annotation/
 package.json
 server.js
+temp/
+__pycache__/
+*.pyc

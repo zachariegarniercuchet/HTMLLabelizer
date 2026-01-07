@@ -4,6 +4,7 @@
 let documentA = null;
 let documentB = null;
 let comparisonResults = null;
+let cachedIAAResults = null;
 let currentTheme = 'dark';
 let isDragging = false;
 let dragState = {
@@ -31,6 +32,18 @@ export function getDocumentB() {
 
 export function setDocumentB(doc) {
   documentB = doc;
+}
+
+// Get all loaded files for IAA analysis
+export function getLoadedFiles() {
+  const files = [];
+  if (documentA && documentA.path) {
+    files.push({ name: documentA.name || 'Document A', path: documentA.path });
+  }
+  if (documentB && documentB.path) {
+    files.push({ name: documentB.name || 'Document B', path: documentB.path });
+  }
+  return files;
 }
 
 // Comparison Results State
@@ -77,4 +90,17 @@ export function resetDragState() {
     xOffset: 0,
     yOffset: 0
   };
+}
+
+// Cached IAA Results State
+export function getCachedIAAResults() {
+  return cachedIAAResults;
+}
+
+export function setCachedIAAResults(results) {
+  cachedIAAResults = results;
+}
+
+export function clearCachedIAAResults() {
+  cachedIAAResults = null;
 }

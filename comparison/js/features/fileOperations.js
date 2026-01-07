@@ -2,7 +2,7 @@
 // Handles file upload, clear all, and related operations
 
 import { domElements } from '../core/domElements.js';
-import { setDocumentA, setDocumentB, setComparisonResults, getDocumentA, getDocumentB } from '../core/state.js';
+import { setDocumentA, setDocumentB, setComparisonResults, getDocumentA, getDocumentB, clearCachedIAAResults } from '../core/state.js';
 import { readFileAsText, isHtmlFile, processFiles } from '../utils/fileLoader.js';
 import { extractExistingLabels, buildLabelsFromSchema, getHtmlStatistics, attachReadOnlyLabelEventListeners } from './htmlProcessor.js';
 import { updateStatistics as updateCardStatistics } from './statistics.js';
@@ -23,6 +23,7 @@ function setupClearAll() {
       clearDocumentB();
       resetStatistics();
       disableDownloadButtons();
+      clearCachedIAAResults(); // Clear IAA cache when documents are cleared
       checkAndEnableIAAButton(); // Disable IAA button when clearing
       
       // Re-attach upload links after clearing
@@ -57,6 +58,7 @@ function clearDocumentA() {
   }
   if (filenameA) filenameA.textContent = '';
   setDocumentA(null);
+  clearCachedIAAResults(); // Clear IAA cache when document changes
 }
 
 function clearDocumentB() {
@@ -85,6 +87,7 @@ function clearDocumentB() {
   }
   if (filenameB) filenameB.textContent = '';
   setDocumentB(null);
+  clearCachedIAAResults(); // Clear IAA cache when document changes
 }
 
 function resetStatistics() {
@@ -291,6 +294,7 @@ async function loadDocumentA(filename, htmlContent) {
   };
   
   setDocumentA(documentData);
+  clearCachedIAAResults(); // Clear IAA cache when new document is loaded
   
   // Enable view toggle button
   if (domElements.viewToggleA) {
@@ -380,6 +384,7 @@ async function loadDocumentB(filename, htmlContent) {
   };
   
   setDocumentB(documentData);
+  clearCachedIAAResults(); // Clear IAA cache when new document is loaded
   
   // Enable view toggle button
   if (domElements.viewToggleB) {
