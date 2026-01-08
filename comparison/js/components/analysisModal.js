@@ -208,125 +208,73 @@ function createMatchOverlay(labelElement, matchType, color, matchScore, matchInf
 }
 
 function displayIAAResults(results, container) {
-  const iaaData = results.iaa || results; // Handle both old and new response format
-  const matchData = results.label_matches;
-  
-  const html = `
+    // DEBUG: Log the full results object to inspect backend output
+    console.log('[IAA DEBUG] Full results object:', results);
+  // New IAA output structure: results.span_f1
+  const spanF1 = results.span_f1 || {};
+  const parentF1 = spanF1.parent_f1 || {};
+  const sublabelF1 = spanF1.sublabel_f1 || {};
+  const attributeF1 = spanF1.attribute_f1 || {};
+
+  // 1. Parent label agreement
+  let parentHtml = `<div class="iaa-section"><h3>1️⃣ Do annotators agree on where <em>parent labels</em> occur?</h3>
+    <div class="iaa-method">Method: We compute inter-annotator agreement using span-level F1 with overlap-based matching (IoU ≥ 0.5) per parent category.</div>`;
+  Object.entries(parentF1).forEach(([pair, cats]) => {
+    parentHtml += `<div class="iaa-subsection"><h4>${pair}</h4>`;
+    Object.entries(cats).forEach(([label, stats]) => {
+      parentHtml += `<div class="iaa-stat-row"><b>${label}</b>: <span class="iaa-score">F1 <b>${stats.f1}</b></span> (P ${stats.precision}, R ${stats.recall}) [TP ${stats.tp}, FP ${stats.fp}, FN ${stats.fn}]</div>`;
+    });
+    parentHtml += `</div>`;
+  });
+  parentHtml += `</div>`;
+
+  // 2. Sublabel agreement
+  let sublabelHtml = `<div class="iaa-section"><h3>2️⃣ Given that annotators agree a <em>parent label</em> exists, do they agree on its internal structure?</h3>
+    <div class="iaa-method">Method: Sublabel agreement is computed conditionally on aligned parent spans using overlap-based F1.</div>`;
+  Object.entries(sublabelF1).forEach(([pair, cats]) => {
+    sublabelHtml += `<div class="iaa-subsection"><h4>${pair}</h4>`;
+    Object.entries(cats).forEach(([parent, subcats]) => {
+      sublabelHtml += `<div class="iaa-parent-label">${parent}`;
+      Object.entries(subcats).forEach(([sublabel, stats]) => {
+        sublabelHtml += `<div class="iaa-stat-row">↳ <b>${sublabel}</b>: <span class="iaa-score">F1 <b>${stats.f1}</b></span> (P ${stats.precision}, R ${stats.recall}) [TP ${stats.tp}, FP ${stats.fp}, FN ${stats.fn}]</div>`;
+      });
+      sublabelHtml += `</div>`;
+    });
+    sublabelHtml += `</div>`;
+  });
+  sublabelHtml += `</div>`;
+
+  // 3. Attribute agreement
+  let attrHtml = `<div class="iaa-section"><h3>3️⃣ Do annotators agree on <em>attributes</em>?</h3>
+    <div class="iaa-method">Method: For each matched label, we compare all non-style, non-labelname, non-parent attributes and report micro and macro F1 scores.</div>`;
+  Object.entries(attributeF1).forEach(([pair, cats]) => {
+    attrHtml += `<div class="iaa-subsection"><h4>${pair}</h4>`;
+    Object.entries(cats).forEach(([label, stats]) => {
+      if (label.endsWith('__sublabels')) {
+        // Sublabel attribute agreement
+        attrHtml += `<div class="iaa-parent-label">${label.replace('__sublabels','')} (sublabels)`;
+        Object.entries(stats).forEach(([sublabel, substats]) => {
+          attrHtml += `<div class="iaa-stat-row">↳ <b>${sublabel}</b>: <span class="iaa-score">F1 <b>${substats.macro.f1}</b></span> (micro F1 ${substats.micro.f1})</div>`;
+        });
+        attrHtml += `</div>`;
+      } else {
+        // Parent attribute agreement
+        attrHtml += `<div class="iaa-stat-row"><b>${label}</b>: <span class="iaa-score">F1 <b>${stats.macro.f1}</b></span> (micro F1 ${stats.micro.f1})</div>`;
+      }
+    });
+    attrHtml += `</div>`;
+  });
+  attrHtml += `</div>`;
+
+  container.innerHTML = `
     <div class="iaa-results">
-      <div class="iaa-section">
-        <h3>📊 Summary</h3>
-        <div class="iaa-grid">
-          <div class="iaa-stat">
-            <span class="iaa-label">Annotators:</span>
-            <span class="iaa-value">${iaaData.summary.num_annotators}</span>
-          </div>
-          <div class="iaa-stat">
-            <span class="iaa-label">Unique Labels:</span>
-            <span class="iaa-value">${iaaData.summary.total_unique_labels}</span>
-          </div>
-          <div class="iaa-stat">
-            <span class="iaa-label">Avg Labels/Annotator:</span>
-            <span class="iaa-value">${iaaData.statistics.avg_labels_per_annotator}</span>
-          </div>
-        </div>
-        
-        <div class="annotator-list">
-          <strong>Annotators:</strong>
-          <ul>
-            ${iaaData.summary.annotators.map(name => `<li>${name}</li>`).join('')}
-          </ul>
-        </div>
-      </div>
-      
-      ${matchData ? `
-      <div class="iaa-section">
-        <h3>🎯 Label Matching Results</h3>
-        <div class="iaa-grid">
-          <div class="iaa-stat">
-            <span class="iaa-label">Exact Matches:</span>
-            <span class="iaa-value highlight">${matchData.summary.exact_matches}</span>
-          </div>
-          <div class="iaa-stat">
-            <span class="iaa-label">Partial Matches:</span>
-            <span class="iaa-value">${matchData.summary.partial_matches}</span>
-          </div>
-          <div class="iaa-stat">
-            <span class="iaa-label">No Matches:</span>
-            <span class="iaa-value">${matchData.summary.no_matches}</span>
-          </div>
-        </div>
-        <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
-          <div style="color: var(--sub); font-size: 13px; margin-bottom: 8px;">💡 Labels are now color-coded in the documents:</div>
-          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <div style="width: 16px; height: 16px; background: #4ade80; border-radius: 4px;"></div>
-              <span style="font-size: 12px; color: var(--text);">Exact Match</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <div style="width: 16px; height: 16px; background: #fbbf24; border-radius: 4px;"></div>
-              <span style="font-size: 12px; color: var(--text);">Partial Match (≥50%)</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <div style="width: 16px; height: 16px; background: #f87171; border-radius: 4px;"></div>
-              <span style="font-size: 12px; color: var(--text);">No Match</span>
-            </div>
-          </div>
-          <div style="color: var(--sub); font-size: 12px; margin-top: 8px;">Hover over labels to see match details</div>
-        </div>
-      </div>
-      ` : ''}
-      
-      <div class="iaa-section">
-        <h3>🏷 Label Usage by Annotator</h3>
-        ${Object.entries(iaaData.label_counts).map(([annotator, counts]) => `
-          <div class="annotator-labels">
-            <strong>${annotator}:</strong>
-            <div class="label-chips">
-              ${Object.entries(counts).map(([label, count]) => `
-                <span class="label-chip">${label} <span class="count-badge">${count}</span></span>
-              `).join('')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-      
-      <div class="iaa-section">
-        <h3>🔄 Overlap Analysis</h3>
-        ${Object.entries(iaaData.overlap_analysis).map(([comparison, metrics]) => `
-          <div class="overlap-card">
-            <h4>${comparison.replace(/_vs_/g, ' vs ')}</h4>
-            <div class="iaa-grid">
-              <div class="iaa-stat">
-                <span class="iaa-label">Common Labels:</span>
-                <span class="iaa-value">${metrics.common_labels}</span>
-              </div>
-              <div class="iaa-stat">
-                <span class="iaa-label">Total Unique:</span>
-                <span class="iaa-value">${metrics.total_unique_labels}</span>
-              </div>
-              <div class="iaa-stat">
-                <span class="iaa-label">Jaccard Similarity:</span>
-                <span class="iaa-value highlight">${(metrics.jaccard_similarity * 100).toFixed(1)}%</span>
-              </div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-      
-      <div class="iaa-section">
-        <h3>📈 Label Types Used</h3>
-        <div class="label-types">
-          ${iaaData.summary.unique_label_types.map(label => `
-            <span class="label-type-badge">${label}</span>
-          `).join('')}
-        </div>
-      </div>
+      ${parentHtml}
+      ${sublabelHtml}
+      ${attrHtml}
     </div>
     <div class="resize-handle" id="resize-handle"></div>
   `;
-  
-  container.innerHTML = html;
-  setupResizable(); // Re-attach resize handler
+  setupResizable();
 }
 
 function setupDraggable() {

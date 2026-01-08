@@ -541,7 +541,7 @@
     /* Tree Structure */
     .label-tree {
       margin-top: 16px;
-      max-height: 400px;
+      /*max-height: 400px;*/
       overflow-y: auto;
     }
 
@@ -755,6 +755,17 @@
 
     .tree-children.expanded {
       max-height: 1000px;
+    }
+
+    /* Style for groups containers (not sublabels containers) */
+    .groups-container {
+      margin-bottom: 10px; /* Add some spacing at bottom */
+    }
+
+    /* Ensure sublabels containers don't have max-height restrictions */
+    .label-group-node > .tree-children:not(.groups-container).expanded {
+      max-height: none;
+      overflow: visible;
     }
 
     /* Gold parameter styling (Group ID) */
@@ -1152,6 +1163,8 @@
   font-size: 13px;
   font-style: italic;
 }
+
+
 
 /* Group items use tree styling - no additional styling needed */
 

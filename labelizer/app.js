@@ -2927,6 +2927,14 @@ function toggleLabelGroupExpansion(labelPath) {
 function refreshGroupsDisplay() {
   const groupsList = document.getElementById('groups-list');
   if (!groupsList) return;
+
+  // Store scroll positions of all groups containers before clearing
+  const scrollPositions = new Map();
+  document.querySelectorAll('.groups-container').forEach((container, index) => {
+    if (container.scrollTop > 0) {
+      scrollPositions.set(index, container.scrollTop);
+    }
+  });
   
   // Clear any active group filter when refreshing
   clearGroupFilter();
@@ -2952,6 +2960,15 @@ function refreshGroupsDisplay() {
   rootLabels.forEach(labelData => {
     renderLabelGroupLevel(labelData, hierarchy, groupsList, 0);
   });
+
+   // After rendering, restore scroll positions
+  setTimeout(() => {
+    document.querySelectorAll('.groups-container').forEach((container, index) => {
+      if (scrollPositions.has(index)) {
+        container.scrollTop = scrollPositions.get(index);
+      }
+    });
+  }, 0);
 }
 
 // Render a label group and its children recursively
@@ -3024,7 +3041,13 @@ function renderLabelGroupLevel(labelData, hierarchy, container, level) {
   
   // Create children container for groups
   const groupsContainer = document.createElement('div');
-  groupsContainer.className = 'tree-children expanded'; // Always show groups under label
+  groupsContainer.className = 'tree-children expanded groups-container'; // Always show groups under label
+  // Add scrolling if there are many groups
+  if (groups.length > 5) { // Or adjust threshold as needed
+    groupsContainer.style.maxHeight = '250px';
+    groupsContainer.style.overflowY = 'auto';
+    groupsContainer.style.overflowX = 'hidden';
+  }
   
   // Render each group under this label
   groups.forEach(({ groupKey, groupData }) => {
@@ -5106,7 +5129,6 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   } else {
     labelElement.setAttribute("parent", "");
   }
-
   labelData.params.forEach((paramDef, paramName) => {
     let initialValue = "";
     if (typeof paramDef === "object" && paramDef.type) {
@@ -5126,10 +5148,11 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
       } else {
         initialValue = attrDef;
       }
+
       labelElement.setAttribute(attrName, initialValue);
     });
   }
-  
+  console.log("Final label element before insertion:", labelElement); // ZAG COMMENT
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
 

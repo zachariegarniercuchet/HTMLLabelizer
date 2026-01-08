@@ -257,52 +257,43 @@ def generate_match_summary(match_results: List[Dict]) -> Dict:
 
 def main():
     import argparse
-    
     parser = argparse.ArgumentParser(description='Match labels across annotated HTML files')
     parser.add_argument('files', nargs='+', help='HTML files to analyze (2 or more)')
     parser.add_argument('--min-overlap', type=float, default=0.5, help='Minimum overlap ratio (0-1)')
     parser.add_argument('--output', '-o', help='Output JSON file (default: stdout)')
-    
+    parser.add_argument('--parallel', action='store_true', help='Use parallel token traversal algorithm (experimental)')
     args = parser.parse_args()
-    
+
     if len(args.files) < 2:
-        print(json.dumps({
-            "error": "At least 2 HTML files are required"
-        }), file=sys.stderr)
+        print(json.dumps({"error": "At least 2 HTML files are required"}), file=sys.stderr)
         sys.exit(1)
-    
-    # Extract labels from all documents
-    documents_data = []
-    for html_file in args.files:
-        if not Path(html_file).exists():
-            print(json.dumps({
-                "error": f"File not found: {html_file}"
-            }), file=sys.stderr)
-            sys.exit(1)
-        
-        doc_data = extract_labels_with_tokens(html_file)
-        documents_data.append(doc_data)
-    
-    # Match labels across documents
-    match_results = match_labels_across_documents(documents_data, min_overlap=args.min_overlap)
-    
-    # Generate summary
-    summary = generate_match_summary(match_results)
-    
-    # Prepare output
-    output = {
-        'summary': summary,
-        'matches': match_results
-    }
-    
-    output_json = json.dumps(output, indent=2, ensure_ascii=False)
-    
+
+    if args.parallel:
+        # Use the new parallel algorithm
+        from comparison.label_matcher import load_and_clean_tokens, match_labels_parallel
+        token_lists = [load_and_clean_tokens(f) for f in args.files]
+        results = match_labels_parallel(token_lists, args.files, min_overlap=args.min_overlap)
+        output = {'matches': results}
+        output_json = json.dumps(output, indent=2, ensure_ascii=False)
+    else:
+        # Use the legacy approach
+        documents_data = []
+        for html_file in args.files:
+            if not Path(html_file).exists():
+                print(json.dumps({"error": f"File not found: {html_file}"}), file=sys.stderr)
+                sys.exit(1)
+            doc_data = extract_labels_with_tokens(html_file)
+            documents_data.append(doc_data)
+        match_results = match_labels_across_documents(documents_data, min_overlap=args.min_overlap)
+        summary = generate_match_summary(match_results)
+        output = {'summary': summary, 'matches': match_results}
+        output_json = json.dumps(output, indent=2, ensure_ascii=False)
+
     if args.output:
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(output_json)
         print(f"Results written to {args.output}")
     else:
-        # Force UTF-8 encoding for stdout to handle Unicode characters
         import sys
         if sys.platform == 'win32':
             import codecs
