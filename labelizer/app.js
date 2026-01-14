@@ -2605,6 +2605,11 @@ function showParameterMenu(labelElement, x, y) {
     
     elements.paramMenu.classList.add('hidden');
     currentParamElement = null;
+    
+    // Clear the form to prevent stale data from being reused
+    if (elements.paramForm) {
+      elements.paramForm.innerHTML = '';
+    }
   }
 
 
@@ -2644,6 +2649,21 @@ function showParameterMenu(labelElement, x, y) {
   // ======= Enhanced Parameter Saving for Multi-Selection =======
 function saveParameters() {
   if (!currentParamElement) return;
+  
+  // Validate that currentParamElement still exists in the DOM
+  if (!document.body.contains(currentParamElement)) {
+    console.warn('currentParamElement no longer exists in DOM, skipping save');
+    currentParamElement = null;
+    return;
+  }
+  
+  // Validate that currentParamElement is still a label element
+  const tagName = currentParamElement.tagName.toLowerCase();
+  if (tagName !== 'manual_label' && tagName !== 'auto_label') {
+    console.warn('currentParamElement is not a label element:', tagName);
+    currentParamElement = null;
+    return;
+  }
 
   // Get parameter values from form
   const paramValues = {};
@@ -5096,6 +5116,10 @@ function refreshSearchAfterLabeling() {
 function applyLabelToHtmlContent(range, labelPath, labelData) {
   const selectedText = range.toString().trim();
   if (!selectedText) return;
+
+  // CRITICAL: Clear parameter menu state to prevent stale data from being applied
+  hideParameterMenu();
+  currentParamElement = null;
 
   // CHECK IF WE'RE APPLYING TO A HIGHLIGHTED ELEMENT
   const startContainer = range.startContainer;
