@@ -17,6 +17,8 @@
   let meta = {}; // store metadata loaded/saved with schema (e.g., time)
   let inactivityTimeoutId = null; // Track inactivity timeout
   const INACTIVITY_TIMEOUT = 60000; // 1 minute in milliseconds
+  let lastSaveReminderMs = 0; // Track when we last showed save reminder
+  const SAVE_REMINDER_INTERVAL = 15 * 1000; // 30 seconds for testing (change to 30 * 60 * 1000 for production)
   // ======= Page Saver State =======
   let pageSavers = new Map(); // id -> { name, position }
   let pageSaverPlacementMode = false;
@@ -104,6 +106,12 @@
     if (!elements.timerDisplay) return;
     const ms = getCurrentAccumulatedMs();
     elements.timerDisplay.textContent = formatMsToHMS(ms);
+    
+    // Show save reminder every SAVE_REMINDER_INTERVAL from lastSaveReminderMs
+    if (timerRunning && ms - lastSaveReminderMs >= SAVE_REMINDER_INTERVAL) {
+      showSaveReminder();
+      lastSaveReminderMs = ms;
+    }
   }
 
   function getCurrentAccumulatedMs() {
@@ -472,6 +480,62 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     }
     
     return updatedCount;
+  }
+
+  // Highlight save buttons as a reminder
+  function showSaveReminder() {
+    console.log('🔔 Save reminder triggered!');
+    
+    // Ensure CSS animation is loaded
+    if (!document.querySelector('#save-reminder-animation-styles')) {
+      const style = document.createElement('style');
+      style.id = 'save-reminder-animation-styles';
+      style.textContent = `
+        @keyframes savePulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(106, 163, 255, 0.7);
+            border-color: var(--hover);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 0 8px rgba(106, 163, 255, 0);
+            border-color: var(--accent);
+            transform: scale(1.05);
+          }
+        }
+        
+        .save-reminder-pulse {
+          animation: savePulse 1.5s ease-in-out 3 !important;
+          position: relative;
+          z-index: 100;
+        }
+      `;
+      document.head.appendChild(style);
+      console.log('✅ CSS animation styles added to page');
+    }
+    
+    // Add highlight animation to save and download buttons
+    if (elements.downloadBtn) {
+      console.log('✅ Adding pulse to download button');
+      elements.downloadBtn.classList.add('save-reminder-pulse');
+      setTimeout(() => {
+        elements.downloadBtn.classList.remove('save-reminder-pulse');
+        console.log('✅ Removed pulse from download button');
+      }, 5000);
+    } else {
+      console.log('❌ Download button not found');
+    }
+    
+    if (elements.saveAsBtn) {
+      console.log('✅ Adding pulse to save-as button');
+      elements.saveAsBtn.classList.add('save-reminder-pulse');
+      setTimeout(() => {
+        elements.saveAsBtn.classList.remove('save-reminder-pulse');
+        console.log('✅ Removed pulse from save-as button');
+      }, 5000);
+    } else {
+      console.log('❌ Save-as button not found');
+    }
   }
 
   // Show a brief notification when parameters are updated
@@ -3853,10 +3917,14 @@ function applySourceChanges() {
         ms = ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
       }
       accumulatedMs = isNaN(ms) ? 0 : ms;
+      // Initialize lastSaveReminderMs so next reminder is 30 min from loaded time
+      lastSaveReminderMs = accumulatedMs;
+      console.log('✅ Timer loaded from file:', formatMsToHMS(accumulatedMs), '- next reminder at', formatMsToHMS(accumulatedMs + SAVE_REMINDER_INTERVAL));
       updateTimerDisplay();
     } else {
       meta = meta || {};
       accumulatedMs = 0;
+      lastSaveReminderMs = 0;
       updateTimerDisplay();
     }
 
@@ -6878,6 +6946,11 @@ function navigateToPreviousMatch() {
       elements.viewToggle.textContent = 'View Source';
       elements.viewToggle.classList.remove('active');
       
+      // Set save reminder baseline to current timer value
+      lastSaveReminderMs = getCurrentAccumulatedMs();
+      const nextReminderTime = lastSaveReminderMs + SAVE_REMINDER_INTERVAL;
+      console.log('✅ Save reminder set - next reminder at', formatMsToHMS(nextReminderTime));
+      
       extractExistingLabels(currentHtml);
       extractPageSavers();
       renderHtmlContent();
@@ -6933,6 +7006,11 @@ function navigateToPreviousMatch() {
       isSourceView = false;
       elements.viewToggle.textContent = 'View Source';
       elements.viewToggle.classList.remove('active');
+
+      // Set save reminder baseline to current timer value
+      lastSaveReminderMs = getCurrentAccumulatedMs();
+      const nextReminderTime = lastSaveReminderMs + SAVE_REMINDER_INTERVAL;
+      console.log('✅ Save reminder set - next reminder at', formatMsToHMS(nextReminderTime));
 
       extractExistingLabels(currentHtml);
       extractPageSavers();
