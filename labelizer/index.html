@@ -66,73 +66,87 @@
       <div class="card">
         <div class="card-header">
           <div class="title">
-            <h2>Label Manager</h2>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="label-creation-section">
-            <div class="label-input-row">
-              <input type="text" id="new-label-name" placeholder="Label name">
-              <input type="color" id="new-label-color" value="#6aa3ff">
-              <button id="add-root-label">Add Label</button>
-            </div>
-          </div>
-          
-          <div class="label-tree" id="label-tree">
-            <!-- Tree will be populated here -->
-          </div>
-
-          <div class="groups-section" id="groups-section">
-            <h3>Active Groups</h3>
-            <div class="groups-list" id="groups-list">
-              <!-- Groups will be rendered here -->
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="title">
-            <div class="advanced-header-controls">
-              <h2>Advanced Labelization</h2>
+            <div class="tab-menu">
+              <button class="tab-btn active" data-tab="labels">Labels</button>
+              <button class="tab-btn" data-tab="coref">Co-reference</button>
+              <button class="tab-btn" data-tab="advanced">Advanced</button>
+              <button class="tab-btn" data-tab="statistics">Statistics</button>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <div class="advanced-wrapper">
-            <div class="advanced-content" id="advanced-content" contenteditable="true"></div>
-            <div class="advanced-nav-buttons">
-              <button id="navigate-previous" class="nav-btn" title="Previous">▲</button>
-              <button id="navigate-next" class="nav-btn" title="Next">▼</button>
+          <!-- Label Manager Tab -->
+          <div class="tab-content active" id="tab-labels">
+            <div class="label-creation-section">
+              <div class="label-input-row">
+                <input type="text" id="new-label-name" placeholder="Label name">
+                <input type="color" id="new-label-color" value="#6aa3ff">
+                <button id="add-root-label">Add Label</button>
+              </div>
+            </div>
+            
+            <div class="label-tree" id="label-tree">
+              <!-- Tree will be populated here -->
             </div>
           </div>
-          <div class="advanced-button-row">
-            <button id="apply-advanced" class="apply-btn">Apply</button>
-            <button id="apply-all-advanced" class="apply-all-btn">Apply All</button>
-            <button id="clear-advanced-labels" class="clear-btn">Clear</button>
-          </div>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="card-header">
-          <div class="title">
-            <h2>Statistics</h2>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="stats-grid">
-            <div class="stat-item">
-              <span class="stat-number" id="total-mentions">0</span>
-              <div class="stat-label">Total Mentions</div>
-            </div>
-            <div class="stat-item">
-              <span class="stat-number" id="total-labels">0</span>
-              <div class="stat-label">Total Labels</div>
+          <!-- Co-reference Manager Tab -->
+          <div class="tab-content" id="tab-coref">
+            <div class="groups-section" id="groups-section">
+              <h3>Active Groups</h3>
+              <div class="groups-list" id="groups-list">
+                <!-- Groups will be rendered here -->
+              </div>
             </div>
           </div>
-          <div id="parent-labels-stats" class="parent-labels-breakdown"></div>
+
+          <!-- Advanced Labelization Tab -->
+          <div class="tab-content" id="tab-advanced">
+            <button class="tool-help-toggle" id="tool-help-toggle">
+              <span class="toggle-icon">▼</span>
+              <span class="toggle-text">Show Tool Descriptions</span>
+            </button>
+
+            <div class="tool-descriptions-wrapper collapsed" id="tool-descriptions-wrapper">
+              <div class="tool-description">
+                <h3>Tool 1: Multi-Selection Labeling</h3>
+                <p>Label multiple text spans simultaneously. Hold <kbd>Ctrl</kbd> while selecting text with your mouse to highlight multiple spans. Once all desired spans are highlighted, apply a label and it will be applied to all selected text at once.</p>
+              </div>
+
+              <div class="tool-description">
+                <h3>Tool 2: Search & Apply Labels</h3>
+                <p>Search for text in the box below and apply labels to it. Use the navigation arrows (▲ ▼) to move through all matching instances in your document, then click <strong>Apply</strong> to apply the same labels to each occurrence. Use <strong>Apply All</strong> to label all matches at once.</p>
+              </div>
+            </div>
+
+            <div class="advanced-wrapper">
+              <div class="advanced-content" id="advanced-content" contenteditable="true"></div>
+              <div class="advanced-nav-buttons">
+                <button id="navigate-previous" class="nav-btn" title="Previous">▲</button>
+                <button id="navigate-next" class="nav-btn" title="Next">▼</button>
+              </div>
+            </div>
+            <div class="advanced-button-row">
+              <button id="apply-advanced" class="apply-btn">Apply</button>
+              <button id="apply-all-advanced" class="apply-all-btn">Apply All</button>
+              <button id="clear-advanced-labels" class="clear-btn">Clear</button>
+            </div>
+          </div>
+
+          <!-- Statistics Tab -->
+          <div class="tab-content" id="tab-statistics">
+            <div class="stats-grid">
+              <div class="stat-item">
+                <span class="stat-number" id="total-mentions">0</span>
+                <div class="stat-label">Total Mentions</div>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number" id="total-labels">0</span>
+                <div class="stat-label">Total Labels</div>
+              </div>
+            </div>
+            <div id="parent-labels-stats" class="parent-labels-breakdown"></div>
+          </div>
         </div>
       </div>
     </div>

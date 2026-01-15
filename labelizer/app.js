@@ -6419,8 +6419,36 @@ function mapNormalizedMatchToReal(originalText, positionMap, normalizedStart, no
     return null;
   }
   
-  const startPos = positionMap[realStart];
-  const endPos = positionMap[Math.min(realEnd - 1, positionMap.length - 1)];
+  // FIX: Trim leading/trailing whitespace from match boundaries
+  // Find the actual start position (skip leading whitespace)
+  let actualRealStart = realStart;
+  while (actualRealStart < realEnd && actualRealStart < positionMap.length) {
+    const pos = positionMap[actualRealStart];
+    if (pos.node && !pos.isVirtualSpace) {
+      const char = pos.node.textContent[pos.offset];
+      if (!/\s/.test(char)) {
+        break; // Found first non-whitespace
+      }
+    }
+    actualRealStart++;
+  }
+  
+  // Find the actual end position (exclude trailing whitespace)
+  let actualRealEnd = realEnd - 1;
+  while (actualRealEnd >= actualRealStart) {
+    const pos = positionMap[actualRealEnd];
+    if (pos.node && !pos.isVirtualSpace) {
+      const char = pos.node.textContent[pos.offset];
+      if (!/\s/.test(char)) {
+        actualRealEnd++; // Move past the last non-whitespace char
+        break;
+      }
+    }
+    actualRealEnd--;
+  }
+  
+  const startPos = positionMap[actualRealStart];
+  const endPos = positionMap[Math.min(actualRealEnd - 1, positionMap.length - 1)];
   
   // Skip virtual spaces
   if (!startPos?.node || !endPos?.node || startPos.isVirtualSpace || endPos.isVirtualSpace) {
@@ -6429,7 +6457,7 @@ function mapNormalizedMatchToReal(originalText, positionMap, normalizedStart, no
   
   // Extract the actual matched text
   let matchedText = '';
-  for (let i = realStart; i < realEnd && i < positionMap.length; i++) {
+  for (let i = actualRealStart; i < actualRealEnd && i < positionMap.length; i++) {
     const pos = positionMap[i];
     if (pos.node && !pos.isVirtualSpace) {
       matchedText += pos.node.textContent[pos.offset] || '';
@@ -6438,11 +6466,13 @@ function mapNormalizedMatchToReal(originalText, positionMap, normalizedStart, no
   
   if (startPos.node === endPos.node) {
     // Single node match
+    // FIX: Use the actual text from the node based on offsets
+    const actualText = startPos.node.textContent.substring(startPos.offset, endPos.offset + 1);
     return {
       node: startPos.node,
       startOffset: startPos.offset,
       endOffset: endPos.offset + 1,
-      text: matchedText,
+      text: actualText,
       isEnhanced: true
     };
   } else {
@@ -6463,19 +6493,33 @@ function mapNormalizedPositionToReal(originalText, normalizedText, normalizedPos
   let realPos = 0;
   let normPos = 0;
   
+  // First, skip leading whitespace in original text since normalized is trimmed
+  while (realPos < originalText.length && /\s/.test(originalText[realPos])) {
+    realPos++;
+  }
+  
   while (realPos < originalText.length && normPos < normalizedPos) {
     const realChar = originalText[realPos];
+    const normChar = normalizedText[normPos];
     
     if (/\s/.test(realChar)) {
-      // Skip consecutive whitespace in original
+      // In original: whitespace character(s)
+      // Skip ALL consecutive whitespace in original
       while (realPos < originalText.length && /\s/.test(originalText[realPos])) {
         realPos++;
       }
-      // Count as one space in normalized
-      normPos++;
+      // In normalized, this corresponds to exactly one space
+      if (normPos < normalizedText.length && /\s/.test(normChar)) {
+        normPos++;
+      }
     } else {
-      realPos++;
-      normPos++;
+      // Non-whitespace character - must match in both
+      if (realChar.toLowerCase() === normChar.toLowerCase()) {
+        realPos++;
+        normPos++;
+      } else {
+        break;
+      }
     }
   }
   
@@ -7301,7 +7345,11 @@ window.addEventListener('resize', updateSearchOverlayPositions);
 
 
 elements.advancedContent.addEventListener('input', () => {
-  const searchText = elements.advancedContent.textContent.trim().replace(/×/g, '');
+  // Use the same method as getCleanAdvancedText() for consistency
+  const clone = elements.advancedContent.cloneNode(true);
+  const deleteButtons = clone.querySelectorAll('.delete-btn');
+  deleteButtons.forEach(btn => btn.remove());
+  const searchText = clone.textContent.trim();
   
   // Clear existing timeout
   clearTimeout(searchTimeout);
@@ -7834,6 +7882,47 @@ window.addEventListener('click', (event) => {
       showTemporaryMessage('Page saver placement cancelled', 2000);
     }
   });
+  
+  // ======= Tab Menu Functionality =======
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+      
+      // Remove active class from all buttons and hide all content
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      tabContents.forEach(content => content.classList.remove('active'));
+      
+      // Add active class to clicked button and show corresponding content
+      button.classList.add('active');
+      const activeContent = document.getElementById(`tab-${tabName}`);
+      if (activeContent) {
+        activeContent.classList.add('active');
+      }
+    });
+  });
+  
+  // ======= Tool Help Toggle Functionality =======
+  const toolHelpToggle = document.getElementById('tool-help-toggle');
+  const toolDescriptionsWrapper = document.getElementById('tool-descriptions-wrapper');
+  
+  if (toolHelpToggle && toolDescriptionsWrapper) {
+    toolHelpToggle.addEventListener('click', () => {
+      const isCollapsed = toolDescriptionsWrapper.classList.contains('collapsed');
+      
+      if (isCollapsed) {
+        toolDescriptionsWrapper.classList.remove('collapsed');
+        toolHelpToggle.classList.add('expanded');
+        toolHelpToggle.querySelector('.toggle-text').textContent = 'Hide Tool Descriptions';
+      } else {
+        toolDescriptionsWrapper.classList.add('collapsed');
+        toolHelpToggle.classList.remove('expanded');
+        toolHelpToggle.querySelector('.toggle-text').textContent = 'Show Tool Descriptions';
+      }
+    });
+  }
   
   console.log('Enhanced HTML Labelizer ready!');
 

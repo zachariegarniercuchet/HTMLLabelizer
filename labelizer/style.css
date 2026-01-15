@@ -361,6 +361,19 @@
       background: rgba(255,255,255,.03);
     }
 
+    /* Special styling for card header with tab menu */
+    .card-header:has(.tab-menu) {
+      padding: 0;
+      border-bottom: none;
+      align-items: stretch;
+    }
+
+    .card-header:has(.tab-menu) .title {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
     .card-header .title h2 {
       margin: 0;
       font-size: 16px;
@@ -370,6 +383,109 @@
     .card-header .filename {
       color: var(--sub);
       font-size: 13px;
+    }
+
+    /* Tab Menu Styles - Modern GitHub-inspired design */
+    .tab-menu {
+      display: flex;
+      width: 100%;
+      border-bottom: 1px solid var(--border);
+      margin: 0;
+      padding: 0;
+      gap: 0;
+    }
+
+    /* Light theme - more subtle border */
+    :root[data-theme="light"] .tab-menu {
+      border-bottom: 1px solid rgba(208, 215, 222, 0.5);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: none !important;
+      background: transparent;
+      color: var(--sub);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent !important;
+      transition: all 0.15s ease;
+      position: relative;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-bottom-color: var(--border) !important;
+      border: none !important;
+      border-bottom: 2px solid var(--border) !important;
+    }
+
+    .tab-btn.active {
+      background: transparent;
+      color: var(--accent);
+      border-bottom-color: var(--accent) !important;
+      border: none !important;
+      border-bottom: 2px solid var(--accent) !important;
+      font-weight: 600;
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+    }
+
+    /* Light theme tab buttons */
+    :root[data-theme="light"] .tab-btn {
+      background: transparent !important;
+      color: var(--sub);
+      border: none !important;
+      border-bottom: 2px solid transparent !important;
+    }
+
+    :root[data-theme="light"] .tab-btn:hover {
+      background: rgba(0, 0, 0, 0.04) !important;
+      color: var(--text);
+      border: none !important;
+      border-bottom: 2px solid transparent !important;
+    }
+
+    :root[data-theme="light"] .tab-btn.active {
+      background: transparent !important;
+      color: var(--accent);
+      border: none !important;
+      border-bottom: 2px solid var(--accent) !important;
+    }
+
+    :root[data-theme="light"] .tab-btn.active::after {
+      background: var(--accent);
+    }
+
+    /* Tab Content Styles */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: grid;
+      gap: 16px;
+    }
+
+    /* Co-reference tab uses flex to fill available height */
+    #tab-coref.tab-content.active {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
     }
 
     .card-body {
@@ -496,6 +612,103 @@
       pointer-events: none;
     }
 
+
+    /* Tool Help Toggle Button */
+    .tool-help-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--sub);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tool-help-toggle:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .tool-help-toggle .toggle-icon {
+      transition: transform 0.2s ease;
+      font-size: 10px;
+    }
+
+    .tool-help-toggle.expanded .toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    /* Light theme tool help toggle - better contrast */
+    :root[data-theme="light"] .tool-help-toggle {
+      background: #f7fafc;
+      border: 1px solid #cbd5e0;
+      color: #4a5568;
+    }
+
+    :root[data-theme="light"] .tool-help-toggle:hover {
+      background: #edf2f7;
+      color: #1a202c;
+      border-color: #a0aec0;
+    }
+
+    /* Tool Descriptions Wrapper */
+    .tool-descriptions-wrapper {
+      max-height: 500px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, margin-bottom 0.3s ease;
+      margin-bottom: 20px;
+    }
+
+    .tool-descriptions-wrapper.collapsed {
+      max-height: 0;
+      margin-bottom: 0;
+    }
+
+    /* Tool Description Sections */
+    .tool-description {
+      margin-bottom: 16px;
+      padding: 16px;
+      background: var(--card-2);
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .tool-description:last-child {
+      margin-bottom: 0;
+    }
+
+    .tool-description h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .tool-description p {
+      font-size: 13px;
+      color: var(--sub);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .tool-description kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-weight: 600;
+    }
 
     /* Wrap editor + nav buttons side by side */
     .advanced-wrapper {
@@ -1132,28 +1345,26 @@
 
     /* Groups section styling - tree-like structure */
 .groups-section {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 2px solid var(--border);
   width: 100%;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .groups-section h3 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  display: flex;
-  align-items: center;
+  display: none;
 }
 
 .groups-list {
-  max-height: 400px;
+  max-height: 70vh;
   overflow-y: auto;
   width: 100%;
   min-width: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 .no-groups {
