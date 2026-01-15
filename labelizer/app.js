@@ -18,7 +18,7 @@
   let inactivityTimeoutId = null; // Track inactivity timeout
   const INACTIVITY_TIMEOUT = 60000; // 1 minute in milliseconds
   let lastSaveReminderMs = 0; // Track when we last showed save reminder
-  const SAVE_REMINDER_INTERVAL = 15 * 1000; // 30 seconds for testing (change to 30 * 60 * 1000 for production)
+  const SAVE_REMINDER_INTERVAL = 30 * 60 * 1000; // 30 minutes
   // ======= Page Saver State =======
   let pageSavers = new Map(); // id -> { name, position }
   let pageSaverPlacementMode = false;
