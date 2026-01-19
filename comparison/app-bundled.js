@@ -585,6 +585,31 @@
     );
   }
   
+  function compareAttributes(labelA, labelB) {
+    // Compare label type/name
+    if (labelA.type !== labelB.type) {
+      return false;
+    }
+    
+    // Get all parameter keys from both labels
+    const keysA = Object.keys(labelA.params);
+    const keysB = Object.keys(labelB.params);
+    
+    // Check if they have the same number of parameters
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+    
+    // Check if all keys exist in both and have the same values
+    for (let key of keysA) {
+      if (!keysB.includes(key) || labelA.params[key] !== labelB.params[key]) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+  
   function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
     const matches = [];
     const matchedBIndices = new Set();
@@ -608,10 +633,17 @@
       
       let matchType = 'no-match';
       if (bestMatch && bestOverlap >= minOverlap) {
+        // Check if positions are exact
         if (arePositionsExact(labelA.position, bestMatch.position)) {
-          matchType = 'exact';
+          // Exact position match - now check attributes
+          if (compareAttributes(labelA, bestMatch)) {
+            matchType = 'exact'; // Green: exact position + same attributes
+          } else {
+            matchType = 'overlap'; // Orange: exact position but different attributes
+          }
         } else {
-          matchType = 'overlap';
+          // Approximate/partial position match
+          matchType = 'no-match'; // Red: approximate match
         }
         
         matchedBIndices.add(bestMatchIndex);
@@ -620,14 +652,16 @@
           labelA: labelA,
           labelB: bestMatch,
           matchType: matchType,
-          overlap: bestOverlap
+          overlap: bestOverlap,
+          attributesMatch: matchType === 'exact'
         });
       } else {
         matches.push({
           labelA: labelA,
           labelB: null,
           matchType: 'no-match',
-          overlap: 0
+          overlap: 0,
+          attributesMatch: false
         });
       }
     });
@@ -638,7 +672,8 @@
           labelA: null,
           labelB: labelB,
           matchType: 'no-match',
-          overlap: 0
+          overlap: 0,
+          attributesMatch: false
         });
       }
     });
@@ -811,23 +846,43 @@
     const matchResults = results.matchResults;
     const summary = matchResults.summary;
     
+    // Calculate span-level F1 (based on exact position matches)
+    const exactMatches = matchResults.matches.filter(m => m.labelA && m.labelB && 
+      (m.matchType === 'exact' || m.matchType === 'overlap'));
+    const tp = exactMatches.length;
+    const fp = matchResults.matches.filter(m => m.labelA && !m.labelB).length;
+    const fn = matchResults.matches.filter(m => !m.labelA && m.labelB).length;
+    
+    const precision = tp > 0 ? tp / (tp + fp) : 0;
+    const recall = tp > 0 ? tp / (tp + fn) : 0;
+    const f1_span = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+    
+    // Calculate attribute F1 (from matched spans only)
+    const matchedSpans = exactMatches.length;
+    const attributeMatches = matchResults.matches.filter(m => m.matchType === 'exact').length;
+    const attributeMismatches = matchResults.matches.filter(m => m.matchType === 'overlap').length;
+    
+    const attr_precision = matchedSpans > 0 ? attributeMatches / matchedSpans : 0;
+    const attr_recall = matchedSpans > 0 ? attributeMatches / matchedSpans : 0;
+    const f1_attr = matchedSpans > 0 ? (attributeMatches / matchedSpans) : 0;
+    
     let html = `
       <div class="iaa-section">
-        <h3>📊 Match Summary</h3>
+        <h3>Match Summary</h3>
         <div class="iaa-summary-grid">
           <div class="iaa-summary-card exact">
             <div class="iaa-summary-number">${summary.exactMatches}</div>
-            <div class="iaa-summary-label">Exact Matches</div>
+            <div class="iaa-summary-label">Exact + Same Attributes</div>
             <div class="iaa-summary-color" style="background: #22c55e;"></div>
           </div>
           <div class="iaa-summary-card overlap">
             <div class="iaa-summary-number">${summary.overlapMatches}</div>
-            <div class="iaa-summary-label">Overlap Matches</div>
+            <div class="iaa-summary-label">Exact + Mismatch Attributes</div>
             <div class="iaa-summary-color" style="background: #f97316;"></div>
           </div>
           <div class="iaa-summary-card no-match">
             <div class="iaa-summary-number">${summary.noMatches}</div>
-            <div class="iaa-summary-label">No Matches</div>
+            <div class="iaa-summary-label">Not Exact</div>
             <div class="iaa-summary-color" style="background: #ef4444;"></div>
           </div>
         </div>
@@ -838,92 +893,57 @@
       </div>
       
       <div class="iaa-section">
-        <h3>🎯 Agreement Metrics</h3>
+        <h3>Span-Level Agreement</h3>
         <div class="iaa-method">
-          Labels are matched based on position overlap (Intersection over Union). 
-          <strong style="color: #22c55e;">Green</strong> = exact position match, 
-          <strong style="color: #f97316;">Orange</strong> = partial overlap, 
-          <strong style="color: #ef4444;">Red</strong> = no match found.
+          Measures agreement on label positions (exact position matches).
         </div>
         <div class="iaa-metrics">
           <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Agreement Rate:</span>
-            <span class="iaa-metric-value">${((summary.exactMatches + summary.overlapMatches) / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
+            <span class="iaa-metric-label">F1 Score:</span>
+            <span class="iaa-metric-value">${f1_span.toFixed(3)}</span>
           </div>
           <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Exact Match Rate:</span>
-            <span class="iaa-metric-value">${(summary.exactMatches / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
+            <span class="iaa-metric-label">Precision:</span>
+            <span class="iaa-metric-value">${precision.toFixed(3)}</span>
+          </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Recall:</span>
+            <span class="iaa-metric-value">${recall.toFixed(3)}</span>
+          </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">TP / FP / FN:</span>
+            <span class="iaa-metric-value">${tp} / ${fp} / ${fn}</span>
           </div>
         </div>
       </div>
       
       <div class="iaa-section">
-        <h3>📋 Detailed Matches</h3>
-        <div class="iaa-matches-list">
-    `;
-    
-    matchResults.matches.forEach((match, index) => {
-      const matchTypeClass = match.matchType.replace('-', '_');
-      const matchTypeLabel = match.matchType === 'exact' ? 'Exact Match' : 
-                             match.matchType === 'overlap' ? 'Overlap Match' : 'No Match';
-      const matchColor = match.matchType === 'exact' ? '#22c55e' : 
-                         match.matchType === 'overlap' ? '#f97316' : '#ef4444';
-      
-      if (match.labelA && match.labelB) {
-        html += `
-          <div class="iaa-match-item ${matchTypeClass}">
-            <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
-              <span class="iaa-match-badge" style="background: ${matchColor};">${matchTypeLabel}</span>
-              <span class="iaa-match-overlap">${(match.overlap * 100).toFixed(0)}% overlap</span>
-            </div>
-            <div class="iaa-match-details">
-              <div class="iaa-match-side">
-                <strong>Doc A:</strong> ${match.labelA.type || 'Label'} 
-                <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
-              </div>
-              <div class="iaa-match-side">
-                <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
-                <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
-              </div>
-            </div>
+        <h3>Attribute Agreement</h3>
+        <div class="iaa-method">
+          Among matched spans, measures agreement on label attributes.
+        </div>
+        <div class="iaa-metrics">
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Attribute F1:</span>
+            <span class="iaa-metric-value">${f1_attr.toFixed(3)}</span>
           </div>
-        `;
-      } else if (match.labelA) {
-        html += `
-          <div class="iaa-match-item no_match">
-            <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
-              <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc A</span>
-            </div>
-            <div class="iaa-match-details">
-              <div class="iaa-match-side">
-                <strong>Doc A:</strong> ${match.labelA.type || 'Label'}
-                <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
-              </div>
-            </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Matched Spans:</span>
+            <span class="iaa-metric-value">${matchedSpans}</span>
           </div>
-        `;
-      } else if (match.labelB) {
-        html += `
-          <div class="iaa-match-item no_match">
-            <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
-              <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc B</span>
-            </div>
-            <div class="iaa-match-details">
-              <div class="iaa-match-side">
-                <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
-                <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
-              </div>
-            </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Same Attributes:</span>
+            <span class="iaa-metric-value">${attributeMatches}</span>
           </div>
-        `;
-      }
-    });
-    
-    html += `
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Different Attributes:</span>
+            <span class="iaa-metric-value">${attributeMismatches}</span>
+          </div>
         </div>
       </div>
-      <div class="resize-handle" id="resize-handle"></div>
     `;
+    
+    html += `<div class="resize-handle" id="resize-handle"></div>`;
     
     container.innerHTML = html;
   }

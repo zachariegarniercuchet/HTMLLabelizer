@@ -94,6 +94,37 @@ function arePositionsExact(pos1, pos2, tolerance = 5) {
 }
 
 /**
+ * Compare attributes between two labels
+ * @param {Object} labelA - First label
+ * @param {Object} labelB - Second label
+ * @returns {boolean} True if all attributes match
+ */
+function compareAttributes(labelA, labelB) {
+  // Compare label type/name
+  if (labelA.type !== labelB.type) {
+    return false;
+  }
+  
+  // Get all parameter keys from both labels
+  const keysA = Object.keys(labelA.params);
+  const keysB = Object.keys(labelB.params);
+  
+  // Check if they have the same number of parameters
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  
+  // Check if all keys exist in both and have the same values
+  for (let key of keysA) {
+    if (!keysB.includes(key) || labelA.params[key] !== labelB.params[key]) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
  * Match labels between two documents based on position overlap
  * @param {Array} labelsA - Labels from document A
  * @param {Array} labelsB - Labels from document B
@@ -129,9 +160,15 @@ export function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
     if (bestMatch && bestOverlap >= minOverlap) {
       // Check if positions are exact
       if (arePositionsExact(labelA.position, bestMatch.position)) {
-        matchType = 'exact';
+        // Exact position match - now check attributes
+        if (compareAttributes(labelA, bestMatch)) {
+          matchType = 'exact'; // Green: exact position + same attributes
+        } else {
+          matchType = 'overlap'; // Orange: exact position but different attributes
+        }
       } else {
-        matchType = 'overlap';
+        // Approximate/partial position match
+        matchType = 'no-match'; // Red: approximate match
       }
       
       // Mark this labelB as matched
@@ -141,7 +178,8 @@ export function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
         labelA: labelA,
         labelB: bestMatch,
         matchType: matchType,
-        overlap: bestOverlap
+        overlap: bestOverlap,
+        attributesMatch: matchType === 'exact'
       });
     } else {
       // No match found
@@ -149,11 +187,13 @@ export function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
         labelA: labelA,
         labelB: null,
         matchType: 'no-match',
-        overlap: 0
+        overlap: 0,
+        attributesMatch: false
       });
     }
   });
-  
+  ,
+        attributesMatch: false
   // Add unmatched labels from document B
   labelsB.forEach((labelB, indexB) => {
     if (!matchedBIndices.has(indexB)) {

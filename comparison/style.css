@@ -54,10 +54,10 @@
   box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 400px;
-  width: 85vw;
+  width: 42vw;
   min-height: 250px;
   height: 80vh;
-  max-width: 95vw;
+  max-width: 50vw;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
