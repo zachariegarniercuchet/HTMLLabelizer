@@ -3,6 +3,7 @@
 
 import { domElements } from '../core/domElements.js';
 import { getIsDragging, setIsDragging, getDragState, updateDragState, getDocumentA, getDocumentB, getCachedIAAResults, setCachedIAAResults } from '../core/state.js';
+import { runIAAAnalysis as runClientSideIAA, clearMatchHighlighting } from '../features/iaaAnalysis.js';
 
 export function initializeAnalysisModal() {
   const { analysisModal, analysisCloseBtn, iaaAnalysisBtn, analysisModalHeader } = domElements;
@@ -14,13 +15,9 @@ export function initializeAnalysisModal() {
     // Check if we have cached results
     const cachedResults = getCachedIAAResults();
     if (cachedResults) {
-      // Display cached results without calling Python
+      // Display cached results and reapply highlighting
       const modalBody = document.querySelector('.analysis-modal-body');
       if (modalBody) {
-        // Reapply highlighting
-        if (cachedResults.label_matches) {
-          applyLabelHighlighting(cachedResults.label_matches);
-        }
         displayIAAResults(cachedResults, modalBody);
       }
     } else {
@@ -69,36 +66,10 @@ async function runIAAAnalysis() {
   `;
   
   try {
-    // Send HTML content directly to backend
-    const response = await fetch('/api/iaa', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        files: [
-          { name: docA.filename || 'Document A', content: docA.html },
-          { name: docB.filename || 'Document B', content: docB.html }
-        ],
-        minOverlap: 0.5
-      })
-    });
+    // Run client-side IAA analysis
+    const results = await runClientSideIAA();
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const results = await response.json();
-    
-    if (results.error) {
-      throw new Error(results.error);
-    }
-    
-    // Apply highlighting to HTML views
-    if (results.label_matches) {
-      applyLabelHighlighting(results.label_matches);
-    }
+    console.log('IAA Analysis Results:', results);
     
     // Cache the results for future reopening
     setCachedIAAResults(results);
@@ -123,158 +94,129 @@ async function runIAAAnalysis() {
   }
 }
 
-function applyLabelHighlighting(labelMatches) {
-  // Get HTML content containers and overlay containers
-  const htmlContentA = document.getElementById('html-content-a');
-  const htmlContentB = document.getElementById('html-content-b');
-  const overlayA = document.getElementById('iaa-overlay-a');
-  const overlayB = document.getElementById('iaa-overlay-b');
+function displayIAAResults(results, container) {
+  console.log('[IAA] Displaying results:', results);
   
-  if (!htmlContentA || !htmlContentB || !overlayA || !overlayB || !labelMatches.matches) return;
+  const matchResults = results.matchResults;
+  const summary = matchResults.summary;
   
-  // Clear existing overlays
-  overlayA.innerHTML = '';
-  overlayB.innerHTML = '';
-  
-  // Process matches for both documents
-  labelMatches.matches.forEach((docMatches, index) => {
-    const htmlContainer = index === 0 ? htmlContentA : htmlContentB;
-    const overlayContainer = index === 0 ? overlayA : overlayB;
-    const allLabels = htmlContainer.querySelectorAll('manual_label, auto_label');
+  // Create summary section
+  let html = `
+    <div class="iaa-section">
+      <h3>📊 Match Summary</h3>
+      <div class="iaa-summary-grid">
+        <div class="iaa-summary-card exact">
+          <div class="iaa-summary-number">${summary.exactMatches}</div>
+          <div class="iaa-summary-label">Exact Matches</div>
+          <div class="iaa-summary-color" style="background: #22c55e;"></div>
+        </div>
+        <div class="iaa-summary-card overlap">
+          <div class="iaa-summary-number">${summary.overlapMatches}</div>
+          <div class="iaa-summary-label">Overlap Matches</div>
+          <div class="iaa-summary-color" style="background: #f97316;"></div>
+        </div>
+        <div class="iaa-summary-card no-match">
+          <div class="iaa-summary-number">${summary.noMatches}</div>
+          <div class="iaa-summary-label">No Matches</div>
+          <div class="iaa-summary-color" style="background: #ef4444;"></div>
+        </div>
+      </div>
+      <div class="iaa-totals">
+        <div>Document A: <strong>${summary.totalA}</strong> labels</div>
+        <div>Document B: <strong>${summary.totalB}</strong> labels</div>
+      </div>
+    </div>
     
-    // Create a map of label index to match info
-    const labelMatchMap = new Map();
-    Object.entries(docMatches.labels).forEach(([labelId, matchData]) => {
-      const labelIndex = parseInt(labelId.split('_')[1]);
-      labelMatchMap.set(labelIndex, matchData);
-    });
+    <div class="iaa-section">
+      <h3>🎯 Agreement Metrics</h3>
+      <div class="iaa-method">
+        Labels are matched based on position overlap (Intersection over Union). 
+        <strong style="color: #22c55e;">Green</strong> = exact position match, 
+        <strong style="color: #f97316;">Orange</strong> = partial overlap, 
+        <strong style="color: #ef4444;">Red</strong> = no match found.
+      </div>
+      <div class="iaa-metrics">
+        <div class="iaa-metric-row">
+          <span class="iaa-metric-label">Agreement Rate:</span>
+          <span class="iaa-metric-value">${((summary.exactMatches + summary.overlapMatches) / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
+        </div>
+        <div class="iaa-metric-row">
+          <span class="iaa-metric-label">Exact Match Rate:</span>
+          <span class="iaa-metric-value">${(summary.exactMatches / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
+        </div>
+      </div>
+    </div>
     
-    // Create overlays for each label
-    allLabels.forEach((labelElement, labelIndex) => {
-      const matchData = labelMatchMap.get(labelIndex);
-      
-      if (!matchData) return;
-      
-      // Get match info for the other document
-      const otherDocName = index === 0 ? 
-        (labelMatches.matches[1]?.document || 'doc2') : 
-        (labelMatches.matches[0]?.document || 'doc1');
-      
-      const matchInfo = matchData.matches[otherDocName];
-      
-      // Determine match type and color
-      let matchType, color, matchScore;
-      if (!matchInfo) {
-        matchType = 'none';
-        color = '#f87171';
-        matchScore = 0;
-      } else {
-        matchType = matchInfo.match_type;
-        matchScore = matchInfo.overlap;
-        color = matchType === 'exact' ? '#4ade80' : '#fbbf24';
-      }
-      
-      // Create overlay element and add to overlay container (not HTML content!)
-      createMatchOverlay(labelElement, matchType, color, matchScore, matchInfo, overlayContainer, htmlContainer);
-    });
-  });
-}
-
-function createMatchOverlay(labelElement, matchType, color, matchScore, matchInfo, overlayContainer, htmlContainer) {
-  // Skip if icon already exists
-  if (labelElement.querySelector('.iaa-match-icon')) return;
-  
-  // Create icon container (like delete-btn pattern)
-  const icon = document.createElement('div');
-  icon.className = 'iaa-match-icon';
-  icon.style.backgroundColor = color;
-  
-  // Add SVG icon
-  icon.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
-      <path d="M 25 1 C 11.222656 1 0 10.878906 0 23.1875 C 0 29.234375 2.773438 34.664063 7.21875 38.6875 C 6.546875 40.761719 5.046875 42.398438 3.53125 43.65625 C 2.714844 44.332031 1.933594 44.910156 1.3125 45.46875 C 1.003906 45.746094 0.722656 46.027344 0.5 46.375 C 0.277344 46.722656 0.078125 47.21875 0.21875 47.75 L 0.34375 48.15625 L 0.6875 48.375 C 1.976563 49.117188 3.582031 49.246094 5.3125 49.125 C 7.042969 49.003906 8.929688 48.605469 10.78125 48.09375 C 14.375 47.101563 17.75 45.6875 19.53125 44.90625 C 21.289063 45.273438 23.054688 45.5 24.90625 45.5 C 38.683594 45.5 49.90625 35.621094 49.90625 23.3125 C 49.90625 11.007813 38.78125 1 25 1 Z M 25 3 C 37.820313 3 47.90625 12.214844 47.90625 23.3125 C 47.90625 34.402344 37.730469 43.5 24.90625 43.5 C 23.078125 43.5 21.355469 43.320313 19.625 42.9375 L 19.28125 42.84375 L 19 43 C 17.328125 43.738281 13.792969 45.179688 10.25 46.15625 C 8.476563 46.644531 6.710938 47.019531 5.1875 47.125 C 4.167969 47.195313 3.539063 46.953125 2.84375 46.78125 C 3.339844 46.355469 4.019531 45.847656 4.8125 45.1875 C 6.554688 43.742188 8.644531 41.730469 9.375 38.75 L 9.53125 38.125 L 9.03125 37.75 C 4.625 34.015625 2 28.875 2 23.1875 C 2 12.097656 12.175781 3 25 3 Z M 23.8125 12.8125 C 23.511719 12.8125 23.40625 12.988281 23.40625 13.1875 L 23.40625 15.8125 C 23.40625 16.113281 23.613281 16.1875 23.8125 16.1875 L 26.1875 16.1875 C 26.488281 16.1875 26.59375 16.011719 26.59375 15.8125 L 26.59375 13.1875 C 26.59375 12.886719 26.386719 12.8125 26.1875 12.8125 Z M 23.90625 20.09375 C 23.605469 20.09375 23.5 20.300781 23.5 20.5 L 23.5 33.90625 C 23.5 34.207031 23.707031 34.3125 23.90625 34.3125 L 23.90625 34.40625 L 26.1875 34.40625 C 26.488281 34.40625 26.59375 34.199219 26.59375 34 L 26.59375 20.5 C 26.59375 20.199219 26.386719 20.09375 26.1875 20.09375 Z"/>
-    </svg>
+    <div class="iaa-section">
+      <h3>📋 Detailed Matches</h3>
+      <div class="iaa-matches-list">
   `;
   
-  // Create hover tooltip - just show percentage
-  const tooltip = document.createElement('div');
-  tooltip.className = 'iaa-match-tooltip';
-  tooltip.textContent = `${(matchScore * 100).toFixed(0)}%`;
+  // Add detailed match list
+  matchResults.matches.forEach((match, index) => {
+    const matchTypeClass = match.matchType.replace('-', '_');
+    const matchTypeLabel = match.matchType === 'exact' ? 'Exact Match' : 
+                           match.matchType === 'overlap' ? 'Overlap Match' : 'No Match';
+    const matchColor = match.matchType === 'exact' ? '#22c55e' : 
+                       match.matchType === 'overlap' ? '#f97316' : '#ef4444';
+    
+    if (match.labelA && match.labelB) {
+      html += `
+        <div class="iaa-match-item ${matchTypeClass}">
+          <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
+            <span class="iaa-match-badge" style="background: ${matchColor};">${matchTypeLabel}</span>
+            <span class="iaa-match-overlap">${(match.overlap * 100).toFixed(0)}% overlap</span>
+          </div>
+          <div class="iaa-match-details">
+            <div class="iaa-match-side">
+              <strong>Doc A:</strong> ${match.labelA.type || 'Label'} 
+              <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
+            </div>
+            <div class="iaa-match-side">
+              <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
+              <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (match.labelA) {
+      html += `
+        <div class="iaa-match-item no_match">
+          <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
+            <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc A</span>
+          </div>
+          <div class="iaa-match-details">
+            <div class="iaa-match-side">
+              <strong>Doc A:</strong> ${match.labelA.type || 'Label'}
+              <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (match.labelB) {
+      html += `
+        <div class="iaa-match-item no_match">
+          <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
+            <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc B</span>
+          </div>
+          <div class="iaa-match-details">
+            <div class="iaa-match-side">
+              <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
+              <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  });
   
-  icon.appendChild(tooltip);
-  
-  // Append directly to the label element (like delete button)
-  labelElement.appendChild(icon);
-}
-
-function displayIAAResults(results, container) {
-    // DEBUG: Log the full results object to inspect backend output
-    console.log('[IAA DEBUG] Full results object:', results);
-  // New IAA output structure: results.span_f1
-  const spanF1 = results.span_f1 || {};
-  const parentF1 = spanF1.parent_f1 || {};
-  const sublabelF1 = spanF1.sublabel_f1 || {};
-  const attributeF1 = spanF1.attribute_f1 || {};
-
-  // 1. Parent label agreement
-  let parentHtml = `<div class="iaa-section"><h3>1️⃣ Do annotators agree on where <em>parent labels</em> occur?</h3>
-    <div class="iaa-method">Method: We compute inter-annotator agreement using span-level F1 with overlap-based matching (IoU ≥ 0.5) per parent category.</div>`;
-  Object.entries(parentF1).forEach(([pair, cats]) => {
-    parentHtml += `<div class="iaa-subsection"><h4>${pair}</h4>`;
-    Object.entries(cats).forEach(([label, stats]) => {
-      parentHtml += `<div class="iaa-stat-row"><b>${label}</b>: <span class="iaa-score">F1 <b>${stats.f1}</b></span> (P ${stats.precision}, R ${stats.recall}) [TP ${stats.tp}, FP ${stats.fp}, FN ${stats.fn}]</div>`;
-    });
-    parentHtml += `</div>`;
-  });
-  parentHtml += `</div>`;
-
-  // 2. Sublabel agreement
-  let sublabelHtml = `<div class="iaa-section"><h3>2️⃣ Given that annotators agree a <em>parent label</em> exists, do they agree on its internal structure?</h3>
-    <div class="iaa-method">Method: Sublabel agreement is computed conditionally on aligned parent spans using overlap-based F1.</div>`;
-  Object.entries(sublabelF1).forEach(([pair, cats]) => {
-    sublabelHtml += `<div class="iaa-subsection"><h4>${pair}</h4>`;
-    Object.entries(cats).forEach(([parent, subcats]) => {
-      sublabelHtml += `<div class="iaa-parent-label">${parent}`;
-      Object.entries(subcats).forEach(([sublabel, stats]) => {
-        sublabelHtml += `<div class="iaa-stat-row">↳ <b>${sublabel}</b>: <span class="iaa-score">F1 <b>${stats.f1}</b></span> (P ${stats.precision}, R ${stats.recall}) [TP ${stats.tp}, FP ${stats.fp}, FN ${stats.fn}]</div>`;
-      });
-      sublabelHtml += `</div>`;
-    });
-    sublabelHtml += `</div>`;
-  });
-  sublabelHtml += `</div>`;
-
-  // 3. Attribute agreement
-  let attrHtml = `<div class="iaa-section"><h3>3️⃣ Do annotators agree on <em>attributes</em>?</h3>
-    <div class="iaa-method">Method: For each matched label, we compare all non-style, non-labelname, non-parent attributes and report micro and macro F1 scores.</div>`;
-  Object.entries(attributeF1).forEach(([pair, cats]) => {
-    attrHtml += `<div class="iaa-subsection"><h4>${pair}</h4>`;
-    Object.entries(cats).forEach(([label, stats]) => {
-      if (label.endsWith('__sublabels')) {
-        // Sublabel attribute agreement
-        attrHtml += `<div class="iaa-parent-label">${label.replace('__sublabels','')} (sublabels)`;
-        Object.entries(stats).forEach(([sublabel, substats]) => {
-          attrHtml += `<div class="iaa-stat-row">↳ <b>${sublabel}</b>: <span class="iaa-score">F1 <b>${substats.macro.f1}</b></span> (micro F1 ${substats.micro.f1})</div>`;
-        });
-        attrHtml += `</div>`;
-      } else {
-        // Parent attribute agreement
-        attrHtml += `<div class="iaa-stat-row"><b>${label}</b>: <span class="iaa-score">F1 <b>${stats.macro.f1}</b></span> (micro F1 ${stats.micro.f1})</div>`;
-      }
-    });
-    attrHtml += `</div>`;
-  });
-  attrHtml += `</div>`;
-
-  container.innerHTML = `
-    <div class="iaa-results">
-      ${parentHtml}
-      ${sublabelHtml}
-      ${attrHtml}
+  html += `
+      </div>
     </div>
     <div class="resize-handle" id="resize-handle"></div>
   `;
-  setupResizable();
+  
+  container.innerHTML = html;
 }
 
 function setupDraggable() {

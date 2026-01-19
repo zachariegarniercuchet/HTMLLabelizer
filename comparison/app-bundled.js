@@ -519,6 +519,214 @@
     setupAnalysisModalResizable();
   }
   
+  // ===== IAA ANALYSIS FUNCTIONS (Client-Side) =====
+  
+  function extractLabelsWithPositions(container, docId) {
+    const labels = [];
+    const labelElements = container.querySelectorAll('manual_label, auto_label');
+    
+    labelElements.forEach((labelElement, index) => {
+      const containerRect = container.getBoundingClientRect();
+      const labelRect = labelElement.getBoundingClientRect();
+      
+      const relativeTop = labelRect.top - containerRect.top + container.scrollTop;
+      const relativeLeft = labelRect.left - containerRect.left + container.scrollLeft;
+      
+      const labelType = labelElement.getAttribute('label') || '';
+      const text = labelElement.textContent || '';
+      
+      const params = {};
+      for (let attr of labelElement.attributes) {
+        if (attr.name !== 'label') {
+          params[attr.name] = attr.value;
+        }
+      }
+      
+      labels.push({
+        id: `${docId}_${index}`,
+        docId: docId,
+        index: index,
+        type: labelType,
+        text: text,
+        params: params,
+        element: labelElement,
+        position: {
+          top: relativeTop,
+          left: relativeLeft,
+          width: labelRect.width,
+          height: labelRect.height,
+          bottom: relativeTop + labelRect.height,
+          right: relativeLeft + labelRect.width
+        }
+      });
+    });
+    
+    return labels;
+  }
+  
+  function calculateOverlap(pos1, pos2) {
+    const xOverlap = Math.max(0, Math.min(pos1.right, pos2.right) - Math.max(pos1.left, pos2.left));
+    const yOverlap = Math.max(0, Math.min(pos1.bottom, pos2.bottom) - Math.max(pos1.top, pos2.top));
+    const intersectionArea = xOverlap * yOverlap;
+    
+    const area1 = pos1.width * pos1.height;
+    const area2 = pos2.width * pos2.height;
+    const unionArea = area1 + area2 - intersectionArea;
+    
+    return unionArea > 0 ? intersectionArea / unionArea : 0;
+  }
+  
+  function arePositionsExact(pos1, pos2, tolerance = 5) {
+    return (
+      Math.abs(pos1.top - pos2.top) <= tolerance &&
+      Math.abs(pos1.left - pos2.left) <= tolerance &&
+      Math.abs(pos1.width - pos2.width) <= tolerance &&
+      Math.abs(pos1.height - pos2.height) <= tolerance
+    );
+  }
+  
+  function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
+    const matches = [];
+    const matchedBIndices = new Set();
+    
+    labelsA.forEach(labelA => {
+      let bestMatch = null;
+      let bestOverlap = 0;
+      let bestMatchIndex = -1;
+      
+      labelsB.forEach((labelB, indexB) => {
+        if (matchedBIndices.has(indexB)) return;
+        
+        const overlap = calculateOverlap(labelA.position, labelB.position);
+        
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestMatch = labelB;
+          bestMatchIndex = indexB;
+        }
+      });
+      
+      let matchType = 'no-match';
+      if (bestMatch && bestOverlap >= minOverlap) {
+        if (arePositionsExact(labelA.position, bestMatch.position)) {
+          matchType = 'exact';
+        } else {
+          matchType = 'overlap';
+        }
+        
+        matchedBIndices.add(bestMatchIndex);
+        
+        matches.push({
+          labelA: labelA,
+          labelB: bestMatch,
+          matchType: matchType,
+          overlap: bestOverlap
+        });
+      } else {
+        matches.push({
+          labelA: labelA,
+          labelB: null,
+          matchType: 'no-match',
+          overlap: 0
+        });
+      }
+    });
+    
+    labelsB.forEach((labelB, indexB) => {
+      if (!matchedBIndices.has(indexB)) {
+        matches.push({
+          labelA: null,
+          labelB: labelB,
+          matchType: 'no-match',
+          overlap: 0
+        });
+      }
+    });
+    
+    return {
+      matches: matches,
+      summary: {
+        totalA: labelsA.length,
+        totalB: labelsB.length,
+        exactMatches: matches.filter(m => m.matchType === 'exact').length,
+        overlapMatches: matches.filter(m => m.matchType === 'overlap').length,
+        noMatches: matches.filter(m => m.matchType === 'no-match').length
+      }
+    };
+  }
+  
+  function applyMatchHighlighting(matchResults) {
+    if (!matchResults || !matchResults.matches) return;
+    
+    clearMatchHighlighting();
+    
+    matchResults.matches.forEach(match => {
+      if (match.labelA && match.labelA.element) {
+        applyHighlightToElement(match.labelA.element, match.matchType);
+      }
+      
+      if (match.labelB && match.labelB.element) {
+        applyHighlightToElement(match.labelB.element, match.matchType);
+      }
+    });
+  }
+  
+  function applyHighlightToElement(element, matchType) {
+    element.setAttribute('data-iaa-match', matchType);
+    
+    let highlightColor, textColor;
+    switch (matchType) {
+      case 'exact':
+        highlightColor = 'rgba(34, 197, 94, 0.3)';
+        textColor = '#22c55e';
+        break;
+      case 'overlap':
+        highlightColor = 'rgba(249, 115, 22, 0.3)';
+        textColor = '#f97316';
+        break;
+      case 'no-match':
+        highlightColor = 'rgba(239, 68, 68, 0.3)';
+        textColor = '#ef4444';
+        break;
+      default:
+        highlightColor = 'transparent';
+        textColor = 'inherit';
+    }
+    
+    element.style.boxShadow = `0 0 0 3px ${highlightColor}`;
+    element.style.backgroundColor = highlightColor;
+    element.style.color = textColor;
+    element.style.fontWeight = 'bold';
+    element.style.borderRadius = '3px';
+    element.style.padding = '2px 4px';
+    element.style.position = 'relative';
+    element.style.zIndex = '10';
+  }
+  
+  function clearMatchHighlighting() {
+    const allContainers = [
+      document.getElementById('html-content-a'),
+      document.getElementById('html-content-b')
+    ];
+    
+    allContainers.forEach(container => {
+      if (!container) return;
+      
+      const highlightedLabels = container.querySelectorAll('[data-iaa-match]');
+      highlightedLabels.forEach(element => {
+        element.removeAttribute('data-iaa-match');
+        element.style.boxShadow = '';
+        element.style.backgroundColor = '';
+        element.style.color = '';
+        element.style.fontWeight = '';
+        element.style.borderRadius = '';
+        element.style.padding = '';
+        element.style.position = '';
+        element.style.zIndex = '';
+      });
+    });
+  }
+  
   async function runIAAAnalysis() {
     const docA = getDocumentA();
     const docB = getDocumentB();
@@ -537,25 +745,187 @@
       return;
     }
     
+    // Show loading state
     modalBody.innerHTML = `
-      <div class="iaa-error">
-        <h3>⚠ IAA Analysis Requires Server</h3>
-        <p>The IAA (Inter-Annotator Agreement) analysis feature requires a Python backend server to calculate agreement statistics.</p>
-        <p>This version is 100% client-side and cannot perform IAA calculations.</p>
-        <details style="margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-          <summary style="cursor: pointer; color: var(--sub);">How to enable IAA analysis</summary>
-          <div style="margin-top: 8px; font-size: 12px; color: var(--text);">
-            <p>To use IAA analysis, you need to:</p>
-            <ol>
-              <li>Install Python dependencies: <code>pip install flask</code></li>
-              <li>Run the backend server (see comparison/README.md)</li>
-              <li>Access the tool via <code>http://localhost:3000/comparison/</code></li>
-            </ol>
-          </div>
-        </details>
+      <div class="iaa-loading">
+        <div class="spinner"></div>
+        <p>Analyzing inter-annotator agreement...</p>
       </div>
       <div class="resize-handle" id="resize-handle"></div>
     `;
+    
+    try {
+      // Get HTML content containers
+      const containerA = document.getElementById('html-content-a');
+      const containerB = document.getElementById('html-content-b');
+      
+      if (!containerA || !containerB) {
+        throw new Error('Document containers not found');
+      }
+      
+      // Extract labels with positions
+      const labelsA = extractLabelsWithPositions(containerA, 'a');
+      const labelsB = extractLabelsWithPositions(containerB, 'b');
+      
+      console.log(`Extracted ${labelsA.length} labels from Document A`);
+      console.log(`Extracted ${labelsB.length} labels from Document B`);
+      
+      // Match labels based on position
+      const matchResults = matchLabelsByPosition(labelsA, labelsB, 0.3);
+      
+      // Apply visual highlighting
+      applyMatchHighlighting(matchResults);
+      
+      const results = {
+        labelsA: labelsA,
+        labelsB: labelsB,
+        matchResults: matchResults,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Cache the results
+      setCachedIAAResults(results);
+      
+      // Display results in modal
+      displayIAAResults(results, modalBody);
+      
+    } catch (error) {
+      console.error('IAA Analysis Error:', error);
+      modalBody.innerHTML = `
+        <div class="iaa-error">
+          <h3>⚠ Analysis Failed</h3>
+          <p>${error.message}</p>
+          <details style="margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <summary style="cursor: pointer; color: var(--sub);">Technical Details</summary>
+            <pre style="margin-top: 8px; font-size: 11px; color: var(--text); overflow-x: auto;">${error.stack || 'No additional details'}</pre>
+          </details>
+        </div>
+        <div class="resize-handle" id="resize-handle"></div>
+      `;
+    }
+  }
+  
+  function displayIAAResults(results, container) {
+    console.log('[IAA] Displaying results:', results);
+    
+    const matchResults = results.matchResults;
+    const summary = matchResults.summary;
+    
+    let html = `
+      <div class="iaa-section">
+        <h3>📊 Match Summary</h3>
+        <div class="iaa-summary-grid">
+          <div class="iaa-summary-card exact">
+            <div class="iaa-summary-number">${summary.exactMatches}</div>
+            <div class="iaa-summary-label">Exact Matches</div>
+            <div class="iaa-summary-color" style="background: #22c55e;"></div>
+          </div>
+          <div class="iaa-summary-card overlap">
+            <div class="iaa-summary-number">${summary.overlapMatches}</div>
+            <div class="iaa-summary-label">Overlap Matches</div>
+            <div class="iaa-summary-color" style="background: #f97316;"></div>
+          </div>
+          <div class="iaa-summary-card no-match">
+            <div class="iaa-summary-number">${summary.noMatches}</div>
+            <div class="iaa-summary-label">No Matches</div>
+            <div class="iaa-summary-color" style="background: #ef4444;"></div>
+          </div>
+        </div>
+        <div class="iaa-totals">
+          <div>Document A: <strong>${summary.totalA}</strong> labels</div>
+          <div>Document B: <strong>${summary.totalB}</strong> labels</div>
+        </div>
+      </div>
+      
+      <div class="iaa-section">
+        <h3>🎯 Agreement Metrics</h3>
+        <div class="iaa-method">
+          Labels are matched based on position overlap (Intersection over Union). 
+          <strong style="color: #22c55e;">Green</strong> = exact position match, 
+          <strong style="color: #f97316;">Orange</strong> = partial overlap, 
+          <strong style="color: #ef4444;">Red</strong> = no match found.
+        </div>
+        <div class="iaa-metrics">
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Agreement Rate:</span>
+            <span class="iaa-metric-value">${((summary.exactMatches + summary.overlapMatches) / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
+          </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Exact Match Rate:</span>
+            <span class="iaa-metric-value">${(summary.exactMatches / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="iaa-section">
+        <h3>📋 Detailed Matches</h3>
+        <div class="iaa-matches-list">
+    `;
+    
+    matchResults.matches.forEach((match, index) => {
+      const matchTypeClass = match.matchType.replace('-', '_');
+      const matchTypeLabel = match.matchType === 'exact' ? 'Exact Match' : 
+                             match.matchType === 'overlap' ? 'Overlap Match' : 'No Match';
+      const matchColor = match.matchType === 'exact' ? '#22c55e' : 
+                         match.matchType === 'overlap' ? '#f97316' : '#ef4444';
+      
+      if (match.labelA && match.labelB) {
+        html += `
+          <div class="iaa-match-item ${matchTypeClass}">
+            <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
+              <span class="iaa-match-badge" style="background: ${matchColor};">${matchTypeLabel}</span>
+              <span class="iaa-match-overlap">${(match.overlap * 100).toFixed(0)}% overlap</span>
+            </div>
+            <div class="iaa-match-details">
+              <div class="iaa-match-side">
+                <strong>Doc A:</strong> ${match.labelA.type || 'Label'} 
+                <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
+              </div>
+              <div class="iaa-match-side">
+                <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
+                <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (match.labelA) {
+        html += `
+          <div class="iaa-match-item no_match">
+            <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
+              <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc A</span>
+            </div>
+            <div class="iaa-match-details">
+              <div class="iaa-match-side">
+                <strong>Doc A:</strong> ${match.labelA.type || 'Label'}
+                <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (match.labelB) {
+        html += `
+          <div class="iaa-match-item no_match">
+            <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
+              <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc B</span>
+            </div>
+            <div class="iaa-match-details">
+              <div class="iaa-match-side">
+                <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
+                <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    });
+    
+    html += `
+        </div>
+      </div>
+      <div class="resize-handle" id="resize-handle"></div>
+    `;
+    
+    container.innerHTML = html;
   }
   
   function setupAnalysisModalDraggable() {
