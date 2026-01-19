@@ -1169,7 +1169,7 @@ manual_label:hover, auto_label:hover {
   font-size: 13px;
   color: var(--text);
   font-weight: 600;
-  min-width: 100px;
+  width: 100px;
   flex: 0 0 auto;
 }
 
@@ -1177,13 +1177,14 @@ manual_label:hover, auto_label:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
 }
 
 .diagram-bar {
   display: flex;
   height: 18px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 20px;
   background: var(--border);
   border-radius: 0;
   overflow: hidden;
@@ -1204,7 +1205,7 @@ manual_label:hover, auto_label:hover {
 .diagram-percentage {
   font-size: 11px;
   color: var(--sub);
-  min-width: 45px;
+  width: 45px;
   text-align: right;
   font-weight: 600;
   flex: 0 0 auto;
