@@ -3020,8 +3020,8 @@ function refreshGroupsDisplay() {
     }
   });
   
-  // Clear any active group filter when refreshing
-  clearGroupFilter();
+  // Don't clear group filter when refreshing - let it persist
+  // Only clear it when user explicitly clicks elsewhere or on another group
   
   groupsList.innerHTML = '';
   
@@ -3045,13 +3045,25 @@ function refreshGroupsDisplay() {
     renderLabelGroupLevel(labelData, hierarchy, groupsList, 0);
   });
 
-   // After rendering, restore scroll positions
+  // After rendering, restore scroll positions and reapply active filter styling
   setTimeout(() => {
     document.querySelectorAll('.groups-container').forEach((container, index) => {
       if (scrollPositions.has(index)) {
         container.scrollTop = scrollPositions.get(index);
       }
     });
+    
+    // Reapply active group filter styling if there's an active filter
+    if (activeGroupFilter) {
+      const groupItems = document.querySelectorAll('.group-item');
+      groupItems.forEach(item => {
+        const titleSpan = item.querySelector('.tree-label');
+        const groupIdValue = titleSpan?.querySelector('.group-id-value')?.textContent;
+        if (titleSpan && activeGroupFilter.includes(groupIdValue || '')) {
+          item.classList.add('group-filtered-active');
+        }
+      });
+    }
   }, 0);
 }
 
@@ -4133,6 +4145,20 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(currentHtml, 'text/html');
 
+    // Store filter state before re-rendering
+    const filterState = new Map();
+    if (activeGroupFilter) {
+      const existingLabels = elements.htmlContent.querySelectorAll('manual_label, auto_label');
+      existingLabels.forEach((el, index) => {
+        if (el.classList.contains('group-filter-highlight') || el.classList.contains('group-filter-dimmed')) {
+          filterState.set(index, {
+            highlight: el.classList.contains('group-filter-highlight'),
+            dimmed: el.classList.contains('group-filter-dimmed')
+          });
+        }
+      });
+    }
+
     const mentions = doc.querySelectorAll('manual_label, auto_label');
 
     mentions.forEach(mention => {
@@ -4152,6 +4178,18 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     });
 
     elements.htmlContent.innerHTML = doc.body.innerHTML;
+    
+    // Reapply filter classes after rendering
+    if (activeGroupFilter && filterState.size > 0) {
+      const newLabels = elements.htmlContent.querySelectorAll('manual_label, auto_label');
+      newLabels.forEach((el, index) => {
+        const state = filterState.get(index);
+        if (state) {
+          if (state.highlight) el.classList.add('group-filter-highlight');
+          if (state.dimmed) el.classList.add('group-filter-dimmed');
+        }
+      });
+    }
     
     // Extract page savers after rendering
     extractPageSavers();

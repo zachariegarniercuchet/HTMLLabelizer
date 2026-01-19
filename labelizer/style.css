@@ -1413,9 +1413,13 @@
 }
 
 .group-filter-highlight {
-  background-color: rgba(255, 215, 0, 0.2) !important;
-  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.4) !important;
+  background-color: rgba(255, 215, 0, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.6) !important;
+  outline: 2px solid rgba(255, 215, 0, 0.8) !important;
+  outline-offset: -2px !important;
   transition: all 0.3s ease;
+  position: relative !important;
+  z-index: 10 !important;
 }
 
 .group-filtered-active {
@@ -1425,8 +1429,10 @@
 
 /* Light theme group filter highlights - more readable */
 :root[data-theme="light"] .group-filter-highlight {
-  background-color: rgba(184, 134, 11, 0.15) !important;
-  box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.3) !important;
+  background-color: rgba(255, 215, 0, 0.40) !important;
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.5) !important;
+  outline: 2px solid rgba(184, 134, 11, 0.7) !important;
+  outline-offset: -2px !important;
 }
 
 :root[data-theme="light"] .group-filtered-active {
