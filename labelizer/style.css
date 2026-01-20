@@ -85,6 +85,20 @@
       margin-right: auto;
     }
 
+    .logo-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-link:hover {
+      opacity: 0.8;
+    }
+
     .logo-img {
       width: 28px;
       height: 28px;
@@ -298,7 +312,7 @@
     }
 
     /* Maintain full opacity for interactive elements */
-    .brand h1, button, input, select, textarea, .stat-number,
+    button, input, select, textarea, .stat-number,
     .accent-text, .tree-action-btn, .settings-header h3 {
       color: var(--text) !important;
     }
