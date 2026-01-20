@@ -507,6 +507,9 @@
   
   function initializeAnalysisModal() {
     domElements.iaaAnalysisBtn?.addEventListener('click', async () => {
+      // Clear any navigation highlights before analysis
+      clearNavigationHighlights();
+      
       domElements.analysisModal?.classList.remove('hidden');
       await runIAAAnalysis();
     });
@@ -1579,13 +1582,36 @@
     setComparisonResults(null);
   }
   
+  // Navigation state for label navigation
+  let currentLabelIndexA = -1;
+  let currentLabelIndexB = -1;
+  let highlightedLabelA = null;
+  let highlightedLabelB = null;
+  
+  function clearNavigationHighlights() {
+    // Clear highlight from Document A
+    if (highlightedLabelA) {
+      highlightedLabelA.style.outline = '';
+      highlightedLabelA = null;
+    }
+    
+    // Clear highlight from Document B
+    if (highlightedLabelB) {
+      highlightedLabelB.style.outline = '';
+      highlightedLabelB = null;
+    }
+  }
+  
   function setupUploadLinks() {
     setTimeout(() => {
       const uploadLinkA = document.getElementById('upload-link-a');
       const uploadLinkB = document.getElementById('upload-link-b');
+      const uploadBtnA = document.getElementById('upload-btn-a');
+      const uploadBtnB = document.getElementById('upload-btn-b');
       
-      if (uploadLinkA) {
-        uploadLinkA.addEventListener('click', (e) => {
+      // Function to create file upload handler
+      const createUploadHandler = (loadFunction) => {
+        return (e) => {
           e.preventDefault();
           const tempInput = document.createElement('input');
           tempInput.type = 'file';
@@ -1595,31 +1621,105 @@
             if (files.length > 0) {
               const processedFiles = await processFiles(files);
               if (processedFiles.length > 0) {
-                await loadDocumentA(processedFiles[0].name, processedFiles[0].content);
+                await loadFunction(processedFiles[0].name, processedFiles[0].content);
               }
             }
           };
           tempInput.click();
-        });
+        };
+      };
+      
+      if (uploadLinkA) {
+        uploadLinkA.addEventListener('click', createUploadHandler(loadDocumentA));
+      }
+      
+      if (uploadBtnA) {
+        uploadBtnA.addEventListener('click', createUploadHandler(loadDocumentA));
       }
       
       if (uploadLinkB) {
-        uploadLinkB.addEventListener('click', (e) => {
-          e.preventDefault();
-          const tempInput = document.createElement('input');
-          tempInput.type = 'file';
-          tempInput.accept = '.html,.htm';
-          tempInput.onchange = async (event) => {
-            const files = Array.from(event.target.files);
-            if (files.length > 0) {
-              const processedFiles = await processFiles(files);
-              if (processedFiles.length > 0) {
-                await loadDocumentB(processedFiles[0].name, processedFiles[0].content);
-              }
-            }
-          };
-          tempInput.click();
+        uploadLinkB.addEventListener('click', createUploadHandler(loadDocumentB));
+      }
+      
+      if (uploadBtnB) {
+        uploadBtnB.addEventListener('click', createUploadHandler(loadDocumentB));
+      }
+    }, 100);
+  }
+  
+  function setupLabelNavigation() {
+    setTimeout(() => {
+      const navPrevA = document.getElementById('navigate-previous-a');
+      const navNextA = document.getElementById('navigate-next-a');
+      const navPrevB = document.getElementById('navigate-previous-b');
+      const navNextB = document.getElementById('navigate-next-b');
+      
+      function navigateLabels(contentId, direction) {
+        const content = document.getElementById(contentId);
+        if (!content) return;
+        
+        // Filter only parent labels (where parent="" or parent attribute is empty/not set)
+        const allLabels = Array.from(content.querySelectorAll('manual_label, auto_label'));
+        const labels = allLabels.filter(label => {
+          const parent = label.getAttribute('parent');
+          return !parent || parent === '';
         });
+        
+        if (labels.length === 0) return;
+        
+        const isA = contentId === 'html-content-a';
+        let currentIndex = isA ? currentLabelIndexA : currentLabelIndexB;
+        
+        // Remove highlight from current label
+        if (isA && highlightedLabelA) {
+          highlightedLabelA.style.outline = '';
+          highlightedLabelA = null;
+        } else if (!isA && highlightedLabelB) {
+          highlightedLabelB.style.outline = '';
+          highlightedLabelB = null;
+        }
+        
+        // Update index
+        if (direction === 'next') {
+          currentIndex = (currentIndex + 1) % labels.length;
+        } else {
+          currentIndex = currentIndex <= 0 ? labels.length - 1 : currentIndex - 1;
+        }
+        
+        // Update global index
+        if (isA) {
+          currentLabelIndexA = currentIndex;
+        } else {
+          currentLabelIndexB = currentIndex;
+        }
+        
+        // Highlight and scroll to new label
+        const targetLabel = labels[currentIndex];
+        targetLabel.style.outline = '3px solid var(--accent)';
+        targetLabel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Track the highlighted label
+        if (isA) {
+          highlightedLabelA = targetLabel;
+        } else {
+          highlightedLabelB = targetLabel;
+        }
+      }
+      
+      if (navPrevA) {
+        navPrevA.addEventListener('click', () => navigateLabels('html-content-a', 'prev'));
+      }
+      
+      if (navNextA) {
+        navNextA.addEventListener('click', () => navigateLabels('html-content-a', 'next'));
+      }
+      
+      if (navPrevB) {
+        navPrevB.addEventListener('click', () => navigateLabels('html-content-b', 'prev'));
+      }
+      
+      if (navNextB) {
+        navNextB.addEventListener('click', () => navigateLabels('html-content-b', 'next'));
       }
     }, 100);
   }
@@ -1695,6 +1795,10 @@
     
     if (domElements.viewToggleA) domElements.viewToggleA.disabled = false;
     if (domElements.statsBtnA) domElements.statsBtnA.disabled = false;
+    const navPrevA = document.getElementById('navigate-previous-a');
+    const navNextA = document.getElementById('navigate-next-a');
+    if (navPrevA) navPrevA.disabled = false;
+    if (navNextA) navNextA.disabled = false;
     if (domElements.filenameA) domElements.filenameA.textContent = filename;
     
     if (domElements.htmlContentA) {
@@ -1749,6 +1853,10 @@
     
     if (domElements.viewToggleB) domElements.viewToggleB.disabled = false;
     if (domElements.statsBtnB) domElements.statsBtnB.disabled = false;
+    const navPrevB = document.getElementById('navigate-previous-b');
+    const navNextB = document.getElementById('navigate-next-b');
+    if (navPrevB) navPrevB.disabled = false;
+    if (navNextB) navNextB.disabled = false;
     if (domElements.filenameB) domElements.filenameB.textContent = filename;
     
     if (domElements.htmlContentB) {
@@ -1821,6 +1929,7 @@
     initializeFileOperations();
     initializeViewToggle();
     initializeStatistics();
+    setupLabelNavigation();
     console.log('Comparison Tool initialized successfully');
   });
   

@@ -868,6 +868,92 @@ manual_label:hover, auto_label:hover {
 }
 
 /* ==============================================
+   UPLOAD BUTTON
+   Button to upload new file after initial load
+   ============================================== */
+
+.upload-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 36px;
+}
+
+.upload-btn .upload-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.upload-btn:hover {
+  background: #5a8fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(106, 163, 255, 0.3);
+}
+
+.upload-btn:active {
+  transform: translateY(0);
+}
+
+/* Light theme */
+:root[data-theme="light"] .upload-btn {
+  background: #e3f2fd;
+  color: var(--accent);
+}
+
+:root[data-theme="light"] .upload-btn:hover {
+  background: #bbdefb;
+}
+
+/* ==============================================
+   NAVIGATION BUTTONS
+   Navigate between labels in document
+   ============================================== */
+
+.nav-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  padding: 3px;
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(254, 255, 255, 0.5);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+:root[data-theme="light"] .nav-btn {
+  color: #8a8a8a;
+}
+
+:root[data-theme="light"] .nav-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+/* ==============================================
    STATISTICS STYLES
    Display statistics on card back
    ============================================== */
