@@ -2194,6 +2194,13 @@
   transition: all 0.4s;
 }
 
+.theme-icon {
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: middle;
+  margin-right: 0.3em;
+}
+
 .theme-label-dark {
   color: #e7ecff;
 }
