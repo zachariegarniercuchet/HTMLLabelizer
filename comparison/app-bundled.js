@@ -811,9 +811,6 @@
       // Match labels based on position
       const matchResults = matchLabelsByPosition(labelsA, labelsB, 0.3);
       
-      // Apply visual highlighting
-      applyMatchHighlighting(matchResults);
-      
       const results = {
         labelsA: labelsA,
         labelsB: labelsB,
@@ -1587,6 +1584,9 @@
   let currentLabelIndexB = -1;
   let highlightedLabelA = null;
   let highlightedLabelB = null;
+  let comparisonViewActive = false;
+  let savedHtmlStateA = null;
+  let savedHtmlStateB = null;
   
   function clearNavigationHighlights() {
     // Clear highlight from Document A
@@ -1600,6 +1600,87 @@
       highlightedLabelB.style.outline = '';
       highlightedLabelB = null;
     }
+  }
+  
+  function setupComparisonViewToggle() {
+    const toggleInput = document.getElementById('comparison-view-toggle');
+    if (!toggleInput) return;
+    
+    toggleInput.addEventListener('change', async () => {
+      comparisonViewActive = toggleInput.checked;
+      
+      if (comparisonViewActive) {
+        // Clear navigation highlights FIRST (before saving HTML)
+        clearNavigationHighlights();
+        
+        // NOW save current HTML state (without highlights)
+        const contentA = document.getElementById('html-content-a');
+        const contentB = document.getElementById('html-content-b');
+        
+        if (contentA) savedHtmlStateA = contentA.innerHTML;
+        if (contentB) savedHtmlStateB = contentB.innerHTML;
+        
+        // Run analysis if not already cached
+        let cachedResults = getCachedIAAResults();
+        if (!cachedResults) {
+          const docA = getDocumentA();
+          const docB = getDocumentB();
+          
+          if (docA && docB) {
+            const containerA = document.getElementById('html-content-a');
+            const containerB = document.getElementById('html-content-b');
+            
+            if (containerA && containerB) {
+              const labelsA = extractLabelsWithPositions(containerA, 'a');
+              const labelsB = extractLabelsWithPositions(containerB, 'b');
+              const matchResults = matchLabelsByPosition(labelsA, labelsB, 0.3);
+              
+              cachedResults = {
+                labelsA: labelsA,
+                labelsB: labelsB,
+                matchResults: matchResults,
+                timestamp: new Date().toISOString()
+              };
+              
+              setCachedIAAResults(cachedResults);
+            }
+          }
+        }
+        
+        // Apply highlighting
+        if (cachedResults && cachedResults.matchResults) {
+          applyMatchHighlighting(cachedResults.matchResults);
+        }
+      } else {
+        // Restore saved HTML state
+        const contentA = document.getElementById('html-content-a');
+        const contentB = document.getElementById('html-content-b');
+        
+        if (contentA && savedHtmlStateA) {
+          contentA.innerHTML = savedHtmlStateA;
+          // Reattach event listeners after restoring HTML
+          const docA = getDocumentA();
+          if (docA && docA.labels) {
+            attachReadOnlyLabelEventListeners(contentA, docA.labels);
+          }
+        }
+        
+        if (contentB && savedHtmlStateB) {
+          contentB.innerHTML = savedHtmlStateB;
+          // Reattach event listeners after restoring HTML
+          const docB = getDocumentB();
+          if (docB && docB.labels) {
+            attachReadOnlyLabelEventListeners(contentB, docB.labels);
+          }
+        }
+        
+        // Clear cached results since DOM elements have been replaced
+        clearCachedIAAResults();
+        
+        // Clear any remaining highlights (but keep currentLabelIndexA/B intact for next navigation)
+        clearNavigationHighlights();
+      }
+    });
   }
   
   function setupUploadLinks() {
@@ -1914,6 +1995,18 @@
         domElements.iaaAnalysisBtn.disabled = true;
       }
     }
+    
+    // Also manage comparison view toggle
+    const comparisonToggle = document.getElementById('comparison-view-toggle');
+    if (comparisonToggle) {
+      if (docA && docB) {
+        comparisonToggle.disabled = false;
+      } else {
+        comparisonToggle.disabled = true;
+        comparisonToggle.checked = false;
+        comparisonViewActive = false;
+      }
+    }
   }
   
   // ======================
@@ -1930,6 +2023,7 @@
     initializeViewToggle();
     initializeStatistics();
     setupLabelNavigation();
+    setupComparisonViewToggle();
     console.log('Comparison Tool initialized successfully');
   });
   
