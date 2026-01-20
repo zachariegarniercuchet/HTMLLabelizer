@@ -1,376 +1,1337 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Documentation - HTML Labelizer</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/header.css">
+  <link rel="stylesheet" href="../shared/buttons.css">
+  <link rel="stylesheet" href="../shared/settings-modal.css">
+  <link rel="icon" type="image/png" href="../favicon.png">
   <style>
-    :root {
-      --bg: #0d1117;
-      --card: #161b22;
-      --border: #30363d;
-      --text: #c9d1d9;
-      --text-secondary: #8b949e;
-      --accent: #58a6ff;
-      --accent-hover: #79c0ff;
-      --code-bg: #1c2128;
+    /* Documentation-specific styles */
+    .docs-layout {
+      display: flex;
+      height: calc(100vh - 58px);
+      overflow: hidden;
     }
 
-    * {
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 280px;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .sidebar-content {
+      padding: 24px 0;
+    }
+
+    .nav-section {
+      margin-bottom: 32px;
+    }
+
+    .nav-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--sub);
+      padding: 0 20px;
+      margin-bottom: 12px;
+    }
+
+    .nav-list {
+      list-style: none;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg);
+    .nav-item {
+      margin: 2px 0;
+    }
+
+    .nav-link {
+      display: block;
+      padding: 8px 20px;
       color: var(--text);
-      line-height: 1.6;
-    }
-
-    .header {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      padding: 1.5rem 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header h1 {
-      font-size: 1.5rem;
-    }
-
-    .back-link {
-      color: var(--accent);
       text-decoration: none;
-      font-size: 0.95rem;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+      opacity: 0.85;
     }
 
-    .back-link:hover {
-      color: var(--accent-hover);
-      text-decoration: underline;
+    .nav-link:hover {
+      background: var(--hover);
+      opacity: 1;
     }
 
-    .container {
+    .nav-link.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(106, 163, 255, 0.1);
+      opacity: 1;
+      font-weight: 500;
+    }
+
+    /* Main Content Area */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    .content-wrapper {
       max-width: 900px;
       margin: 0 auto;
-      padding: 3rem 2rem;
+      padding: 48px 64px 96px;
+    }
+
+    /* Typography */
+    .page-title {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .page-description {
+      font-size: 1.125rem;
+      color: var(--sub);
+      margin-bottom: 48px;
+      line-height: 1.7;
     }
 
     h2 {
-      font-size: 1.8rem;
-      margin: 2rem 0 1rem;
-      padding-bottom: 0.5rem;
+      font-size: 1.875rem;
+      margin: 48px 0 20px;
+      padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      scroll-margin-top: 20px;
+    }
+
+    h2:first-child {
+      margin-top: 0;
     }
 
     h3 {
-      font-size: 1.3rem;
-      margin: 1.5rem 0 0.75rem;
-      color: var(--accent);
+      font-size: 1.375rem;
+      margin: 32px 0 16px;
+      font-weight: 600;
+      color: var(--text);
+      scroll-margin-top: 20px;
+    }
+
+    h4 {
+      font-size: 1.125rem;
+      margin: 24px 0 12px;
+      font-weight: 600;
+      color: var(--text);
     }
 
     p {
-      margin-bottom: 1rem;
-      color: var(--text-secondary);
+      margin-bottom: 16px;
+      color: var(--sub);
+      line-height: 1.7;
     }
 
     ul, ol {
-      margin: 1rem 0 1rem 2rem;
-      color: var(--text-secondary);
+      margin: 16px 0;
+      padding-left: 24px;
+      color: var(--sub);
+      line-height: 1.7;
     }
 
     li {
-      margin: 0.5rem 0;
+      margin: 8px 0;
     }
 
+    strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Code Blocks */
     code {
-      background: var(--code-bg);
-      padding: 0.2rem 0.4rem;
-      border-radius: 3px;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 0.9em;
-      color: #ff7b72;
+      background: var(--card);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.875em;
+      color: var(--accent-2);
+      border: 1px solid var(--border);
     }
 
     pre {
-      background: var(--code-bg);
+      background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1rem;
+      border-radius: 8px;
+      padding: 16px 20px;
       overflow-x: auto;
-      margin: 1rem 0;
+      margin: 20px 0;
+      line-height: 1.5;
     }
 
     pre code {
       background: none;
       padding: 0;
       color: var(--text);
+      border: none;
+      font-size: 0.9em;
     }
 
+    /* Feature Grid */
     .feature-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
     }
 
     .feature-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1.5rem;
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 12px rgba(106, 163, 255, 0.15);
     }
 
     .feature-card h4 {
       color: var(--accent);
-      margin-bottom: 0.5rem;
+      margin: 0 0 8px 0;
+      font-size: 1rem;
     }
 
     .feature-card p {
       margin: 0;
       font-size: 0.9rem;
+      color: var(--sub);
     }
 
+    /* Alert Boxes */
     .alert {
       background: var(--card);
       border-left: 4px solid var(--accent);
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 4px;
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 6px;
     }
 
     .alert-title {
       font-weight: 600;
       color: var(--accent);
-      margin-bottom: 0.5rem;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
     }
 
+    .alert p {
+      margin: 0;
+    }
+
+    .alert.alert-warning {
+      border-left-color: var(--warning);
+    }
+
+    .alert.alert-warning .alert-title {
+      color: var(--warning);
+    }
+
+    .alert.alert-danger {
+      border-left-color: var(--danger);
+    }
+
+    .alert.alert-danger .alert-title {
+      color: var(--danger);
+    }
+
+    /* Links */
     a {
       color: var(--accent);
       text-decoration: none;
+      transition: color 0.2s ease;
     }
 
     a:hover {
-      color: var(--accent-hover);
+      color: var(--accent-2);
       text-decoration: underline;
     }
 
-    .toc {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+    /* Logo link should use opacity hover from shared header.css */
+    .logo-link:hover {
+      color: inherit !important;
+      text-decoration: none !important;
     }
 
-    .toc h3 {
-      margin-top: 0;
+    .main-content a code {
+      color: var(--accent);
     }
 
-    .toc ul {
-      margin-left: 1rem;
+    /* Theme Toggle Styles */
+    .setting-group h4 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .theme-toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .theme-toggle {
+      position: relative;
+      display: inline-block;
+      width: 280px;
+      height: 50px;
+      cursor: pointer;
+    }
+
+    .theme-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .theme-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+      border: 2px solid var(--border);
+      transition: all 0.4s;
+      border-radius: 25px;
+    }
+
+    .theme-slider:before {
+      position: absolute;
+      content: "";
+      height: 38px;
+      width: 80px;
+      left: 4px;
+      bottom: 4px;
+      background: linear-gradient(135deg, #6aa3ff, #4c7ce5);
+      transition: all 0.4s;
+      border-radius: 19px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .theme-toggle input:checked + .theme-slider {
+      background: linear-gradient(90deg, #f0f4f8 0%, #ffffff 100%);
+      border-color: #dadce0;
+    }
+
+    .theme-toggle input:checked + .theme-slider:before {
+      transform: translateX(188px);
+      background: linear-gradient(135deg, #1a73e8, #137333);
+    }
+
+    .theme-labels {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px;
+      pointer-events: none;
+    }
+
+    .theme-label-dark, .theme-label-light {
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.4s;
+    }
+
+    .theme-icon {
+      width: 0.9em;
+      height: 0.9em;
+      vertical-align: middle;
+      margin-right: 0.3em;
+    }
+
+    .theme-label-dark {
+      color: #e7ecff;
+    }
+
+    .theme-label-light {
+      color: #5f6368;
+    }
+
+    .theme-toggle input:checked ~ .theme-labels .theme-label-dark {
+      color: #9aa0a6;
+    }
+
+    .theme-toggle input:checked ~ .theme-labels .theme-label-light {
+      color: #1a1a1a;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1024px) {
+      .sidebar {
+        width: 240px;
+      }
+
+      .content-wrapper {
+        padding: 32px 40px 80px;
+      }
     }
 
     @media (max-width: 768px) {
-      .container {
-        padding: 2rem 1rem;
+      .docs-layout {
+        flex-direction: column;
+        height: auto;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 300px;
+      }
+
+      .main-content {
+        height: auto;
+      }
+
+      .content-wrapper {
+        padding: 24px 20px 60px;
+      }
+
+      .page-title {
+        font-size: 2rem;
+      }
+
+      h2 {
+        font-size: 1.5rem;
       }
 
       .feature-grid {
         grid-template-columns: 1fr;
       }
     }
+
+    /* Scrollbar Styling */
+    .sidebar::-webkit-scrollbar,
+    .main-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sidebar::-webkit-scrollbar-track,
+    .main-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb,
+    .main-content::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb:hover,
+    .main-content::-webkit-scrollbar-thumb:hover {
+      background: var(--hover);
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>📚 HTML Labelizer Documentation</h1>
-    <a href="../" class="back-link">← Back to Home</a>
+  <!-- Header -->
+  <div class="app-header">
+    <div class="brand">
+      <a href="../index.html" class="logo-link">
+        <img src="../favicon.png" alt="HTML Labelizer" class="logo-img">
+        <h1>HTML Labelizer Documentation</h1>
+      </a>
+    </div>
+    <div class="controls">
+      <button id="settings-btn" class="settings-btn" title="Settings">⚙</button>
+    </div>
   </div>
 
-  <div class="container">
-    <div class="toc">
-      <h3>Table of Contents</h3>
-      <ul>
-        <li><a href="#quick-start">Quick Start</a></li>
-        <li><a href="#features">Key Features</a></li>
-        <li><a href="#hierarchical">Hierarchical Labeling</a></li>
-        <li><a href="#pattern">Pattern-Based Labeling</a></li>
-        <li><a href="#groups">Group Management & Coreference</a></li>
-        <li><a href="#examples">Usage Examples</a></li>
-        <li><a href="#technical">Technical Details</a></li>
-      </ul>
-    </div>
+  <!-- Documentation Layout -->
+  <div class="docs-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-content">
+        <nav class="nav-section">
+          <div class="nav-section-title">Getting Started</div>
+          <ul class="nav-list">
+            <li class="nav-item"><a href="#overview" class="nav-link">Overview</a></li>
+            <li class="nav-item"><a href="#quick-start" class="nav-link">Quick Start</a></li>
+            <li class="nav-item"><a href="#key-features" class="nav-link">Key Features</a></li>
+          </ul>
+        </nav>
 
-    <section id="quick-start">
-      <h2>🚀 Quick Start</h2>
-      <ol>
-        <li><strong>Open the app:</strong> Navigate to <a href="../labelizer/">the labelizer tool</a></li>
-        <li><strong>Upload your HTML file:</strong> Drag-and-drop or click "Load HTML File"</li>
-        <li><strong>Create labels:</strong> Click "Add Label" to define your annotation schema</li>
-        <li><strong>Apply labels:</strong> Select text in the rendered view and choose a label from the context menu</li>
-        <li><strong>Download:</strong> Export your annotated HTML with embedded schema</li>
-      </ol>
-      
-      <div class="alert">
-        <div class="alert-title">🔒 Privacy First</div>
-        Everything runs locally in your browser — no data is sent to any server.
+        <nav class="nav-section">
+          <div class="nav-section-title">Core Concepts</div>
+          <ul class="nav-list">
+            <li class="nav-item"><a href="#hierarchical" class="nav-link">Hierarchical Labels</a></li>
+            <li class="nav-item"><a href="#attributes" class="nav-link">Label Attributes</a></li>
+            <li class="nav-item"><a href="#coreference" class="nav-link">Coreference & Groups</a></li>
+            <li class="nav-item"><a href="#pattern-labeling" class="nav-link">Pattern-Based Labeling</a></li>
+          </ul>
+        </nav>
+
+        <nav class="nav-section">
+          <div class="nav-section-title">User Guide</div>
+          <ul class="nav-list">
+            <li class="nav-item"><a href="#creating-labels" class="nav-link">Creating Labels</a></li>
+            <li class="nav-item"><a href="#applying-labels" class="nav-link">Applying Labels</a></li>
+            <li class="nav-item"><a href="#managing-groups" class="nav-link">Managing Groups</a></li>
+            <li class="nav-item"><a href="#import-export" class="nav-link">Import & Export</a></li>
+          </ul>
+        </nav>
+
+        <nav class="nav-section">
+          <div class="nav-section-title">Examples</div>
+          <ul class="nav-list">
+            <li class="nav-item"><a href="#example-legal" class="nav-link">Legal Citations</a></li>
+            <li class="nav-item"><a href="#example-coreference" class="nav-link">Coreference Example</a></li>
+            <li class="nav-item"><a href="#example-nested" class="nav-link">Nested Structures</a></li>
+          </ul>
+        </nav>
+
+        <nav class="nav-section">
+          <div class="nav-section-title">Technical</div>
+          <ul class="nav-list">
+            <li class="nav-item"><a href="#data-format" class="nav-link">Data Format</a></li>
+            <li class="nav-item"><a href="#html-structure" class="nav-link">HTML Structure</a></li>
+            <li class="nav-item"><a href="#browser-support" class="nav-link">Browser Support</a></li>
+          </ul>
+        </nav>
       </div>
-    </section>
+    </aside>
 
-    <section id="features">
-      <h2>✨ Key Features</h2>
-      <div class="feature-grid">
-        <div class="feature-card">
-          <h4>📋 Hierarchical Labels</h4>
-          <p>Create nested label structures up to 2 levels deep with custom attributes</p>
-        </div>
-        <div class="feature-card">
-          <h4>🎨 Color Coding</h4>
-          <p>Visual distinction with customizable colors for each label type</p>
-        </div>
-        <div class="feature-card">
-          <h4>🔍 Pattern Search</h4>
-          <p>Find and label all occurrences of text patterns automatically</p>
-        </div>
-        <div class="feature-card">
-          <h4>🔗 Coreference</h4>
-          <p>Link related annotations with synchronized attributes</p>
-        </div>
-        <div class="feature-card">
-          <h4>⚡ Real-time Stats</h4>
-          <p>Track annotation progress with live statistics</p>
-        </div>
-        <div class="feature-card">
-          <h4>💾 Export/Import</h4>
-          <p>Save and reload your work with embedded schemas</p>
-        </div>
-      </div>
-    </section>
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="content-wrapper">
+        <section id="overview">
+          <h1 class="page-title">HTML Labelizer Documentation</h1>
+          <p class="page-description">
+            A client-side web application for semantic annotation of HTML documents with hierarchical label schemas, 
+            pattern-based labeling, and coreference resolution capabilities.
+          </p>
+        </section>
 
-    <section id="hierarchical">
-      <h2>📋 Hierarchical Labeling</h2>
-      <p>Create nested label structures with custom attributes:</p>
-      
-      <h3>Attribute Types</h3>
-      <ul>
-        <li><strong>String:</strong> Free-text values for flexible annotation</li>
-        <li><strong>Dropdown:</strong> Controlled vocabularies with predefined options</li>
-        <li><strong>Checkbox:</strong> Boolean flags for binary properties</li>
-      </ul>
+        <section id="quick-start">
+          <h2>Quick Start</h2>
+          <p>Get started with HTML Labelizer in five simple steps:</p>
+          <ol>
+            <li><strong>Open the application:</strong> Navigate to <a href="../labelizer/">the labelizer tool</a></li>
+            <li><strong>Load your document:</strong> Drag and drop an HTML file or click "Load HTML File"</li>
+            <li><strong>Define your schema:</strong> Click "Add Label" to create your annotation labels</li>
+            <li><strong>Annotate content:</strong> Select text in the rendered view and apply labels from the context menu</li>
+            <li><strong>Save your work:</strong> Click "Download" or "Save as..." to export your annotated HTML with embedded schema</li>
+          </ol>
+          
+          <div class="alert">
+            <div class="alert-title">Privacy First</div>
+            <p>All processing happens locally in your browser. No data is transmitted to any server.</p>
+          </div>
+        </section>
 
-      <h3>Example Structure</h3>
-      <pre><code>mention (parent)
-├── docid (string)
-├── doctype (dropdown: legislation, decision, other)
-├── url (string)
-└── sublabels:
+        <section id="key-features">
+          <h2>Key Features</h2>
+          <p>Designed for information retrieval research, coreference resolution, entity disambiguation, and semantic annotation tasks in legal, academic, and research contexts.</p>
+          <div class="feature-grid">
+            <div class="feature-card">
+              <h4>Hierarchical Labels</h4>
+              <p>Create nested label structures up to 2 levels deep with custom attributes</p>
+            </div>
+            <div class="feature-card">
+              <h4>Pattern Search</h4>
+              <p>Find and label all occurrences of text patterns automatically with bulk apply</p>
+            </div>
+            <div class="feature-card">
+              <h4>Coreference Resolution</h4>
+              <p>Link related annotations with synchronized attributes across the document</p>
+            </div>
+            <div class="feature-card">
+              <h4>IAA Comparison Tool</h4>
+              <p>Compare two annotated documents with Inter-Annotator Agreement analysis and visual statistics</p>
+            </div>
+            <div class="feature-card">
+              <h4>No Installation Required</h4>
+              <p>Web-based tool with no downloads, setup, or configuration needed. Just open and start annotating</p>
+            </div>
+            <div class="feature-card">
+              <h4>Free, Open Source & Private</h4>
+              <p>Completely free to use with open source code on GitHub. All data stays in your browser</p>
+            </div>
+            <div class="feature-card">
+              <h4>Real-time Statistics</h4>
+              <p>Track annotation progress with live label counts and distribution</p>
+            </div>
+            <div class="feature-card">
+              <h4>Persistent Storage</h4>
+              <p>Schemas and annotations embedded directly in HTML for portability</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="hierarchical">
+          <h2>Hierarchical Labels</h2>
+          <p>
+            HTML Labelizer supports creating complex, nested label structures with up to 2 levels of hierarchy. 
+            Each label can have custom attributes and child sublabels.
+          </p>
+          
+          <h3>Label Structure</h3>
+          <p>Labels are organized in a tree structure where:</p>
+          <ul>
+            <li><strong>Parent labels</strong> represent high-level semantic categories</li>
+            <li><strong>Sublabels</strong> provide fine-grained classification within parent categories</li>
+            <li><strong>Attributes</strong> store metadata about the labeled content</li>
+          </ul>
+
+          <h3>Why Use Sublabels? A Comparison</h3>
+          <p>
+            When annotating text, you can store information either as <strong>attributes</strong> (metadata) 
+            or as <strong>sublabels</strong> (nested annotations). The key difference is that sublabels preserve 
+            the <em>location</em> of information within the text.
+          </p>
+
+          <h3>Example 1: Book Citation with Attributes Only</h3>
+          <p>This approach stores all information as metadata but loses positional information:</p>
+          <pre><code>book (parent label)
+├── Attributes:
+│   ├── book_id (string) - Unique identifier
+│   ├── title (string) - Book title
+│   ├── author (string) - Author name
+│   ├── year (string) - Publication year
+│   ├── publisher (string) - Publisher name
+│   └── isbn (string) - ISBN number
+└── No sublabels</code></pre>
+          
+          <p><strong>Text example:</strong></p>
+          <pre><code>"The Great Gatsby by F. Scott Fitzgerald (1925)"</code></pre>
+          
+          <p><strong>Annotation:</strong> The entire text is wrapped in one label with attributes, 
+          but you cannot identify where exactly "The Great Gatsby" or "F. Scott Fitzgerald" appears in the text.</p>
+
+          <h3>Example 2: Book Citation with Sublabels</h3>
+          <p>This approach preserves the exact location of each piece of information:</p>
+          <pre><code>book (parent label)
+├── Attributes:
+│   ├── book_id (string) - Unique identifier for coreference
+│   ├── genre (dropdown: fiction, non-fiction, academic, reference)
+│   └── language (dropdown: English, French, Spanish, other)
+└── Sublabels:
     ├── title
-    │   └── titletype (dropdown: long title, acronym, short title)
-    ├── reference
-    │   └── reftype (dropdown: neutral, official)
-    └── fragment
-        ├── fragmentid (string)
-        └── fragmenttype (dropdown: section, article, paragraph)</code></pre>
-    </section>
+    │   ├── title_type (dropdown: main, subtitle, series)
+    │   └── abbreviated (checkbox)
+    ├── author
+    │   ├── author_type (dropdown: primary, co-author, editor)
+    │   └── full_name (checkbox)
+    ├── publication
+    │   ├── year (string)
+    │   └── publisher (string)
+    └── identifier
+        ├── isbn (string)
+        └── doi (string)</code></pre>
 
-    <section id="pattern">
-      <h2>🔍 Pattern-Based Labeling</h2>
-      <p>The Advanced Labelization panel allows you to find and label multiple occurrences efficiently:</p>
-      
-      <ol>
-        <li>Enter a text pattern in the search field</li>
-        <li>Navigate through matches with Previous/Next buttons</li>
-        <li>Select portions of the match and apply labels</li>
-        <li>Use "Apply" for the current match or "Apply All" for all occurrences</li>
-      </ol>
+          <p><strong>Text example:</strong></p>
+          <pre><code>"The Great Gatsby by F. Scott Fitzgerald (1925)"</code></pre>
+          
+          <p><strong>Annotation with sublabels:</strong> You can mark exactly where each element appears:</p>
+          <ul>
+            <li>"The Great Gatsby" is labeled with the <code>title</code> sublabel</li>
+            <li>"F. Scott Fitzgerald" is labeled with the <code>author</code> sublabel</li>
+            <li>"1925" is labeled with the <code>publication</code> sublabel</li>
+          </ul>
 
-      <div class="alert">
-        <div class="alert-title">💡 Pro Tip</div>
-        Build complex nested labels once, then apply to all similar patterns in your document with a single click.
-      </div>
-    </section>
+          <div class="alert">
+            <div class="alert-title">When to Use Sublabels</div>
+            <p>
+              Use sublabels when you need to preserve the <strong>position</strong> of information within text. 
+              Use attributes when you only need to store <strong>metadata</strong> about the entire labeled span. 
+              Often, a combination of both is ideal: attributes for general metadata, sublabels for locating specific elements.
+            </p>
+          </div>
+        </section>
 
-    <section id="groups">
-      <h2>🔗 Group Management & Coreference Resolution</h2>
-      <p>Link related annotations together to represent the same entity mentioned multiple times:</p>
-      
-      <h3>How it Works</h3>
-      <ul>
-        <li><strong>Group ID:</strong> Use the same identifier (e.g., <code>docid</code>) for related mentions</li>
-        <li><strong>Group Attributes:</strong> Designate which attributes should sync across all group members</li>
-        <li><strong>Active Groups Panel:</strong> View all coreference groups in real-time</li>
-        <li><strong>Automatic Sync:</strong> Changes to group attributes propagate to all linked labels</li>
-      </ul>
+        <section id="attributes">
+          <h2>Label Attributes</h2>
+          <p>Attributes provide metadata and additional context for labeled content. There are three data types and three functional types of attributes:</p>
 
-      <h3>Example Use Case</h3>
-      <p>If a document references "IRPA", "the Act", and "Immigration and Refugee Protection Act", 
-      you can give all three the same <code>docid="irpa"</code> to indicate they refer to the same legislation.</p>
-    </section>
+          <h3>Attribute Data Types</h3>
+          
+          <h4>String Attributes</h4>
+          <p>Free-text fields for flexible data entry. Use for identifiers, names, or any textual metadata.</p>
+          <pre><code>book_id: "gatsby-1925"
+isbn: "978-0-7432-7356-5"
+author: "F. Scott Fitzgerald"</code></pre>
 
-    <section id="examples">
-      <h2>📖 Usage Examples</h2>
-      
-      <h3>Example 1: Basic Legal Citation</h3>
-      <p><strong>Original text:</strong></p>
-      <pre><code>See Theratechnologies inc. v. 121851 Canada inc., 2015 SCC 18</code></pre>
-      
-      <p><strong>After labeling:</strong></p>
-      <pre><code>&lt;manual_label labelname="mention" docid="scc2015-18" doctype="decision"&gt;
-  &lt;manual_label labelname="title" titletype="case name"&gt;
+          <h4>Dropdown Attributes</h4>
+          <p>Controlled vocabulary with predefined options. Ensures consistent annotation and enables filtering.</p>
+          <pre><code>genre: ["fiction", "non-fiction", "academic", "reference"]
+language: ["English", "French", "Spanish", "other"]
+title_type: ["main", "subtitle", "series"]</code></pre>
+
+          <h4>Checkbox Attributes</h4>
+          <p>Boolean flags for binary properties. Use for yes/no questions or feature toggles.</p>
+          <pre><code>abbreviated: true
+full_name: false
+in_print: true</code></pre>
+
+          <h3>Attribute Functional Types</h3>
+          <p>Attributes also have different roles in the coreference system:</p>
+
+          <h4>Regular Attributes</h4>
+          <p>Standard attributes that are set individually for each label instance. You define and edit these in the parameter menu when applying labels. Each annotation can have different values for regular attributes.</p>
+          <pre><code>Example: A "mention" label with attribute "notetype" (dropdown: "citation", "reference", "quotation")
+Each mention can have its own notetype value.</code></pre>
+
+          <h4>Group ID Attribute</h4>
+          <p>A special attribute that links multiple label instances together as a coreference group. When multiple labels with the same name share the same Group ID value, they are automatically linked together and appear as a group in the Co-reference panel.</p>
+          <pre><code>Example: A "mention" label with attribute "docid" configured as the Group ID
+All mentions with docid="irpa" form one coreference group.</code></pre>
+          
+          <div class="alert">
+            <div class="alert-title">How Group ID Works</div>
+            <p>
+              The Group ID attribute is a regular attribute that you set during the attribute creation. The special part is that 
+              when you designate it as the "Group ID Attribute" during its creation, the system uses it to 
+              link labels together. Labels with the same Group ID value become members of the same coreference group.
+            </p>
+          </div>
+
+          <h4>Group Attributes</h4>
+          <p>Attributes designated as "Group Attributes" are synchronized across all members of a coreference group. These attributes <strong>cannot be edited in the attribute menu</strong> when applying labels. Instead, they must be set in the Co-reference panel, and any changes automatically propagate to all group members.</p>
+          <pre><code>Example: A "mention" label with "uri" configured as a Group Attribute
+You cannot set "uri" when creating individual mentions.
+Instead, set it once in the Co-reference panel, and all group members receive the same value.</code></pre>
+
+          <div class="alert alert-warning">
+            <div class="alert-title">Important: Group Attributes vs Regular Attributes</div>
+            <p>
+              <strong>Regular attributes:</strong> Set individually in the attribute menu for each label instance.<br>
+              <strong>Group Attributes:</strong> Can only be set in the Co-reference panel and are shared across all group members.
+            </p>
+          </div>
+        </section>
+
+        <section id="coreference">
+          <h2>Coreference & Groups</h2>
+          <p>
+            Group management allows you to link related annotations that refer to the same entity, 
+            enabling coreference resolution across your document.
+          </p>
+
+          <h3>Configuration</h3>
+          <ul>
+            <li><strong>Group ID Attribute:</strong> The attribute used to identify group membership (e.g., <code>docid</code>)</li>
+            <li><strong>Group Attributes:</strong> Which attributes should synchronize across all group members</li>
+          </ul>
+
+          <h3>Functionality</h3>
+          <ul>
+            <li>Labels with the same Group ID value are automatically linked</li>
+            <li>Changes to Group Attributes propagate to all group members</li>
+            <li>The Co-reference panel displays all coreference groups in real-time</li>
+            <li>Click on groups to highlight all occurrences in the document</li>
+          </ul>
+
+          <h3>Use Case</h3>
+          <p>
+            When a document references the same legislation multiple times using different names 
+            ("IRPA", "the Act", "Immigration and Refugee Protection Act"), assign the same 
+            <code>docid</code> value to link them together.
+          </p>
+        </section>
+
+        <section id="pattern-labeling">
+          <h2>Pattern-Based Labeling</h2>
+          <p>
+            The Advanced Labelization panel enables efficient annotation of repeated patterns throughout your document.
+          </p>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <video autoplay loop muted playsinline style="max-width: 90%; width: 800px; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);">
+              <source src="include/advanced_tool.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          <h3>How It Works</h3>
+          <ol>
+            <li>Enter a text pattern in the search field</li>
+            <li>Navigate through matches using Previous/Next buttons</li>
+            <li>Select portions of the highlighted match</li>
+            <li>Apply labels to the selection</li>
+            <li>Use "Apply All" to replicate the annotation to all matching patterns</li>
+          </ol>
+
+          <div class="alert">
+            <div class="alert-title">Best Practice</div>
+            <p>
+              Create your complete nested label structure on the first occurrence, then use "Apply All" 
+              to annotate all similar patterns in one action.
+            </p>
+          </div>
+
+          <h3>Multi-Selection with Ctrl</h3>
+          <p>
+            For patterns that are similar but not identical, use Ctrl+click to apply the same label to multiple selections at once. 
+            This is perfect for variations like "IRPA", "the Act", "s.117 of the IRPA", "section 117"—all referring to the same thing 
+            but with different phrasings.
+          </p>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <video autoplay loop muted playsinline style="max-width: 90%; width: 800px; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);">
+              <source src="include/ctr_labelization.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          <h4>How to Use Multi-Selection</h4>
+          <ol>
+            <li>Select your first text span normally</li>
+            <li>Hold <strong>Ctrl</strong> (or <strong>Cmd</strong> on Mac) and select additional text spans</li>
+            <li>Release the selection to open the context menu</li>
+            <li>Choose a label—it will be applied to all selected spans at once</li>
+            <li>Fill in attributes that apply to all instances</li>
+          </ol>
+
+          <div class="alert">
+            <div class="alert-title">When to Use Multi-Selection vs Pattern Search</div>
+            <p>
+              <strong>Pattern Search:</strong> Best for identical text patterns scattered throughout the document.<br>
+              <strong>Multi-Selection (Ctrl+click):</strong> Best for related but differently-worded references that need the same label.
+            </p>
+          </div>
+        </section>
+
+        <section id="creating-labels">
+          <h2>Creating Labels</h2>
+          <p>Build your annotation schema using the Label Tree panel:</p>
+
+          <h3>Add a Parent Label</h3>
+          <ol>
+            <li>Click the "Add Label" button at the top of the Labels panel</li>
+            <li>Enter a name for your label</li>
+          </ol>
+
+          <h3>Add Attributes</h3>
+          <ol>
+            <li>Click the gold "⚙" icon next to the label name in the label tree</li>
+            <li>Enter the attribute name</li>
+            <li>Select the attribute type (string, dropdown, or checkbox)</li>
+            <li>For dropdowns, define the available options</li>
+          </ol>
+
+          <h3>Add Sublabels</h3>
+          <ol>
+            <li>Click the green "+" icon next to the label name in the label tree</li>
+            <li>Configure the sublabel with its own name and color</li>
+            <li>Add attributes to sublabels following the same process</li>
+          </ol>
+
+          
+
+        </section>
+
+        <section id="applying-labels">
+          <h2>Applying Labels</h2>
+          <p>Annotate your document by applying labels to text selections:</p>
+
+          <h3>Manual Application</h3>
+          <ol>
+            <li>Select text in the rendered HTML view</li>
+            <li>Release the selection to open the context menu</li>
+            <li>Choose a label from the hierarchical menu</li>
+            <li>Fill in attribute values in the attribute form</li>
+            <li>Press enter or click elsewhere to create the annotation</li>
+          </ol>
+
+          <h3>Nested Labels</h3>
+          <p>To create nested structures:</p>
+          <ol>
+            <li>Apply a parent label to a text span</li>
+            <li>Select a portion within the parent label</li>
+            <li>Apply a sublabel from the context menu</li>
+            <li>Fill in sublabel-specific attributes</li>
+          </ol>
+
+          <h3>Editing Labels</h3>
+          <ul>
+            <li>Click on label attributes in the rendered view to edit values</li>
+            <li>Click the delete button (×) on a label to remove it</li>
+            <li>Deleting a parent label removes all nested children</li>
+          </ul>
+        </section>
+
+        <section id="managing-groups">
+          <h2>Managing Groups</h2>
+          <p>
+            The coreference system allows you to link related annotations that refer to the same entity 
+            (e.g., multiple references to the same document or person throughout your text). This is accomplished 
+            through Group ID attributes and Group Attributes.
+          </p>
+
+          <h3>Understanding the System</h3>
+          <ul>
+            <li><strong>Group ID Attribute:</strong> An attribute you designate to identify which labels belong together. When multiple labels share the same Group ID value, they form a coreference group.</li>
+            <li><strong>Group Attributes:</strong> Attributes that are shared across all members of a group. These can only be edited in the Co-reference panel and changes propagate to all group members automatically.</li>
+            <li><strong>Regular Attributes:</strong> All other attributes remain individual and are set in the attribute menu when applying labels.</li>
+          </ul>
+
+          <h3>Step 1: Configure Group Settings</h3>
+          <ol>
+            <li>Create your label and add all attributes you need (including the Group ID attribute)</li>
+            <li>Expand the label in the Label Tree panel</li>
+            <li>Locate the "Group Configuration" section at the bottom</li>
+            <li><strong>Select the Group ID Attribute:</strong> Choose which attribute will serve as the group identifier (e.g., <code>docid</code>)</li>
+            <li><strong>Select Group Attributes:</strong> Check the boxes for attributes that should be synchronized across all group members (e.g., <code>uri</code>, <code>doctype</code>)</li>
+          </ol>
+
+          <div class="alert">
+            <div class="alert-title">Configuration Example</div>
+            <p>
+              For a "mention" label tracking legal documents:<br>
+              • Group ID Attribute: <code>docid</code> (to identify which document is referenced)<br>
+              • Group Attributes: <code>uri</code>, <code>jurisdiction</code> (shared information about the document)<br>
+              • Regular Attributes: <code>page_number</code>, <code>context_type</code> (specific to each mention)
+            </p>
+          </div>
+
+          <h3>Step 2: Create Label Instances</h3>
+          <ol>
+            <li>Select text in the rendered view and apply your configured label</li>
+            <li>In the parameter menu, set a value for the <strong>Group ID attribute</strong> (e.g., <code>docid="irpa"</code>)</li>
+            <li>Set values for any <strong>regular attributes</strong> (these are specific to this instance)</li>
+            <li><strong>Note:</strong> You will not see Group Attributes in this menu—they're only editable in the Co-reference panel</li>
+            <li>Press Enter or click elsewhere to create the annotation</li>
+          </ol>
+
+          <h3>Step 3: Link Additional Instances</h3>
+          <ol>
+            <li>Find another text span referring to the same entity</li>
+            <li>Apply the same label type</li>
+            <li>Use the <strong>same Group ID value</strong> (e.g., <code>docid="irpa"</code> again)</li>
+            <li>The two instances are now linked as a coreference group</li>
+          </ol>
+
+          <h3>Step 4: Manage Groups in Co-reference Panel</h3>
+          <p>Once groups are created, they appear in the Co-reference panel (right side of the interface):</p>
+          <ul>
+            <li>Groups are organized by label name</li>
+            <li>Each group shows its Group ID value and member count</li>
+            <li>Click "Edit" on a group to set Group Attribute values</li>
+            <li>Changes to Group Attributes apply to <strong>all</strong> group members instantly</li>
+            <li>Click on a group to highlight all its members in the document</li>
+          </ul>
+
+          <h3>Use Case Example</h3>
+          <p>Annotating references to the Immigration and Refugee Protection Act:</p>
+          <pre><code>First mention: "Immigration and Refugee Protection Act"
+  • Label: mention
+  • docid: "irpa" (Group ID)
+  • page_number: "5" (Regular attribute)
+
+Second mention: "IRPA"
+  • Label: mention  
+  • docid: "irpa" (Same Group ID → linked!)
+  • page_number: "12" (Different regular attribute)
+
+Third mention: "the Act"
+  • Label: mention
+  • docid: "irpa" (Same Group ID → linked!)
+  • page_number: "15" (Different regular attribute)
+
+In Co-reference panel:
+  • Group "irpa" (3 members)
+  • Set Group Attributes:
+    - uri: "https://laws.justice.gc.ca/eng/acts/I-2.5/"
+    - jurisdiction: "Federal"
+  • These values now apply to all three mentions</code></pre>
+
+          <div class="alert alert-warning">
+            <div class="alert-title">Remember</div>
+            <p>
+              <strong>Group ID attribute:</strong> Set individually when creating each label (but use the same value to link them).<br>
+              <strong>Group Attributes:</strong> Only editable in the Co-reference panel, shared across all group members.<br>
+              <strong>Regular attributes:</strong> Set individually in the parameter menu, unique to each instance.
+            </p>
+          </div>
+        </section>
+
+        <section id="import-export">
+          <h2>Import & Export</h2>
+          <p>Save and reload your annotated documents with embedded schemas:</p>
+
+          <h3>Export</h3>
+          <p>Click the "Download" button to save your work. The exported HTML includes:</p>
+          <ul>
+            <li>Original document content</li>
+            <li>Applied annotations using <code>&lt;manual_label&gt;</code> elements</li>
+            <li>Label schema stored in HTML comments</li>
+            <li>All attribute values preserved</li>
+          </ul>
+
+          <h3>Import</h3>
+          <p>Load a previously annotated document:</p>
+          <ol>
+            <li>Click "Load HTML File" or drag-drop the file</li>
+            <li>The label schema is automatically extracted from the HTML comments</li>
+            <li>Applied labels are parsed and displayed</li>
+            <li>Continue annotating or make edits</li>
+          </ol>
+
+          <h3>Portability</h3>
+          <p>
+            All data is self-contained within the HTML file. Share annotated documents 
+            with collaborators who can open them directly in HTML Labelizer.
+          </p>
+        </section>
+
+        <section id="example-legal">
+          <h2>Example: Legal Citations</h2>
+          <p>Annotating a legal citation with nested structure:</p>
+
+          <h3>Original Text</h3>
+          <pre><code>See Theratechnologies inc. v. 121851 Canada inc., 2015 SCC 18</code></pre>
+
+          <h3>Annotation Process</h3>
+          <ol>
+            <li>Select the entire citation</li>
+            <li>Apply "mention" label with attributes:
+              <ul>
+                <li><code>docid="scc2015-18"</code></li>
+                <li><code>doctype="decision"</code></li>
+              </ul>
+            </li>
+            <li>Select "Theratechnologies inc. v. 121851 Canada inc."</li>
+            <li>Apply "title" sublabel with <code>titletype="case name"</code></li>
+            <li>Select "2015 SCC 18"</li>
+            <li>Apply "reference" sublabel</li>
+          </ol>
+
+          <h3>Resulting HTML</h3>
+          <pre><code>&lt;manual_label labelname="mention" docid="scc2015-18" doctype="decision"&gt;
+  See &lt;manual_label labelname="title" titletype="case name"&gt;
     Theratechnologies inc. v. 121851 Canada inc.
   &lt;/manual_label&gt;, 
   &lt;manual_label labelname="reference"&gt;
     2015 SCC 18
   &lt;/manual_label&gt;
 &lt;/manual_label&gt;</code></pre>
+        </section>
 
-      <h3>Example 2: Coreference</h3>
-      <p>Label multiple references to the same document with a shared <code>docid</code>:</p>
-      <pre><code>&lt;manual_label labelname="mention" docid="irpa"&gt;Immigration and Refugee Protection Act&lt;/manual_label&gt;
-...
-&lt;manual_label labelname="mention" docid="irpa"&gt;IRPA&lt;/manual_label&gt;
-...
-&lt;manual_label labelname="mention" docid="irpa"&gt;the Act&lt;/manual_label&gt;</code></pre>
-    </section>
+        <section id="example-coreference">
+          <h2>Example: Coreference</h2>
+          <p>Linking multiple references to the same document:</p>
 
-    <section id="technical">
-      <h2>🔧 Technical Details</h2>
-      
-      <h3>Data Storage</h3>
-      <p>Labels are stored as HTML comments before the <code>&lt;head&gt;</code> tag:</p>
-      <pre><code>&lt;!-- HTMLLabelizer {"labels": [...], "version": "1.0"} --&gt;</code></pre>
-      
-      <h3>Applied Labels</h3>
-      <p>Annotations use custom <code>&lt;manual_label&gt;</code> elements with attributes:</p>
-      <pre><code>&lt;manual_label labelname="mention" docid="example" doctype="legislation"&gt;
-  text content
+          <h3>Scenario</h3>
+          <p>A document refers to the Immigration and Refugee Protection Act in three different ways:</p>
+          <ul>
+            <li>"Immigration and Refugee Protection Act" (full name)</li>
+            <li>"IRPA" (acronym)</li>
+            <li>"the Act" (anaphoric reference)</li>
+          </ul>
+
+          <h3>Annotation</h3>
+          <p>Apply the "mention" label to each occurrence with the same <code>docid="irpa"</code>:</p>
+          <pre><code>&lt;manual_label labelname="mention" docid="irpa" doctype="legislation"&gt;
+  Immigration and Refugee Protection Act
+&lt;/manual_label&gt;
+
+...
+
+&lt;manual_label labelname="mention" docid="irpa"&gt;
+  IRPA
+&lt;/manual_label&gt;
+
+...
+
+&lt;manual_label labelname="mention" docid="irpa"&gt;
+  the Act
 &lt;/manual_label&gt;</code></pre>
 
-      <h3>Browser Compatibility</h3>
-      <ul>
-        <li>Chrome/Edge 90+</li>
-        <li>Firefox 88+</li>
-        <li>Safari 14+</li>
-      </ul>
+          <h3>Result</h3>
+          <p>
+            All three annotations form a coreference group. If you edit the <code>doctype</code> 
+            on any member (assuming it's configured as a Group Attribute), the change propagates to all members.
+          </p>
+        </section>
 
-      <h3>No Installation Required</h3>
-      <p>The tool is a static web application that runs entirely in your browser. 
-      No server, no installation, no data transmission.</p>
-    </section>
+        <section id="example-nested">
+          <h2>Example: Nested Structures</h2>
+          <p>Complex annotation with multiple nesting levels:</p>
 
-    <div class="alert">
-      <div class="alert-title">📢 Need Help?</div>
-      Found a bug or have a feature request? Visit the 
-      <a href="https://github.com/zachariegarniercuchet/HTMLLabelizer" target="_blank">GitHub repository</a> 
-      to open an issue or contribute to the project.
+          <h3>Text</h3>
+          <pre><code>Section 12(1)(a) of the Competition Act, R.S.C. 1985, c. C-34</code></pre>
+
+          <h3>Structure</h3>
+          <ul>
+            <li><strong>mention</strong> (entire citation)
+              <ul>
+                <li><code>docid="competition-act"</code></li>
+                <li><code>doctype="legislation"</code></li>
+                <li><strong>fragment</strong> (Section 12(1)(a))
+                  <ul>
+                    <li><code>fragmentid="12(1)(a)"</code></li>
+                    <li><code>fragmenttype="section"</code></li>
+                  </ul>
+                </li>
+                <li><strong>title</strong> (Competition Act)
+                  <ul>
+                    <li><code>titletype="short title"</code></li>
+                  </ul>
+                </li>
+                <li><strong>reference</strong> (R.S.C. 1985, c. C-34)
+                  <ul>
+                    <li><code>reftype="official"</code></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+
+        <section id="data-format">
+          <h2>Data Format</h2>
+          <p>HTML Labelizer uses a custom data format embedded within HTML documents:</p>
+
+          <h3>Schema Storage</h3>
+          <p>The label schema is stored as a JSON object in an HTML comment before the <code>&lt;head&gt;</code> tag:</p>
+          <pre><code>&lt;!-- HTMLLabelizer {
+  "labels": [...],
+  "version": "1.0"
+} --&gt;</code></pre>
+
+          <h3>Label Schema Structure</h3>
+          <pre><code>{
+  "name": "mention",
+  "color": "#6aa3ff",
+  "type": "structured",
+  "params": {
+    "docid": { "type": "string", "default": "" },
+    "doctype": { 
+      "type": "dropdown", 
+      "options": ["legislation", "decision", "other"],
+      "default": "legislation"
+    }
+  },
+  "sublabels": [...],
+  "groupConfig": {
+    "groupIdAttribute": "docid",
+    "groupAttributes": ["doctype", "url"]
+  }
+}</code></pre>
+        </section>
+
+        <section id="html-structure">
+          <h2>HTML Structure</h2>
+          <p>Applied annotations use custom <code>&lt;manual_label&gt;</code> elements:</p>
+
+          <h3>Element Format</h3>
+          <pre><code>&lt;manual_label 
+  labelname="mention" 
+  docid="example-123" 
+  doctype="legislation"&gt;
+  annotated text content
+&lt;/manual_label&gt;</code></pre>
+
+          <h3>Attributes</h3>
+          <ul>
+            <li><code>labelname</code> - Required. The name of the label being applied</li>
+            <li>Additional attributes - All label parameters stored as HTML attributes</li>
+          </ul>
+
+          <h3>Nesting</h3>
+          <p>Sublabels are nested within parent <code>&lt;manual_label&gt;</code> elements:</p>
+          <pre><code>&lt;manual_label labelname="mention" docid="abc"&gt;
+  Some text
+  &lt;manual_label labelname="title"&gt;
+    nested content
+  &lt;/manual_label&gt;
+  more text
+&lt;/manual_label&gt;</code></pre>
+        </section>
+
+        <section id="browser-support">
+          <h2>Browser Support</h2>
+          <p>HTML Labelizer works in modern browsers with ES6 module support:</p>
+
+          <h3>Minimum Versions</h3>
+          <ul>
+            <li><strong>Chrome/Edge:</strong> Version 90 or later</li>
+            <li><strong>Firefox:</strong> Version 88 or later</li>
+            <li><strong>Safari:</strong> Version 14 or later</li>
+          </ul>
+
+          <h3>Required Features</h3>
+          <ul>
+            <li>ES6 Modules (<code>import</code>/<code>export</code>)</li>
+            <li>JavaScript Map and Set</li>
+            <li>CSS Grid and Flexbox</li>
+            <li>Local file system access via File API</li>
+          </ul>
+
+          <h3>No Installation Required</h3>
+          <p>
+            HTML Labelizer is a static web application that runs entirely in your browser. 
+            No server components, no installation process, and no external dependencies.
+          </p>
+
+          <div class="alert alert-warning">
+            <div class="alert-title">Note on File Access</div>
+            <p>
+              For security reasons, browsers do not allow automatic writing to the file system. 
+              Use the "Download" button to save your work, which triggers a browser download.
+            </p>
+          </div>
+        </section>
+
+        <div class="alert">
+          <div class="alert-title">Need Help?</div>
+          <p>
+            Found a bug or have a feature request? Visit the 
+            <a href="https://github.com/zachariegarniercuchet/HTMLLabelizer" target="_blank">GitHub repository</a> 
+            to open an issue or contribute to the project.
+          </p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-modal hidden" id="settings-modal">
+    <div class="settings-overlay" id="settings-overlay"></div>
+    <div class="settings-content">
+      <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="settings-close-btn" id="settings-close-btn">×</button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-group">
+          <h4>Theme</h4>
+          <div class="theme-toggle-container">
+            <label class="theme-toggle">
+              <input type="checkbox" id="theme-toggle" />
+              <span class="theme-slider"></span>
+              <span class="theme-labels">
+                <span class="theme-label-dark"><img src="../moon.png" alt="Moon" class="theme-icon"> Dark</span>
+                <span class="theme-label-light"><img src="../sun.png" alt="Sun" class="theme-icon"> Light</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+
+  <script type="module">
+    // Theme control
+    const themeToggle = document.getElementById('theme-toggle');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsCloseBtn = document.getElementById('settings-close-btn');
+
+    // Load saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      themeToggle.checked = true;
+    }
+
+    // Theme toggle
+    themeToggle.addEventListener('change', function() {
+      if (this.checked) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'dark');
+      }
+    });
+
+    // Settings modal
+    settingsBtn.addEventListener('click', () => {
+      settingsModal.classList.remove('hidden');
+    });
+
+    settingsOverlay.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+    });
+
+    settingsCloseBtn.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+    });
+
+    // Smooth scroll for navigation
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const targetId = link.getAttribute('href').substring(1);
+        const targetElement = document.getElementById(targetId);
+        
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          
+          // Update active state
+          document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+          link.classList.add('active');
+          
+          // Update URL without scrolling
+          history.pushState(null, null, `#${targetId}`);
+        }
+      });
+    });
+
+    // Intersection Observer for active nav highlighting
+    const observerOptions = {
+      rootMargin: '-20% 0px -70% 0px',
+      threshold: 0
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.getAttribute('id');
+          document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === `#${id}`) {
+              link.classList.add('active');
+            }
+          });
+        }
+      });
+    }, observerOptions);
+
+    // Observe all sections
+    document.querySelectorAll('section[id]').forEach(section => {
+      observer.observe(section);
+    });
+
+    // Set initial active state on page load
+    if (window.location.hash) {
+      const activeLink = document.querySelector(`.nav-link[href="${window.location.hash}"]`);
+      if (activeLink) {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        activeLink.classList.add('active');
+      }
+    } else {
+      document.querySelector('.nav-link')?.classList.add('active');
+    }
+  </script>
 </body>
 </html>
