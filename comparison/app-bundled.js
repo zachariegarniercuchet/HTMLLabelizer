@@ -955,6 +955,11 @@
   }
   
   function analysisModalDragStart(e) {
+    // Don't drag if clicking on a button
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+      return;
+    }
+    
     const dragState = getDragState();
     if (e.target === domElements.analysisModalHeader || e.target.tagName === 'H2') {
       updateDragState({
@@ -972,11 +977,55 @@
     const dragState = getDragState();
     const modalRect = domElements.analysisModal.getBoundingClientRect();
     const headerRect = domElements.analysisModalHeader.getBoundingClientRect();
+    const headerHeight = headerRect.height;
+    const modalWidth = modalRect.width;
+    const modalHeight = modalRect.height;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
     let currentX = e.clientX - dragState.initialX;
     let currentY = e.clientY - dragState.initialY;
+    
+    // Calculate the modal's center position
+    let centerX = viewportWidth / 2 + currentX;
+    let centerY = viewportHeight / 2 + currentY;
+    
+    // Calculate header's position after move
+    let headerTop = centerY - modalHeight / 2;
+    let headerLeft = centerX - modalWidth / 2;
+    let headerRight = headerLeft + modalWidth;
+    let modalBottom = centerY + modalHeight / 2;
+    
+    // Constrain top (header always visible)
+    if (headerTop < 0) {
+      currentY += -headerTop;
+      centerY += -headerTop;
+      headerTop = 0;
+      modalBottom = centerY + modalHeight / 2;
+    }
+    // Constrain left
+    if (headerLeft < 0) {
+      currentX += -headerLeft;
+      centerX += -headerLeft;
+      headerLeft = 0;
+      headerRight = headerLeft + modalWidth;
+    }
+    // Constrain right
+    if (headerRight > viewportWidth) {
+      let over = headerRight - viewportWidth;
+      currentX -= over;
+      centerX -= over;
+      headerLeft -= over;
+      headerRight = viewportWidth;
+    }
+    // Constrain bottom (modal bottom)
+    if (modalBottom > viewportHeight) {
+      let over = modalBottom - viewportHeight;
+      currentY -= over;
+      centerY -= over;
+      headerTop -= over;
+      modalBottom = viewportHeight;
+    }
     
     updateDragState({ currentX, currentY, xOffset: currentX, yOffset: currentY });
     domElements.analysisModal.style.transform = `translate(calc(-50% + ${currentX}px), calc(-50% + ${currentY}px))`;

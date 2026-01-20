@@ -33,9 +33,6 @@ export function initializeAnalysisModal() {
   
   // Setup draggable functionality
   setupDraggable();
-  
-  // Setup resizable functionality
-  setupResizable();
 }
 
 async function runIAAAnalysis() {
@@ -51,7 +48,6 @@ async function runIAAAnalysis() {
         <h3>⚠ Insufficient Data</h3>
         <p>Please load at least 2 annotated HTML files to perform IAA analysis.</p>
       </div>
-      <div class="resize-handle" id="resize-handle"></div>
     `;
     return;
   }
@@ -62,7 +58,6 @@ async function runIAAAnalysis() {
       <div class="spinner"></div>
       <p>Analyzing inter-annotator agreement...</p>
     </div>
-    <div class="resize-handle" id="resize-handle"></div>
   `;
   
   try {
@@ -89,7 +84,6 @@ async function runIAAAnalysis() {
         </details>
         <button onclick="location.reload()" style="margin-top: 12px;">Retry</button>
       </div>
-      <div class="resize-handle" id="resize-handle"></div>
     `;
   }
 }
@@ -213,7 +207,6 @@ function displayIAAResults(results, container) {
   html += `
       </div>
     </div>
-    <div class="resize-handle" id="resize-handle"></div>
   `;
   
   container.innerHTML = html;
@@ -230,6 +223,11 @@ function setupDraggable() {
 function dragStart(e) {
   const { analysisModalHeader } = domElements;
   const dragState = getDragState();
+  
+  // Don't drag if clicking on a button
+  if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+    return;
+  }
   
   if (e.target === analysisModalHeader || e.target.tagName === 'H2') {
     updateDragState({
@@ -343,58 +341,4 @@ function dragEnd(e) {
 
 function setTranslate(xPos, yPos, el) {
   el.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
-}
-
-// Resize functionality
-let isResizing = false;
-let resizeState = {
-  startWidth: 0,
-  startHeight: 0,
-  startX: 0,
-  startY: 0
-};
-
-function setupResizable() {
-  const resizeHandle = document.getElementById('resize-handle');
-  
-  if (!resizeHandle) return;
-  
-  resizeHandle.addEventListener('mousedown', resizeStart);
-  document.addEventListener('mousemove', resize);
-  document.addEventListener('mouseup', resizeEnd);
-}
-
-function resizeStart(e) {
-  const { analysisModal } = domElements;
-  
-  isResizing = true;
-  
-  resizeState.startWidth = analysisModal.offsetWidth;
-  resizeState.startHeight = analysisModal.offsetHeight;
-  resizeState.startX = e.clientX;
-  resizeState.startY = e.clientY;
-  
-  e.preventDefault();
-}
-
-function resize(e) {
-  if (!isResizing) return;
-  
-  const { analysisModal } = domElements;
-  
-  const width = resizeState.startWidth + (e.clientX - resizeState.startX);
-  const height = resizeState.startHeight + (e.clientY - resizeState.startY);
-  
-  // Apply size constraints
-  if (width >= 400 && width <= window.innerWidth * 0.9) {
-    analysisModal.style.width = `${width}px`;
-  }
-  
-  if (height >= 250 && height <= window.innerHeight * 0.8) {
-    analysisModal.style.height = `${height}px`;
-  }
-}
-
-function resizeEnd() {
-  isResizing = false;
 }
