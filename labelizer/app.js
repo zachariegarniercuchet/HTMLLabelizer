@@ -38,6 +38,7 @@
   // ======= Group Display State =======
   let expandedGroups = new Set(); // Track expanded groups
   let expandedLabelGroups = new Set(); // Track expanded label groups in Active Groups section
+  let selectedGroupLabel = null; // Track which label's groups are currently displayed in co-ref tab
   let groupsSectionExpanded = true; // Track if entire groups section is expanded
   let activeGroupFilter = null; // Track active group filter
 
@@ -3008,21 +3009,11 @@ function toggleLabelGroupExpansion(labelPath) {
   refreshGroupsDisplay();
 }
 
+// Toggle group container expansion (the list of groups under a label)
 function refreshGroupsDisplay() {
   const groupsList = document.getElementById('groups-list');
   if (!groupsList) return;
 
-  // Store scroll positions of all groups containers before clearing
-  const scrollPositions = new Map();
-  document.querySelectorAll('.groups-container').forEach((container, index) => {
-    if (container.scrollTop > 0) {
-      scrollPositions.set(index, container.scrollTop);
-    }
-  });
-  
-  // Don't clear group filter when refreshing - let it persist
-  // Only clear it when user explicitly clicks elsewhere or on another group
-  
   groupsList.innerHTML = '';
   
   // Collect all active groups from the HTML content
@@ -3040,147 +3031,137 @@ function refreshGroupsDisplay() {
   const organizedGroups = organizeGroupsByLabelHierarchy(activeGroups);
   const { rootLabels, hierarchy } = buildLabelGroupHierarchy(organizedGroups);
   
-  // Render hierarchical structure
-  rootLabels.forEach(labelData => {
-    renderLabelGroupLevel(labelData, hierarchy, groupsList, 0);
-  });
-
-  // After rendering, restore scroll positions and reapply active filter styling
-  setTimeout(() => {
-    document.querySelectorAll('.groups-container').forEach((container, index) => {
-      if (scrollPositions.has(index)) {
-        container.scrollTop = scrollPositions.get(index);
+  // Create label buttons section
+  const labelsSection = document.createElement('div');
+  labelsSection.className = 'group-labels-list';
+  
+  // Flatten all labels (root + nested) into a single list
+  const allLabelData = [];
+  function collectAllLabels(labelDataArray) {
+    labelDataArray.forEach(labelData => {
+      allLabelData.push(labelData);
+      const pathKey = labelData.path.join('/');
+      if (hierarchy.has(pathKey)) {
+        collectAllLabels(hierarchy.get(pathKey));
       }
     });
+  }
+  collectAllLabels(rootLabels);
+  
+  // Render label buttons
+  allLabelData.forEach(labelData => {
+    const { labelName, path, label, groups } = labelData;
+    const pathKey = path.join('/');
     
-    // Reapply active group filter styling if there's an active filter
-    if (activeGroupFilter) {
+    const labelBtn = document.createElement('button');
+    labelBtn.className = 'group-label-btn';
+    if (selectedGroupLabel === pathKey) {
+      labelBtn.classList.add('active');
+    }
+    
+    // Label color indicator
+    const labelColor = label ? label.color : '#6aa3ff';
+    const icon = document.createElement('div');
+    icon.className = 'tree-color-indicator';
+    icon.style.backgroundColor = labelColor;
+    icon.style.border = '1px solid var(--border)';
+    icon.style.width = '14px';
+    icon.style.height = '14px';
+    icon.style.borderRadius = '3px';
+    icon.style.marginRight = '8px';
+    icon.style.flexShrink = '0';
+    
+    // Label name (with full path if nested)
+    const labelText = document.createElement('span');
+    labelText.textContent = path.join(' > ');
+    labelText.style.flex = '1';
+    labelText.style.textAlign = 'left';
+    
+    // Group count badge
+    const countBadge = document.createElement('span');
+    countBadge.className = 'group-count-badge';
+    countBadge.textContent = groups.length;
+    countBadge.style.cssText = `
+      background: var(--accent);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: auto;
+    `;
+    
+    labelBtn.appendChild(icon);
+    labelBtn.appendChild(labelText);
+    labelBtn.appendChild(countBadge);
+    
+    // Click handler to select this label
+    labelBtn.onclick = () => {
+      if (selectedGroupLabel === pathKey) {
+        selectedGroupLabel = null; // Deselect if clicking the same label
+      } else {
+        selectedGroupLabel = pathKey;
+      }
+      refreshGroupsDisplay();
+    };
+    
+    labelsSection.appendChild(labelBtn);
+  });
+  
+  groupsList.appendChild(labelsSection);
+  
+  // If a label is selected, show its groups
+  if (selectedGroupLabel) {
+    // Add separator line
+    const separator = document.createElement('div');
+    separator.className = 'groups-separator';
+    groupsList.appendChild(separator);
+    
+    // Find the selected label data
+    const selectedLabelData = allLabelData.find(ld => ld.path.join('/') === selectedGroupLabel);
+    
+    if (selectedLabelData) {
+      // Create scrollable groups container
+      const groupsContainer = document.createElement('div');
+      groupsContainer.className = 'selected-label-groups';
+      
+      // Render each group
+      selectedLabelData.groups.forEach(({ groupKey, groupData }) => {
+        const groupNode = renderSingleGroupFlat(groupData, groupKey);
+        groupsContainer.appendChild(groupNode);
+      });
+      
+      groupsList.appendChild(groupsContainer);
+    }
+  }
+  
+  // Reapply active group filter styling if there's an active filter
+  if (activeGroupFilter) {
+    setTimeout(() => {
       const groupItems = document.querySelectorAll('.group-item');
       groupItems.forEach(item => {
-        const titleSpan = item.querySelector('.tree-label');
-        const groupIdValue = titleSpan?.querySelector('.group-id-value')?.textContent;
-        if (titleSpan && activeGroupFilter.includes(groupIdValue || '')) {
+        const itemGroupKey = item.dataset.groupKey;
+        if (itemGroupKey && itemGroupKey === activeGroupFilter) {
           item.classList.add('group-filtered-active');
         }
       });
-    }
-  }, 0);
+    }, 0);
+  }
 }
 
-// Render a label group and its children recursively
-function renderLabelGroupLevel(labelData, hierarchy, container, level) {
-  const { labelName, path, label, groups } = labelData;
-  const pathKey = path.join('/');
-  const hasChildren = hierarchy.has(pathKey);
-  const isExpanded = expandedLabelGroups.has(pathKey);
-  
-  // Create label group container
-  const labelGroupNode = document.createElement('div');
-  labelGroupNode.className = 'tree-node label-group-node';
-  
-  // Create label header
-  const labelHeader = document.createElement('div');
-  labelHeader.className = `tree-item level-${level} label-group-header`;
-  labelHeader.style.paddingLeft = `${level * 20}px`;
-  
-  // Expand/collapse button for label (if has sublabels with groups)
-  const labelExpandBtn = document.createElement('button');
-  if (hasChildren) {
-    labelExpandBtn.className = `tree-expand-btn ${isExpanded ? 'expanded' : 'collapsed'}`;
-    labelExpandBtn.onclick = (e) => {
-      e.stopPropagation();
-      toggleLabelGroupExpansion(path);
-    };
-  } else {
-    labelExpandBtn.className = 'tree-expand-btn no-children';
-  }
-  
-  // Label color indicator
-  const labelColor = label ? label.color : '#6aa3ff';
-  const icon = document.createElement('div');
-  icon.className = 'tree-color-indicator';
-  icon.style.backgroundColor = labelColor;
-  icon.style.border = '1px solid var(--border)';
-  icon.style.width = '14px';
-  icon.style.height = '14px';
-  icon.style.borderRadius = '3px';
-  icon.style.marginRight = '8px';
-  icon.style.flexShrink = '0';
-  
-  // Label name
-  const labelTitle = document.createElement('div');
-  labelTitle.className = 'tree-label';
-  labelTitle.style.fontWeight = '600';
-  labelTitle.textContent = labelName;
-  
-  // Group count badge
-  const countBadge = document.createElement('span');
-  countBadge.className = 'group-count-badge';
-  countBadge.textContent = groups.length;
-  countBadge.style.cssText = `
-    background: var(--accent);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    margin-left: 8px;
-  `;
-  labelTitle.appendChild(countBadge);
-  
-  // Assemble label header
-  labelHeader.appendChild(labelExpandBtn);
-  labelHeader.appendChild(icon);
-  labelHeader.appendChild(labelTitle);
-  
-  labelGroupNode.appendChild(labelHeader);
-  
-  // Create children container for groups
-  const groupsContainer = document.createElement('div');
-  groupsContainer.className = 'tree-children expanded groups-container'; // Always show groups under label
-  // Add scrolling if there are many groups
-  if (groups.length > 5) { // Or adjust threshold as needed
-    groupsContainer.style.maxHeight = '250px';
-    groupsContainer.style.overflowY = 'auto';
-    groupsContainer.style.overflowX = 'hidden';
-  }
-  
-  // Render each group under this label
-  groups.forEach(({ groupKey, groupData }) => {
-    const groupNode = renderSingleGroup(groupData, groupKey, level + 1);
-    groupsContainer.appendChild(groupNode);
-  });
-  
-  labelGroupNode.appendChild(groupsContainer);
-  
-  // Create children container for sublabels
-  if (hasChildren) {
-    const sublabelsContainer = document.createElement('div');
-    sublabelsContainer.className = `tree-children ${isExpanded ? 'expanded' : 'collapsed'}`;
-    
-    hierarchy.get(pathKey).forEach(childLabelData => {
-      renderLabelGroupLevel(childLabelData, hierarchy, sublabelsContainer, level + 1);
-    });
-    
-    labelGroupNode.appendChild(sublabelsContainer);
-  }
-  
-  container.appendChild(labelGroupNode);
-}
-
-// Render a single group (doc ID) with its attributes
-function renderSingleGroup(groupData, groupKey, level) {
+// Render a single group in flat list (no nesting)
+function renderSingleGroupFlat(groupData, groupKey) {
   const { labelName, groupId, groupIdAttr, groupAttributes, values } = groupData;
   
   // Create group node container
   const groupNode = document.createElement('div');
   groupNode.className = 'tree-node';
   
-  // Create main group item (similar to tree-item)
+  // Create main group item
   const groupItem = document.createElement('div');
-  groupItem.className = `tree-item level-${level} group-item`;
+  groupItem.className = 'tree-item group-item';
   groupItem.dataset.editing = 'false';
-  groupItem.style.paddingLeft = `${level * 20 + 10}px`;
+  groupItem.dataset.groupKey = groupKey;
   
   // Expand/collapse button - only show if group has attributes
   const expandBtn = document.createElement('button');
@@ -3220,11 +3201,10 @@ function renderSingleGroup(groupData, groupKey, level) {
   groupIdSpan.style.fontWeight = '500';
   titleSpan.appendChild(groupIdSpan);
   
-  // Actions (modify button - always show if there are attributes or group ID to modify)
+  // Actions (modify button)
   const actions = document.createElement('div');
   actions.className = 'tree-actions';
   
-  // Always show modify button (for both group ID and attributes)
   const modifyBtn = document.createElement('button');
   modifyBtn.className = 'tree-action-btn edit';
   modifyBtn.title = 'Modify group ID and attributes';
@@ -3237,7 +3217,6 @@ function renderSingleGroup(groupData, groupKey, level) {
   
   // Add click handler for group filtering
   groupItem.onclick = (e) => {
-    // Don't trigger if clicking on actions or expand button
     if (e.target.closest('.tree-actions') || e.target.closest('.tree-expand-btn')) {
       return;
     }
@@ -3250,62 +3229,51 @@ function renderSingleGroup(groupData, groupKey, level) {
   groupItem.appendChild(titleSpan);
   groupItem.appendChild(actions);
   
-  // Create children container for attributes (only if there are attributes)
-  const childrenDiv = document.createElement('div');
-  if (groupAttributes.size === 0) {
-    childrenDiv.className = 'tree-children collapsed';
-  } else {
-    childrenDiv.className = `tree-children ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
-  }
-  
-  // Add attributes as child items
-  groupAttributes.forEach((attrDef, attrName) => {
-    const attrNode = document.createElement('div');
-    attrNode.className = 'tree-node';
-    
-    const attrItem = document.createElement('div');
-    attrItem.className = `tree-item level-${level + 1} group-attribute-item`;
-    attrItem.style.paddingLeft = `${(level + 1) * 20 + 10}px`;
-    
-    // Empty expand button for alignment
-    const attrExpandBtn = document.createElement('button');
-    attrExpandBtn.className = 'tree-expand-btn no-children';
-    
-    // Attribute icon (silver)
-    const attrIcon = document.createElement('div');
-    attrIcon.className = 'tree-icon param param-silver';
-    
-    // Attribute name
-    const attrLabel = document.createElement('div');
-    attrLabel.className = 'tree-label';
-    attrLabel.textContent = attrName;
-    
-    // Attribute value
-    const attrValue = document.createElement('div');
-    attrValue.className = 'tree-param-value';
-    attrValue.dataset.attrName = attrName;
-    
-    const currentValue = values.get(attrName) || attrDef.default || '';
-    
-    if (attrDef.type === 'checkbox') {
-      attrValue.textContent = currentValue === 'true' ? '✓' : '✗';
-    } else {
-      attrValue.textContent = currentValue;
-    }
-    
-    // Assemble attribute item
-    attrItem.appendChild(attrExpandBtn);
-    attrItem.appendChild(attrIcon);
-    attrItem.appendChild(attrLabel);
-    attrItem.appendChild(attrValue);
-    
-    attrNode.appendChild(attrItem);
-    childrenDiv.appendChild(attrNode);
-  });
-  
-  // Assemble complete group
   groupNode.appendChild(groupItem);
-  groupNode.appendChild(childrenDiv);
+  
+  // Render group attributes if any
+  if (groupAttributes.size > 0) {
+    const childrenDiv = document.createElement('div');
+    childrenDiv.className = `tree-children ${expandedGroups.has(groupKey) ? 'expanded' : 'collapsed'}`;
+    
+    groupAttributes.forEach((attrDef, attrName) => {
+      const attrNode = document.createElement('div');
+      attrNode.className = 'tree-node';
+      
+      const attrItem = document.createElement('div');
+      attrItem.className = 'tree-item';
+      attrItem.style.paddingLeft = '40px';
+      
+      const noChildBtn = document.createElement('button');
+      noChildBtn.className = 'tree-expand-btn no-children';
+      
+      // Get the actual value from the values Map
+      const attrValue = values.get(attrName) || attrDef.default || '';
+      
+      const attrLabel = document.createElement('div');
+      attrLabel.className = 'tree-label group-attribute-item';
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.style.color = '#C0C0C0';
+      nameSpan.style.fontWeight = '500';
+      nameSpan.textContent = attrName + ': ';
+      
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'tree-param-value';
+      valueSpan.dataset.attrName = attrName;
+      valueSpan.textContent = attrValue;
+      
+      attrLabel.appendChild(nameSpan);
+      attrLabel.appendChild(valueSpan);
+      
+      attrItem.appendChild(noChildBtn);
+      attrItem.appendChild(attrLabel);
+      attrNode.appendChild(attrItem);
+      childrenDiv.appendChild(attrNode);
+    });
+    
+    groupNode.appendChild(childrenDiv);
+  }
   
   return groupNode;
 }
@@ -3335,9 +3303,8 @@ function toggleGroupFilter(groupKey, labelName, groupId, groupIdAttr) {
     // Update group item appearance to show it's active
     const groupItems = document.querySelectorAll('.group-item');
     groupItems.forEach(item => {
-      const titleSpan = item.querySelector('.tree-label');
-      if (titleSpan && titleSpan.textContent.includes(labelName) && 
-          titleSpan.textContent.includes(groupId === 'undefined' ? '' : groupId)) {
+      const itemGroupKey = item.dataset.groupKey;
+      if (itemGroupKey === groupKey) {
         item.classList.add('group-filtered-active');
       }
     });
@@ -3492,7 +3459,8 @@ function toggleGroupEdit(groupDiv, groupKey) {
       input.style.padding = '2px 6px';
       input.style.fontSize = '11px';
       input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
-      input.style.minWidth = '100px';
+      input.style.minWidth = '150px';
+      input.style.maxWidth = '90%';
       
       groupIdSpan.textContent = '';
       groupIdSpan.appendChild(input);
@@ -3510,7 +3478,7 @@ function toggleGroupEdit(groupDiv, groupKey) {
         
         // Get attribute definition to know the type
         const [labelName, groupId] = groupKey.split('_');
-        const label = Array.from(labels.values()).find(l => l.name === labelName);
+        const label = getLabelByPath([labelName]);
         
         if (label && label.groupConfig) {
           const attrDef = label.groupConfig.groupAttributes.get(attrName);
@@ -3527,10 +3495,12 @@ function toggleGroupEdit(groupDiv, groupKey) {
             input.style.padding = '2px 6px';
             input.style.fontSize = '11px';
             input.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace';
+            input.style.minWidth = '150px';
+            input.style.maxWidth = '90%';
           } else if (attrDef.type === 'checkbox') {
             input = document.createElement('input');
             input.type = 'checkbox';
-            input.checked = currentValue === '✓';
+            input.checked = currentValue === 'true' || currentValue === '✓';
           } else if (attrDef.type === 'dropdown') {
             input = document.createElement('select');
             input.style.background = 'var(--bg)';
