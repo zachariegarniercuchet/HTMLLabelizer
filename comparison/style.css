@@ -900,18 +900,27 @@ manual_label:hover, auto_label:hover {
 .nav-buttons {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
+  height: 36px; /* Match stats-btn height */
+  justify-content: center;
 }
 
 .nav-btn {
   background: transparent;
   border: none;
-  padding: 3px;
-  font-size: 20px;
+  padding: 0;
+  margin: 0;
+  font-size: 16px; /* Reduced from 20px */
   line-height: 1;
+  height: 18px; /* Fixed height */
+  width: 24px; /* Fixed width */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: rgba(254, 255, 255, 0.5);
   cursor: pointer;
   transition: color 0.2s;
+  flex-shrink: 0;
 }
 
 .nav-btn:hover:not(:disabled) {
@@ -919,7 +928,7 @@ manual_label:hover, auto_label:hover {
 }
 
 .nav-btn:disabled {
-  opacity: 0.3;
+  color: rgba(254, 255, 255, 0.2); /* Only color change, no opacity */
   cursor: not-allowed;
 }
 
@@ -929,6 +938,10 @@ manual_label:hover, auto_label:hover {
 
 :root[data-theme="light"] .nav-btn:hover:not(:disabled) {
   color: var(--accent);
+}
+
+:root[data-theme="light"] .nav-btn:disabled {
+  color: #d0d0d0; /* Only color change for light theme */
 }
 
 /* ==============================================
