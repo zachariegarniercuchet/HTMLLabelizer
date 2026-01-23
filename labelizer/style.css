@@ -304,6 +304,30 @@
       border-color: var(--accent-2) !important;
     }
 
+    /* Full Screen Button */
+    .fullscreen-btn {
+      background: var(--card) !important;
+      border: 1px solid var(--border) !important;
+      padding: 8px 12px !important;
+      cursor: pointer !important;
+      transition: all 0.2s ease !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fullscreen-btn:hover {
+      background: var(--hover) !important;
+      border-color: var(--accent) !important;
+    }
+
+    .fullscreen-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+      filter: brightness(0) invert(1);
+    }
+
     /* Text Contrast Control - Apply to text elements */
     .tree-label, .tree-param-value, .card-header .filename, 
     .empty-state p, .stat-label, .no-labels, .html-content,

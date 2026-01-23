@@ -58,6 +58,7 @@
     downloadBtn: document.getElementById('download-html'),
     saveAsBtn: document.getElementById('save-as'),
     clearBtn: document.getElementById('clear-all'),
+    fullscreenBtn: document.getElementById('fullscreen-btn'),
     htmlContent: document.getElementById('html-content'),
     currentFilename: document.getElementById('current-filename'),
     newLabelName: document.getElementById('new-label-name'),
@@ -6970,6 +6971,9 @@ function navigateToPreviousMatch() {
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
       // Enable page saver button when file is loaded
       if (elements.pageSaverBtn) elements.pageSaverBtn.disabled = false;
+      // Enable fullscreen button when file is loaded
+      if (elements.fullscreenBtn) elements.fullscreenBtn.disabled = false;
+
 
       
     } catch (error) {
@@ -7030,6 +7034,7 @@ function navigateToPreviousMatch() {
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
       // Enable page saver button when file is loaded
       if (elements.pageSaverBtn) elements.pageSaverBtn.disabled = false;
+
 
     } catch (error) {
       alert('Error reading HTML file');
@@ -7968,6 +7973,55 @@ window.addEventListener('click', (event) => {
       showTemporaryMessage('Page saver placement cancelled', 2000);
     }
   });
+  
+  // ======= Full Screen Mode Functionality =======
+  // Full screen button event listener
+  if (elements.fullscreenBtn) {
+    elements.fullscreenBtn.addEventListener('click', () => {
+      const elem = document.documentElement;
+      
+      // Toggle fullscreen
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        // Enter fullscreen
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) { // Safari
+          elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) { // IE11
+          elem.msRequestFullscreen();
+        }
+      } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) { // Safari
+          document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) { // IE11
+          document.msExitFullscreen();
+        }
+      }
+    });
+  }
+
+  // Update fullscreen button icon based on fullscreen state
+  function updateFullscreenIcon() {
+    if (elements.fullscreenBtn) {
+      const icon = elements.fullscreenBtn.querySelector('.fullscreen-icon');
+      if (icon) {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          icon.src = 'icons-exit-full-screen.png';
+          elements.fullscreenBtn.title = 'Exit Full Screen (Esc)';
+        } else {
+          icon.src = 'icons-full-screen.png';
+          elements.fullscreenBtn.title = 'Full Screen (F11 or Esc to exit)';
+        }
+      }
+    }
+  }
+
+  // Listen for fullscreen changes
+  document.addEventListener('fullscreenchange', updateFullscreenIcon);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenIcon); // Safari
   
   // ======= Tab Menu Functionality =======
   const tabButtons = document.querySelectorAll('.tab-btn');
