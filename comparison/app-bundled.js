@@ -1655,8 +1655,10 @@
     const toggleInput = document.getElementById('comparison-view-toggle');
     if (!toggleInput) return;
     
-    toggleInput.addEventListener('change', async () => {
-      comparisonViewActive = toggleInput.checked;
+    toggleInput.addEventListener('click', async () => {
+      // Toggle the active state
+      comparisonViewActive = !comparisonViewActive;
+      toggleInput.classList.toggle('active', comparisonViewActive);
       
       if (comparisonViewActive) {
         // Clear navigation highlights FIRST (before saving HTML)
@@ -2052,7 +2054,7 @@
         comparisonToggle.disabled = false;
       } else {
         comparisonToggle.disabled = true;
-        comparisonToggle.checked = false;
+        comparisonToggle.classList.remove('active');
         comparisonViewActive = false;
       }
     }
