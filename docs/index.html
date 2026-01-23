@@ -13,7 +13,7 @@
     /* Documentation-specific styles */
     .docs-layout {
       display: flex;
-      height: calc(100vh - 58px);
+      min-height: calc(100vh - 70px);
       overflow: hidden;
     }
 
@@ -265,12 +265,6 @@
     a:hover {
       color: var(--accent-2);
       text-decoration: underline;
-    }
-
-    /* Logo link should use opacity hover from shared header.css */
-    .logo-link:hover {
-      color: inherit !important;
-      text-decoration: none !important;
     }
 
     .main-content a code {
