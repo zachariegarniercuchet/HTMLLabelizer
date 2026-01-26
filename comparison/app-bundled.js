@@ -660,24 +660,32 @@
     if (norm1 === norm2) return 1.0;
     if (!norm1 || !norm2) return 0.0;
     
-    const longer = norm1.length > norm2.length ? norm1 : norm2;
-    const shorter = norm1.length > norm2.length ? norm2 : norm1;
+    // Token-based similarity: split on non-alphanumeric characters
+    const tokens1 = norm1.split(/[^a-z0-9]+/).filter(t => t.length > 0);
+    const tokens2 = norm2.split(/[^a-z0-9]+/).filter(t => t.length > 0);
     
-    if (longer.includes(shorter)) {
-      return shorter.length / longer.length;
-    }
+    if (tokens1.length === 0 || tokens2.length === 0) return 0.0;
     
-    let matchCount = 0;
-    const shorterLen = shorter.length;
-    const longerLen = longer.length;
+    // Count matching tokens (exact matches)
+    let exactMatches = 0;
+    const used = new Set();
     
-    for (let i = 0; i < shorterLen; i++) {
-      if (longer.includes(shorter[i])) {
-        matchCount++;
+    for (const t1 of tokens1) {
+      for (let i = 0; i < tokens2.length; i++) {
+        if (!used.has(i) && t1 === tokens2[i]) {
+          exactMatches++;
+          used.add(i);
+          break;
+        }
       }
     }
     
-    return matchCount / longerLen;
+    // Calculate Jaccard similarity on tokens
+    const allTokens = new Set([...tokens1, ...tokens2]);
+    const intersection = exactMatches;
+    const union = allTokens.size;
+    
+    return union > 0 ? intersection / union : 0.0;
   }
   
   function matchLabelsByText(labelsA, labelsB, minSimilarity = 0.9, strictParams = false) {
@@ -956,6 +964,316 @@
     });
   }
   
+  // ===== CO-REFERENCE / CLUSTER ANALYSIS =====
+  
+  function extractLabelTreeSchema(doc) {
+    const iterator = doc.createNodeIterator(doc, NodeFilter.SHOW_COMMENT);
+    let commentNode;
+    
+    while (commentNode = iterator.nextNode()) {
+      const commentText = commentNode.textContent.trim();
+      if (commentText.includes('HTMLLabelizer') || commentText.includes('labeltree')) {
+        try {
+          const jsonMatch = commentText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const schema = JSON.parse(jsonMatch[0]);
+            if (schema.labeltree) {
+              return schema.labeltree;
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing label tree schema:', e);
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  function extractGroupIdAttributesFromSchema(labelTree) {
+    const groupIdMap = new Map();
+    
+    function processLabel(labelName, labelDef) {
+      const groupIdAttrs = [];
+      
+      if (labelDef.attributes) {
+        for (const [attrName, attrDef] of Object.entries(labelDef.attributes)) {
+          if (attrDef.groupRole === 'groupID') {
+            groupIdAttrs.push(attrName);
+          }
+        }
+      }
+      
+      if (groupIdAttrs.length > 0) {
+        groupIdMap.set(labelName, groupIdAttrs);
+      }
+      
+      if (labelDef.sublabels) {
+        for (const [sublabelName, sublabelDef] of Object.entries(labelDef.sublabels)) {
+          processLabel(sublabelName, sublabelDef);
+        }
+      }
+    }
+    
+    for (const [labelName, labelDef] of Object.entries(labelTree)) {
+      processLabel(labelName, labelDef);
+    }
+    
+    return groupIdMap;
+  }
+  
+  function compareLabelTreeSchemas(schemaA, schemaB) {
+    const differences = [];
+    
+    function compareObjects(objA, objB, path = '') {
+      const keysA = Object.keys(objA || {});
+      const keysB = Object.keys(objB || {});
+      
+      for (const key of keysA) {
+        if (!(key in objB)) {
+          differences.push(`${path}.${key} exists in A but not in B`);
+        }
+      }
+      
+      for (const key of keysB) {
+        if (!(key in objA)) {
+          differences.push(`${path}.${key} exists in B but not in A`);
+        }
+      }
+      
+      const commonKeys = keysA.filter(k => keysB.includes(k));
+      for (const key of commonKeys) {
+        if (key === 'color') continue;
+        
+        const valA = objA[key];
+        const valB = objB[key];
+        
+        if (typeof valA === 'object' && typeof valB === 'object' && valA !== null && valB !== null) {
+          compareObjects(valA, valB, `${path}.${key}`);
+        }
+      }
+    }
+    
+    compareObjects(schemaA, schemaB, 'labeltree');
+    
+    return {
+      matches: differences.length === 0,
+      differences: differences
+    };
+  }
+  
+  function getGroupId(label, groupIdMap) {
+    if (!label || !label.params) return null;
+    
+    const labelName = label.params.labelname || label.params.label || '';
+    if (!labelName) return null;
+    
+    const groupIdAttrs = groupIdMap.get(labelName);
+    if (!groupIdAttrs || groupIdAttrs.length === 0) return null;
+    
+    for (const attrName of groupIdAttrs) {
+      const value = label.params[attrName];
+      if (value && value.trim() !== '') {
+        return value.trim();
+      }
+    }
+    
+    return null;
+  }
+  
+  function extractClusters(labels, docId, groupIdMap) {
+    const clusters = new Map();
+    const labelToCluster = new Map();
+    
+    labels.forEach((label, index) => {
+      const groupId = getGroupId(label, groupIdMap);
+      
+      if (groupId) {
+        if (!clusters.has(groupId)) {
+          clusters.set(groupId, []);
+        }
+        clusters.get(groupId).push(index);
+        labelToCluster.set(index, groupId);
+      }
+    });
+    
+    return {
+      clusters: clusters,
+      labelToCluster: labelToCluster,
+      clusterCount: clusters.size,
+      clusteredLabelCount: labelToCluster.size,
+      totalLabelCount: labels.length
+    };
+  }
+  
+  function analyzeCoReferenceClusters(matches, labelsA, labelsB, groupIdMap) {
+    if (!groupIdMap || groupIdMap.size === 0) {
+      return {
+        hasGrouping: false,
+        message: 'No groupID attributes defined in label tree schema'
+      };
+    }
+    
+    const clustersA = extractClusters(labelsA, 'A', groupIdMap);
+    const clustersB = extractClusters(labelsB, 'B', groupIdMap);
+    
+    console.log(`Document A: ${clustersA.clusterCount} clusters, ${clustersA.clusteredLabelCount}/${clustersA.totalLabelCount} labels in clusters`);
+    console.log(`Document B: ${clustersB.clusterCount} clusters, ${clustersB.clusteredLabelCount}/${clustersB.totalLabelCount} labels in clusters`);
+    
+    const clusterNamesA = Array.from(clustersA.clusters.keys());
+    const clusterNamesB = Array.from(clustersB.clusters.keys());
+    
+    const clusterCorrespondences = [];
+    const matchedBClusters = new Set();
+    
+    clusterNamesA.forEach(groupIdA => {
+      const labelsInClusterA = clustersA.clusters.get(groupIdA);
+      
+      let bestMatches = [];
+      let bestSimilarity = 0;
+      
+      clusterNamesB.forEach(groupIdB => {
+        if (matchedBClusters.has(groupIdB)) return;
+        
+        const similarity = calculateTextSimilarity(groupIdA, groupIdB);
+        
+        if (similarity > bestSimilarity) {
+          bestSimilarity = similarity;
+          bestMatches = [{ groupIdB, similarity }];
+        } else if (similarity === bestSimilarity && similarity > 0) {
+          bestMatches.push({ groupIdB, similarity });
+        }
+      });
+      
+      if (bestMatches.length > 1) {
+        bestMatches.forEach(match => {
+          const labelsInClusterB = clustersB.clusters.get(match.groupIdB);
+          
+          let sharedMatchedLabels = 0;
+          labelsInClusterA.forEach(indexA => {
+            const labelA = labelsA[indexA];
+            labelsInClusterB.forEach(indexB => {
+              const labelB = labelsB[indexB];
+              const isMatched = matches.some(m => 
+                m.labelA === labelA && 
+                m.labelB === labelB && 
+                m.matchType !== 'no-match'
+              );
+              if (isMatched) sharedMatchedLabels++;
+            });
+          });
+          
+          match.labelOverlap = sharedMatchedLabels;
+        });
+        
+        bestMatches.sort((a, b) => b.labelOverlap - a.labelOverlap);
+      } else if (bestMatches.length === 1) {
+        const labelsInClusterB = clustersB.clusters.get(bestMatches[0].groupIdB);
+        let sharedMatchedLabels = 0;
+        labelsInClusterA.forEach(indexA => {
+          const labelA = labelsA[indexA];
+          labelsInClusterB.forEach(indexB => {
+            const labelB = labelsB[indexB];
+            const isMatched = matches.some(m => 
+              m.labelA === labelA && 
+              m.labelB === labelB && 
+              m.matchType !== 'no-match'
+            );
+            if (isMatched) sharedMatchedLabels++;
+          });
+        });
+        bestMatches[0].labelOverlap = sharedMatchedLabels;
+      }
+      
+      if (bestMatches.length > 0) {
+        const bestMatch = bestMatches[0];
+        const groupIdB = bestMatch.groupIdB;
+        const labelsInClusterB = clustersB.clusters.get(groupIdB);
+        
+        const crossMatches = bestMatch.labelOverlap || 0;
+        const sizeA = labelsInClusterA.length;
+        const sizeB = labelsInClusterB.length;
+        
+        const matchedInA = labelsInClusterA.filter(indexA => {
+          const labelA = labelsA[indexA];
+          return matches.some(m => m.labelA === labelA && m.matchType !== 'no-match');
+        }).length;
+        
+        const matchedInB = labelsInClusterB.filter(indexB => {
+          const labelB = labelsB[indexB];
+          return matches.some(m => m.labelB === labelB && m.matchType !== 'no-match');
+        }).length;
+        
+        const precision = matchedInA > 0 ? crossMatches / matchedInA : 0;
+        const recall = matchedInB > 0 ? crossMatches / matchedInB : 0;
+        const f1Score = (precision + recall) > 0 ? 
+          (2 * precision * recall) / (precision + recall) : 0;
+        
+        clusterCorrespondences.push({
+          groupIdA: groupIdA,
+          groupIdB: groupIdB,
+          sizeA: sizeA,
+          sizeB: sizeB,
+          matchedInA: matchedInA,
+          matchedInB: matchedInB,
+          crossMatches: crossMatches,
+          nameSimilarity: bestSimilarity,
+          precision: precision,
+          recall: recall,
+          f1Score: f1Score,
+          matchMethod: bestMatches.length > 1 ? 'name+overlap' : 'name'
+        });
+        
+        matchedBClusters.add(groupIdB);
+      }
+    });
+    
+    clusterCorrespondences.sort((a, b) => b.f1Score - a.f1Score);
+    
+    const avgF1 = clusterCorrespondences.length > 0 ?
+      clusterCorrespondences.reduce((sum, c) => sum + c.f1Score, 0) / clusterCorrespondences.length : 0;
+    const avgNameSimilarity = clusterCorrespondences.length > 0 ?
+      clusterCorrespondences.reduce((sum, c) => sum + c.nameSimilarity, 0) / clusterCorrespondences.length : 0;
+    
+    const unmatchedClustersA = clusterNamesA
+      .filter(name => !clusterCorrespondences.some(c => c.groupIdA === name))
+      .map(name => ({
+        groupId: name,
+        size: clustersA.clusters.get(name).length,
+        doc: 'A'
+      }));
+    
+    const unmatchedClustersB = clusterNamesB
+      .filter(name => !matchedBClusters.has(name))
+      .map(name => ({
+        groupId: name,
+        size: clustersB.clusters.get(name).length,
+        doc: 'B'
+      }));
+    
+    return {
+      hasGrouping: true,
+      clustersA: clustersA,
+      clustersB: clustersB,
+      correspondences: clusterCorrespondences,
+      unmatchedClustersA: unmatchedClustersA,
+      unmatchedClustersB: unmatchedClustersB,
+      summary: {
+        totalClustersA: clustersA.clusterCount,
+        totalClustersB: clustersB.clusterCount,
+        mappedClustersA: clusterCorrespondences.length,
+        mappedClustersB: matchedBClusters.size,
+        totalCorrespondences: clusterCorrespondences.length,
+        avgF1Score: avgF1,
+        avgNameSimilarity: avgNameSimilarity,
+        clusterCoverageA: clustersA.clusterCount > 0 ? 
+          (clusterCorrespondences.length / clustersA.clusterCount) : 0,
+        clusterCoverageB: clustersB.clusterCount > 0 ? 
+          (matchedBClusters.size / clustersB.clusterCount) : 0
+      }
+    };
+  }
+  
   function applyHighlightToElement(element, matchType) {
     element.setAttribute('data-iaa-match', matchType);
     
@@ -1040,6 +1358,35 @@
     `;
     
     try {
+      // Parse HTML to extract label tree schemas
+      const parserA = new DOMParser();
+      const parserB = new DOMParser();
+      const parsedDocA = parserA.parseFromString(docA.htmlContent, 'text/html');
+      const parsedDocB = parserB.parseFromString(docB.htmlContent, 'text/html');
+      
+      const schemaA = extractLabelTreeSchema(parsedDocA);
+      const schemaB = extractLabelTreeSchema(parsedDocB);
+      
+      // Validate that both documents have label tree schemas
+      if (!schemaA || !schemaB) {
+        throw new Error('Both documents must have HTMLLabelizer label tree schema. Cannot compare documents without schemas.');
+      }
+      
+      // Compare schemas - they must match
+      const schemaComparison = compareLabelTreeSchemas(schemaA, schemaB);
+      if (!schemaComparison.matches) {
+        const diffMessage = schemaComparison.differences.slice(0, 5).join('\n  • ');
+        const moreCount = schemaComparison.differences.length > 5 ? `\n  ... and ${schemaComparison.differences.length - 5} more differences` : '';
+        throw new Error(`Cannot compare documents with different label tree schemas.\n\nDifferences found:\n  • ${diffMessage}${moreCount}`);
+      }
+      
+      console.log('✓ Label tree schemas match');
+      
+      // Extract groupID attributes from schema
+      const groupIdMap = extractGroupIdAttributesFromSchema(schemaA);
+      console.log(`Found ${groupIdMap.size} label types with groupID attributes:`, 
+        Array.from(groupIdMap.entries()).map(([label, attrs]) => `${label}: [${attrs.join(', ')}]`).join(', '));
+      
       // Get HTML content containers
       const containerA = document.getElementById('html-content-a');
       const containerB = document.getElementById('html-content-b');
@@ -1067,10 +1414,20 @@
       
       console.log('Match Results Summary:', matchResults.summary);
       
+      // Perform co-reference cluster analysis (using schema-based groupID attributes)
+      const coRefAnalysis = analyzeCoReferenceClusters(matchResults.matches, labelsA, labelsB, groupIdMap);
+      
+      if (coRefAnalysis.hasGrouping === false) {
+        console.log('⚠ No co-reference analysis: ' + coRefAnalysis.message);
+      } else {
+        console.log('Co-Reference Analysis Summary:', coRefAnalysis.summary);
+      }
+      
       const results = {
         labelsA: labelsA,
         labelsB: labelsB,
         matchResults: matchResults,
+        coRefAnalysis: coRefAnalysis,
         timestamp: new Date().toISOString()
       };
       
@@ -1198,6 +1555,147 @@
         </div>
       </div>
     `;
+    
+    // Add co-reference analysis section if available
+    if (results.coRefAnalysis) {
+      const coRef = results.coRefAnalysis;
+      
+      // Check if grouping is available
+      if (coRef.hasGrouping === false) {
+        html += `
+      <div class="iaa-section" style="opacity: 0.6;">
+        <h3>Co-Reference / Cluster Agreement</h3>
+        <div class="iaa-method" style="color: var(--sub);">
+          ⚠️ ${coRef.message}
+        </div>
+        <p style="margin-top: 12px; font-size: 13px; color: var(--sub);">
+          To enable co-reference analysis, add attributes with <code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">groupRole: "groupID"</code> to your label tree schema.
+        </p>
+      </div>
+      `;
+      } else {
+        const summary = coRef.summary;
+      
+      html += `
+      <div class="iaa-section">
+        <h3>Co-Reference / Cluster Agreement</h3>
+        <div class="iaa-method">
+          Analyzes if labels with the same groupID (cluster) in one document correspond to labels in the same cluster in the other document.
+        </div>
+        <div class="iaa-summary-grid">
+          <div class="iaa-summary-card">
+            <div class="iaa-summary-number">${summary.totalClustersA}</div>
+            <div class="iaa-summary-label">Clusters in Doc A</div>
+          </div>
+          <div class="iaa-summary-card">
+            <div class="iaa-summary-number">${summary.totalClustersB}</div>
+            <div class="iaa-summary-label">Clusters in Doc B</div>
+          </div>
+          <div class="iaa-summary-card">
+            <div class="iaa-summary-number">${summary.oneToOneMappings}</div>
+            <div class="iaa-summary-label">1:1 Cluster Mappings</div>
+          </div>
+        </div>
+        <div class="iaa-metrics">
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Avg Cluster F1:</span>
+            <span class="iaa-metric-value">${summary.avgF1Score.toFixed(3)}</span>
+          </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Mapped Clusters (A → B):</span>
+            <span class="iaa-metric-value">${summary.mappedClustersA} / ${summary.totalClustersA} (${(summary.clusterCoverageA * 100).toFixed(1)}%)</span>
+          </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Mapped Clusters (B → A):</span>
+            <span class="iaa-metric-value">${summary.mappedClustersB} / ${summary.totalClustersB} (${(summary.clusterCoverageB * 100).toFixed(1)}%)</span>
+          </div>
+          <div class="iaa-metric-row">
+            <span class="iaa-metric-label">Matched Labels with Clusters:</span>
+            <span class="iaa-metric-value">${summary.matchesWithClustersBoth}</span>
+          </div>
+        </div>
+        ${coRef.correspondences.length > 0 ? `
+        <details style="margin-top: 16px;">
+          <summary style="cursor: pointer; font-weight: 600; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+            View Cluster Correspondences (${coRef.correspondences.length})
+          </summary>
+          <div style="margin-top: 12px; max-height: 300px; overflow-y: auto;">
+            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+              <thead style="background: rgba(255,255,255,0.1); position: sticky; top: 0;">
+                <tr>
+                  <th style="padding: 8px; text-align: left;">Group A → Group B</th>
+                  <th style="padding: 8px; text-align: center;">Name Sim</th>
+                  <th style="padding: 8px; text-align: center;">Size A/B</th>
+                  <th style="padding: 8px; text-align: center;">Matched</th>
+                  <th style="padding: 8px; text-align: center;">F1</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${coRef.correspondences.map(c => `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <td style="padding: 8px;">
+                      <div style="font-family: monospace; font-size: 11px;">
+                        <div style="color: #76CEDE;">${c.groupIdA}</div>
+                        <div style="color: #999; margin: 2px 0;">→</div>
+                        <div style="color: #6aa3ff;">${c.groupIdB}</div>
+                      </div>
+                    </td>
+                    <td style="padding: 8px; text-align: center; font-weight: 600; color: ${c.nameSimilarity > 0.7 ? '#22c55e' : c.nameSimilarity > 0.3 ? '#f97316' : '#ef4444'};">
+                      ${c.nameSimilarity.toFixed(3)}
+                    </td>
+                    <td style="padding: 8px; text-align: center;">
+                      ${c.sizeA} / ${c.sizeB}
+                    </td>
+                    <td style="padding: 8px; text-align: center;">
+                      ${c.crossMatches}
+                    </td>
+                    <td style="padding: 8px; text-align: center; font-weight: 600; color: ${c.f1Score > 0.8 ? '#22c55e' : c.f1Score > 0.5 ? '#f97316' : '#ef4444'};">
+                      ${c.f1Score.toFixed(3)}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </details>
+        ` : ''}
+        ${(coRef.unmatchedClustersA.length > 0 || coRef.unmatchedClustersB.length > 0) ? `
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; font-weight: 600; padding: 8px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; color: #ef4444;">
+            Unmatched Clusters (${coRef.unmatchedClustersA.length + coRef.unmatchedClustersB.length})
+          </summary>
+          <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            ${coRef.unmatchedClustersA.length > 0 ? `
+            <div>
+              <h4 style="font-size: 13px; color: #76CEDE; margin-bottom: 8px;">Document A (${coRef.unmatchedClustersA.length})</h4>
+              <ul style="list-style: none; padding: 0; font-size: 12px; font-family: monospace;">
+                ${coRef.unmatchedClustersA.map(c => `
+                  <li style="padding: 4px 8px; background: rgba(239, 68, 68, 0.1); margin-bottom: 4px; border-radius: 4px;">
+                    ${c.groupId} <span style="color: #999;">(${c.size} labels)</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            ` : ''}
+            ${coRef.unmatchedClustersB.length > 0 ? `
+            <div>
+              <h4 style="font-size: 13px; color: #6aa3ff; margin-bottom: 8px;">Document B (${coRef.unmatchedClustersB.length})</h4>
+              <ul style="list-style: none; padding: 0; font-size: 12px; font-family: monospace;">
+                ${coRef.unmatchedClustersB.map(c => `
+                  <li style="padding: 4px 8px; background: rgba(239, 68, 68, 0.1); margin-bottom: 4px; border-radius: 4px;">
+                    ${c.groupId} <span style="color: #999;">(${c.size} labels)</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            ` : ''}
+          </div>
+        </details>
+        ` : ''}
+      </div>
+      `;
+      }
+    }
     
     html += `<div class="resize-handle" id="resize-handle"></div>`;
     
@@ -1938,6 +2436,15 @@
             const containerB = document.getElementById('html-content-b');
             
             if (containerA && containerB) {
+              // Parse HTML to extract schemas for cached results
+              const parserA = new DOMParser();
+              const parserB = new DOMParser();
+              const parsedDocA = parserA.parseFromString(docA.htmlContent, 'text/html');
+              const parsedDocB = parserB.parseFromString(docB.htmlContent, 'text/html');
+              
+              const schemaA = extractLabelTreeSchema(parsedDocA);
+              const groupIdMap = schemaA ? extractGroupIdAttributesFromSchema(schemaA) : new Map();
+              
               const labelsA = extractLabelsWithPositions(containerA, 'a');
               const labelsB = extractLabelsWithPositions(containerB, 'b');
               
@@ -1950,10 +2457,14 @@
               };
               const matchResults = matchLabelsHybrid(labelsA, labelsB, matchingOptions);
               
+              // Perform co-reference cluster analysis
+              const coRefAnalysis = analyzeCoReferenceClusters(matchResults.matches, labelsA, labelsB, groupIdMap);
+              
               cachedResults = {
                 labelsA: labelsA,
                 labelsB: labelsB,
                 matchResults: matchResults,
+                coRefAnalysis: coRefAnalysis,
                 timestamp: new Date().toISOString()
               };
               
