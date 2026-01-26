@@ -22,16 +22,15 @@ export function extractLabelsWithPositions(container, docId) {
     const relativeTop = labelRect.top - containerRect.top + container.scrollTop;
     const relativeLeft = labelRect.left - containerRect.left + container.scrollLeft;
     
-    // Extract label attributes
-    const labelType = labelElement.getAttribute('label') || '';
+    // Extract label type - prefer labelname over label attribute
+    const labelType = labelElement.getAttribute('labelname') || 
+                      labelElement.getAttribute('label') || '';
     const text = labelElement.textContent || '';
     
     // Get all attributes as parameters
     const params = {};
     for (let attr of labelElement.attributes) {
-      if (attr.name !== 'label') {
-        params[attr.name] = attr.value;
-      }
+      params[attr.name] = attr.value;
     }
     
     labels.push({
@@ -94,106 +93,209 @@ function arePositionsExact(pos1, pos2, tolerance = 5) {
 }
 
 /**
- * Compare attributes between two labels
- * @param {Object} labelA - First label
- * @param {Object} labelB - Second label
- * @returns {boolean} True if all attributes match
+ * Normalize text for comparison (remove extra whitespace, standardize formatting)
+ * @param {string} text - Text to normalize
+ * @returns {string} Normalized text
  */
-function compareAttributes(labelA, labelB) {
-  // Compare label type/name
-  if (labelA.type !== labelB.type) {
-    return false;
-  }
+function normalizeText(text) {
+  if (!text) return '';
   
-  // Get all parameter keys from both labels
-  const keysA = Object.keys(labelA.params);
-  const keysB = Object.keys(labelB.params);
-  
-  // Check if they have the same number of parameters
-  if (keysA.length !== keysB.length) {
-    return false;
-  }
-  
-  // Check if all keys exist in both and have the same values
-  for (let key of keysA) {
-    if (!keysB.includes(key) || labelA.params[key] !== labelB.params[key]) {
-      return false;
-    }
-  }
-  
-  return true;
+  return text
+    .replace(/\s+/g, ' ')        // Replace multiple spaces/newlines with single space
+    .replace(/\u00A0/g, ' ')     // Replace non-breaking spaces
+    .trim()                       // Remove leading/trailing whitespace
+    .toLowerCase();               // Case-insensitive comparison
 }
 
 /**
- * Match labels between two documents based on position overlap
+ * Extract the label name from labelname or label attribute
+ * @param {Object} params - Label parameters object
+ * @returns {string} Label name
+ */
+function getLabelName(params) {
+  return params.labelname || params.label || '';
+}
+
+/**
+ * Check if two labels have the same label hierarchy (considering parent attribute)
+ * @param {Object} labelA - First label
+ * @param {Object} labelB - Second label
+ * @returns {boolean} True if label hierarchy matches
+ */
+function labelHierarchyMatches(labelA, labelB) {
+  const nameA = getLabelName(labelA.params);
+  const nameB = getLabelName(labelB.params);
+  
+  if (nameA !== nameB) return false;
+  
+  // Also check parent if it exists
+  const parentA = labelA.params.parent || '';
+  const parentB = labelB.params.parent || '';
+  
+  return parentA === parentB;
+}
+
+/**
+ * Compare label attributes, with special handling for groupID attributes
+ * @param {Object} labelA - First label
+ * @param {Object} labelB - Second label
+ * @param {boolean} strictMode - If true, all params must match; if false, only key params
+ * @returns {Object} Match result with type and details
+ */
+function compareAttributesDetailed(labelA, labelB, strictMode = false) {
+  // First check if label names match
+  if (!labelHierarchyMatches(labelA, labelB)) {
+    return { matches: false, type: 'different-label' };
+  }
+  
+  // Get parameters, excluding style/class/presentation attributes
+  const ignoredAttrs = ['style', 'class', 'labelname', 'label', 'parent'];
+  const paramsA = Object.keys(labelA.params).filter(k => !ignoredAttrs.includes(k));
+  const paramsB = Object.keys(labelB.params).filter(k => !ignoredAttrs.includes(k));
+  
+  if (strictMode) {
+    // Strict: all parameters must match exactly
+    if (paramsA.length !== paramsB.length) {
+      return { matches: false, type: 'different-params' };
+    }
+    
+    for (let key of paramsA) {
+      if (!paramsB.includes(key) || labelA.params[key] !== labelB.params[key]) {
+        return { matches: false, type: 'different-params' };
+      }
+    }
+    
+    return { matches: true, type: 'exact' };
+  } else {
+    // Lenient: key parameters should match, but extra params are ok
+    const keyParams = ['docid', 'fragmentid', 'titletype', 'uri', 'non_standard'];
+    
+    for (let key of keyParams) {
+      const hasA = paramsA.includes(key);
+      const hasB = paramsB.includes(key);
+      
+      // If both have this key, values must match
+      if (hasA && hasB && labelA.params[key] !== labelB.params[key]) {
+        return { matches: false, type: 'different-key-params' };
+      }
+    }
+    
+    return { matches: true, type: 'lenient' };
+  }
+}
+
+/**
+ * Calculate text similarity using longest common subsequence ratio
+ * @param {string} text1 - First text
+ * @param {string} text2 - Second text
+ * @returns {number} Similarity ratio (0 to 1)
+ */
+function calculateTextSimilarity(text1, text2) {
+  const norm1 = normalizeText(text1);
+  const norm2 = normalizeText(text2);
+  
+  if (norm1 === norm2) return 1.0;
+  if (!norm1 || !norm2) return 0.0;
+  
+  // Simple character-based similarity
+  const longer = norm1.length > norm2.length ? norm1 : norm2;
+  const shorter = norm1.length > norm2.length ? norm2 : norm1;
+  
+  if (longer.includes(shorter)) {
+    return shorter.length / longer.length;
+  }
+  
+  // Calculate overlap ratio
+  let matchCount = 0;
+  const shorterLen = shorter.length;
+  const longerLen = longer.length;
+  
+  for (let i = 0; i < shorterLen; i++) {
+    if (longer.includes(shorter[i])) {
+      matchCount++;
+    }
+  }
+  
+  return matchCount / longerLen;
+}
+
+/**
+ * Match labels based on text content similarity
  * @param {Array} labelsA - Labels from document A
  * @param {Array} labelsB - Labels from document B
- * @param {number} minOverlap - Minimum overlap ratio for partial match (default: 0.3)
+ * @param {number} minSimilarity - Minimum text similarity for match (default: 0.9)
+ * @param {boolean} strictParams - If true, require exact parameter match
  * @returns {Object} Matching results
  */
-export function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
+function matchLabelsByText(labelsA, labelsB, minSimilarity = 0.9, strictParams = false) {
   const matches = [];
   const matchedBIndices = new Set();
   
-  // For each label in document A, find the best match in document B
+  // For each label in document A, find the best text-based match in document B
   labelsA.forEach(labelA => {
     let bestMatch = null;
-    let bestOverlap = 0;
+    let bestSimilarity = 0;
     let bestMatchIndex = -1;
+    let bestAttrResult = null;
     
     labelsB.forEach((labelB, indexB) => {
       // Skip if this label B is already matched
       if (matchedBIndices.has(indexB)) return;
       
-      // Calculate overlap
-      const overlap = calculateOverlap(labelA.position, labelB.position);
+      // Calculate text similarity
+      const textSimilarity = calculateTextSimilarity(labelA.text, labelB.text);
       
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap;
-        bestMatch = labelB;
-        bestMatchIndex = indexB;
+      if (textSimilarity >= minSimilarity && textSimilarity > bestSimilarity) {
+        // Check if label names match
+        const attrResult = compareAttributesDetailed(labelA, labelB, strictParams);
+        
+        if (attrResult.matches || textSimilarity === 1.0) {
+          bestSimilarity = textSimilarity;
+          bestMatch = labelB;
+          bestMatchIndex = indexB;
+          bestAttrResult = attrResult;
+        }
       }
     });
     
-    // Determine match type
+    // Determine match type based on text + attributes
     let matchType = 'no-match';
-    if (bestMatch && bestOverlap >= minOverlap) {
-      // Check if positions are exact
-      if (arePositionsExact(labelA.position, bestMatch.position)) {
-        // Exact position match - now check attributes
-        if (compareAttributes(labelA, bestMatch)) {
-          matchType = 'exact'; // Green: exact position + same attributes
-        } else {
-          matchType = 'overlap'; // Orange: exact position but different attributes
-        }
-      } else {
-        // Approximate/partial position match
-        matchType = 'no-match'; // Red: approximate match
-      }
-      
+    if (bestMatch) {
       // Mark this labelB as matched
       matchedBIndices.add(bestMatchIndex);
+      
+      // Exact text match + exact attributes = exact match
+      if (bestSimilarity === 1.0 && bestAttrResult.type === 'exact') {
+        matchType = 'exact';
+      } 
+      // Close text match or lenient attribute match = overlap
+      else if (bestSimilarity >= minSimilarity || bestAttrResult.type === 'lenient') {
+        matchType = 'overlap';
+      } else {
+        matchType = 'no-match';
+      }
       
       matches.push({
         labelA: labelA,
         labelB: bestMatch,
         matchType: matchType,
-        overlap: bestOverlap,
-        attributesMatch: matchType === 'exact'
+        textSimilarity: bestSimilarity,
+        attributesMatch: bestAttrResult.type === 'exact',
+        matchMethod: 'text'
       });
     } else {
-      // No match found
+      // No text-based match found
       matches.push({
         labelA: labelA,
         labelB: null,
         matchType: 'no-match',
-        overlap: 0,
-        attributesMatch: false
+        textSimilarity: 0,
+        attributesMatch: false,
+        matchMethod: 'none'
       });
     }
   });
-  ,
-        attributesMatch: false
+  
   // Add unmatched labels from document B
   labelsB.forEach((labelB, indexB) => {
     if (!matchedBIndices.has(indexB)) {
@@ -201,19 +303,123 @@ export function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
         labelA: null,
         labelB: labelB,
         matchType: 'no-match',
-        overlap: 0
+        textSimilarity: 0,
+        attributesMatch: false,
+        matchMethod: 'none'
       });
     }
   });
   
+  return matches;
+}
+
+/**
+ * Match labels using hybrid approach: text first, then position fallback
+ * @param {Array} labelsA - Labels from document A
+ * @param {Array} labelsB - Labels from document B
+ * @param {Object} options - Matching options
+ * @returns {Object} Matching results
+ */
+export function matchLabelsHybrid(labelsA, labelsB, options = {}) {
+  const {
+    textSimilarityThreshold = 0.85,
+    positionOverlapThreshold = 0.3,
+    strictParams = false,
+    preferTextMatching = true
+  } = options;
+  
+  console.log(`Starting hybrid matching with ${labelsA.length} labels from A and ${labelsB.length} labels from B`);
+  
+  // First attempt: text-based matching
+  const textMatches = matchLabelsByText(labelsA, labelsB, textSimilarityThreshold, strictParams);
+  
+  // Separate matched and unmatched labels
+  const matchedAIndices = new Set();
+  const matchedBIndices = new Set();
+  const finalMatches = [];
+  
+  textMatches.forEach((match, idx) => {
+    if (match.matchType !== 'no-match' && match.labelA && match.labelB) {
+      finalMatches.push(match);
+      matchedAIndices.add(labelsA.indexOf(match.labelA));
+      matchedBIndices.add(labelsB.indexOf(match.labelB));
+    }
+  });
+  
+  console.log(`Text matching found ${finalMatches.length} matches`);
+  
+  // Second attempt: position-based matching for unmatched labels
+  if (!preferTextMatching || finalMatches.length < Math.min(labelsA.length, labelsB.length) * 0.5) {
+    const unmatchedA = labelsA.filter((_, idx) => !matchedAIndices.has(idx));
+    const unmatchedB = labelsB.filter((_, idx) => !matchedBIndices.has(idx));
+    
+    console.log(`Attempting position matching for ${unmatchedA.length} unmatched A and ${unmatchedB.length} unmatched B`);
+    
+    unmatchedA.forEach(labelA => {
+      let bestMatch = null;
+      let bestOverlap = 0;
+      let bestMatchB = null;
+      
+      unmatchedB.forEach(labelB => {
+        const overlap = calculateOverlap(labelA.position, labelB.position);
+        
+        if (overlap >= positionOverlapThreshold && overlap > bestOverlap) {
+          // Check if label names at least match
+          if (labelHierarchyMatches(labelA, labelB)) {
+            bestOverlap = overlap;
+            bestMatchB = labelB;
+          }
+        }
+      });
+      
+      if (bestMatchB) {
+        const attrResult = compareAttributesDetailed(labelA, bestMatchB, strictParams);
+        const matchType = attrResult.matches ? 
+          (arePositionsExact(labelA.position, bestMatchB.position) ? 'exact' : 'overlap') : 
+          'overlap';
+        
+        finalMatches.push({
+          labelA: labelA,
+          labelB: bestMatchB,
+          matchType: matchType,
+          overlap: bestOverlap,
+          attributesMatch: attrResult.matches,
+          matchMethod: 'position'
+        });
+        
+        // Remove from unmatched
+        const bIndex = unmatchedB.indexOf(bestMatchB);
+        if (bIndex > -1) {
+          unmatchedB.splice(bIndex, 1);
+        }
+      }
+    });
+    
+    console.log(`Position matching added ${finalMatches.length - matchedAIndices.size} additional matches`);
+  }
+  
+  // Add all unmatched labels
+  textMatches.forEach(match => {
+    if (match.matchType === 'no-match') {
+      if (match.labelA && !Array.from(finalMatches).find(m => m.labelA === match.labelA)) {
+        finalMatches.push(match);
+      }
+      if (match.labelB && !Array.from(finalMatches).find(m => m.labelB === match.labelB)) {
+        finalMatches.push(match);
+      }
+    }
+  });
+  
   return {
-    matches: matches,
+    matches: finalMatches,
     summary: {
       totalA: labelsA.length,
       totalB: labelsB.length,
-      exactMatches: matches.filter(m => m.matchType === 'exact').length,
-      overlapMatches: matches.filter(m => m.matchType === 'overlap').length,
-      noMatches: matches.filter(m => m.matchType === 'no-match').length
+      exactMatches: finalMatches.filter(m => m.matchType === 'exact').length,
+      overlapMatches: finalMatches.filter(m => m.matchType === 'overlap').length,
+      noMatches: finalMatches.filter(m => m.matchType === 'no-match').length,
+      textBasedMatches: finalMatches.filter(m => m.matchMethod === 'text').length,
+      positionBasedMatches: finalMatches.filter(m => m.matchMethod === 'position').length
     }
   };
 }
@@ -310,9 +516,10 @@ export function clearMatchHighlighting() {
 
 /**
  * Run complete IAA analysis
+ * @param {Object} options - Analysis options
  * @returns {Object} Analysis results with matches and summary
  */
-export async function runIAAAnalysis() {
+export async function runIAAAnalysis(options = {}) {
   const docA = getDocumentA();
   const docB = getDocumentB();
   
@@ -335,8 +542,17 @@ export async function runIAAAnalysis() {
   console.log(`Extracted ${labelsA.length} labels from Document A`);
   console.log(`Extracted ${labelsB.length} labels from Document B`);
   
-  // Match labels based on position
-  const matchResults = matchLabelsByPosition(labelsA, labelsB, 0.3);
+  // Use hybrid matching (text-based with position fallback)
+  const matchingOptions = {
+    textSimilarityThreshold: options.textSimilarityThreshold || 0.85,
+    positionOverlapThreshold: options.positionOverlapThreshold || 0.3,
+    strictParams: options.strictParams || false,
+    preferTextMatching: options.preferTextMatching !== false
+  };
+  
+  const matchResults = matchLabelsHybrid(labelsA, labelsB, matchingOptions);
+  
+  console.log('Match Results Summary:', matchResults.summary);
   
   // Apply visual highlighting
   applyMatchHighlighting(matchResults);
@@ -345,6 +561,7 @@ export async function runIAAAnalysis() {
     labelsA: labelsA,
     labelsB: labelsB,
     matchResults: matchResults,
+    options: matchingOptions,
     timestamp: new Date().toISOString()
   };
 }

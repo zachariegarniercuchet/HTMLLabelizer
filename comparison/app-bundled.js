@@ -535,14 +535,15 @@
       const relativeTop = labelRect.top - containerRect.top + container.scrollTop;
       const relativeLeft = labelRect.left - containerRect.left + container.scrollLeft;
       
-      const labelType = labelElement.getAttribute('label') || '';
+      // Extract label type - prefer labelname over label attribute
+      const labelType = labelElement.getAttribute('labelname') || 
+                        labelElement.getAttribute('label') || '';
       const text = labelElement.textContent || '';
       
+      // Get all attributes as parameters
       const params = {};
       for (let attr of labelElement.attributes) {
-        if (attr.name !== 'label') {
-          params[attr.name] = attr.value;
-        }
+        params[attr.name] = attr.value;
       }
       
       labels.push({
@@ -588,29 +589,275 @@
     );
   }
   
-  function compareAttributes(labelA, labelB) {
-    // Compare label type/name
-    if (labelA.type !== labelB.type) {
-      return false;
+  // ===== NEW TEXT-BASED MATCHING FUNCTIONS =====
+  
+  function normalizeText(text) {
+    if (!text) return '';
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/\u00A0/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+  
+  function getLabelName(params) {
+    return params.labelname || params.label || '';
+  }
+  
+  function labelHierarchyMatches(labelA, labelB) {
+    const nameA = getLabelName(labelA.params);
+    const nameB = getLabelName(labelB.params);
+    
+    if (nameA !== nameB) return false;
+    
+    const parentA = labelA.params.parent || '';
+    const parentB = labelB.params.parent || '';
+    
+    return parentA === parentB;
+  }
+  
+  function compareAttributesDetailed(labelA, labelB, strictMode = false) {
+    if (!labelHierarchyMatches(labelA, labelB)) {
+      return { matches: false, type: 'different-label' };
     }
     
-    // Get all parameter keys from both labels
-    const keysA = Object.keys(labelA.params);
-    const keysB = Object.keys(labelB.params);
+    const ignoredAttrs = ['style', 'class', 'labelname', 'label', 'parent'];
+    const paramsA = Object.keys(labelA.params).filter(k => !ignoredAttrs.includes(k));
+    const paramsB = Object.keys(labelB.params).filter(k => !ignoredAttrs.includes(k));
     
-    // Check if they have the same number of parameters
-    if (keysA.length !== keysB.length) {
-      return false;
+    if (strictMode) {
+      if (paramsA.length !== paramsB.length) {
+        return { matches: false, type: 'different-params' };
+      }
+      
+      for (let key of paramsA) {
+        if (!paramsB.includes(key) || labelA.params[key] !== labelB.params[key]) {
+          return { matches: false, type: 'different-params' };
+        }
+      }
+      
+      return { matches: true, type: 'exact' };
+    } else {
+      const keyParams = ['docid', 'fragmentid', 'titletype', 'uri', 'non_standard'];
+      
+      for (let key of keyParams) {
+        const hasA = paramsA.includes(key);
+        const hasB = paramsB.includes(key);
+        
+        if (hasA && hasB && labelA.params[key] !== labelB.params[key]) {
+          return { matches: false, type: 'different-key-params' };
+        }
+      }
+      
+      return { matches: true, type: 'lenient' };
+    }
+  }
+  
+  function calculateTextSimilarity(text1, text2) {
+    const norm1 = normalizeText(text1);
+    const norm2 = normalizeText(text2);
+    
+    if (norm1 === norm2) return 1.0;
+    if (!norm1 || !norm2) return 0.0;
+    
+    const longer = norm1.length > norm2.length ? norm1 : norm2;
+    const shorter = norm1.length > norm2.length ? norm2 : norm1;
+    
+    if (longer.includes(shorter)) {
+      return shorter.length / longer.length;
     }
     
-    // Check if all keys exist in both and have the same values
-    for (let key of keysA) {
-      if (!keysB.includes(key) || labelA.params[key] !== labelB.params[key]) {
-        return false;
+    let matchCount = 0;
+    const shorterLen = shorter.length;
+    const longerLen = longer.length;
+    
+    for (let i = 0; i < shorterLen; i++) {
+      if (longer.includes(shorter[i])) {
+        matchCount++;
       }
     }
     
-    return true;
+    return matchCount / longerLen;
+  }
+  
+  function matchLabelsByText(labelsA, labelsB, minSimilarity = 0.9, strictParams = false) {
+    const matches = [];
+    const matchedBIndices = new Set();
+    
+    labelsA.forEach(labelA => {
+      let bestMatch = null;
+      let bestSimilarity = 0;
+      let bestMatchIndex = -1;
+      let bestAttrResult = null;
+      
+      labelsB.forEach((labelB, indexB) => {
+        if (matchedBIndices.has(indexB)) return;
+        
+        const textSimilarity = calculateTextSimilarity(labelA.text, labelB.text);
+        
+        if (textSimilarity >= minSimilarity && textSimilarity > bestSimilarity) {
+          const attrResult = compareAttributesDetailed(labelA, labelB, strictParams);
+          
+          if (attrResult.matches || textSimilarity === 1.0) {
+            bestSimilarity = textSimilarity;
+            bestMatch = labelB;
+            bestMatchIndex = indexB;
+            bestAttrResult = attrResult;
+          }
+        }
+      });
+      
+      let matchType = 'no-match';
+      if (bestMatch) {
+        matchedBIndices.add(bestMatchIndex);
+        
+        if (bestSimilarity === 1.0 && bestAttrResult.type === 'exact') {
+          matchType = 'exact';
+        } else if (bestSimilarity >= minSimilarity || bestAttrResult.type === 'lenient') {
+          matchType = 'overlap';
+        } else {
+          matchType = 'no-match';
+        }
+        
+        matches.push({
+          labelA: labelA,
+          labelB: bestMatch,
+          matchType: matchType,
+          textSimilarity: bestSimilarity,
+          attributesMatch: bestAttrResult.type === 'exact',
+          matchMethod: 'text'
+        });
+      } else {
+        matches.push({
+          labelA: labelA,
+          labelB: null,
+          matchType: 'no-match',
+          textSimilarity: 0,
+          attributesMatch: false,
+          matchMethod: 'none'
+        });
+      }
+    });
+    
+    labelsB.forEach((labelB, indexB) => {
+      if (!matchedBIndices.has(indexB)) {
+        matches.push({
+          labelA: null,
+          labelB: labelB,
+          matchType: 'no-match',
+          textSimilarity: 0,
+          attributesMatch: false,
+          matchMethod: 'none'
+        });
+      }
+    });
+    
+    return matches;
+  }
+  
+  function compareAttributes(labelA, labelB) {
+    // Legacy function - kept for compatibility
+    const result = compareAttributesDetailed(labelA, labelB, true);
+    return result.matches;
+  }
+  
+  
+  function matchLabelsHybrid(labelsA, labelsB, options = {}) {
+    const {
+      textSimilarityThreshold = 0.85,
+      positionOverlapThreshold = 0.3,
+      strictParams = false,
+      preferTextMatching = true
+    } = options;
+    
+    console.log(`Starting hybrid matching with ${labelsA.length} labels from A and ${labelsB.length} labels from B`);
+    
+    const textMatches = matchLabelsByText(labelsA, labelsB, textSimilarityThreshold, strictParams);
+    
+    const matchedAIndices = new Set();
+    const matchedBIndices = new Set();
+    const finalMatches = [];
+    
+    textMatches.forEach((match, idx) => {
+      if (match.matchType !== 'no-match' && match.labelA && match.labelB) {
+        finalMatches.push(match);
+        matchedAIndices.add(labelsA.indexOf(match.labelA));
+        matchedBIndices.add(labelsB.indexOf(match.labelB));
+      }
+    });
+    
+    console.log(`Text matching found ${finalMatches.length} matches`);
+    
+    if (!preferTextMatching || finalMatches.length < Math.min(labelsA.length, labelsB.length) * 0.5) {
+      const unmatchedA = labelsA.filter((_, idx) => !matchedAIndices.has(idx));
+      const unmatchedB = labelsB.filter((_, idx) => !matchedBIndices.has(idx));
+      
+      console.log(`Attempting position matching for ${unmatchedA.length} unmatched A and ${unmatchedB.length} unmatched B`);
+      
+      unmatchedA.forEach(labelA => {
+        let bestMatch = null;
+        let bestOverlap = 0;
+        let bestMatchB = null;
+        
+        unmatchedB.forEach(labelB => {
+          const overlap = calculateOverlap(labelA.position, labelB.position);
+          
+          if (overlap >= positionOverlapThreshold && overlap > bestOverlap) {
+            if (labelHierarchyMatches(labelA, labelB)) {
+              bestOverlap = overlap;
+              bestMatchB = labelB;
+            }
+          }
+        });
+        
+        if (bestMatchB) {
+          const attrResult = compareAttributesDetailed(labelA, bestMatchB, strictParams);
+          const matchType = attrResult.matches ? 
+            (arePositionsExact(labelA.position, bestMatchB.position) ? 'exact' : 'overlap') : 
+            'overlap';
+          
+          finalMatches.push({
+            labelA: labelA,
+            labelB: bestMatchB,
+            matchType: matchType,
+            overlap: bestOverlap,
+            attributesMatch: attrResult.matches,
+            matchMethod: 'position'
+          });
+          
+          const bIndex = unmatchedB.indexOf(bestMatchB);
+          if (bIndex > -1) {
+            unmatchedB.splice(bIndex, 1);
+          }
+        }
+      });
+      
+      console.log(`Position matching added ${finalMatches.length - matchedAIndices.size} additional matches`);
+    }
+    
+    textMatches.forEach(match => {
+      if (match.matchType === 'no-match') {
+        if (match.labelA && !Array.from(finalMatches).find(m => m.labelA === match.labelA)) {
+          finalMatches.push(match);
+        }
+        if (match.labelB && !Array.from(finalMatches).find(m => m.labelB === match.labelB)) {
+          finalMatches.push(match);
+        }
+      }
+    });
+    
+    return {
+      matches: finalMatches,
+      summary: {
+        totalA: labelsA.length,
+        totalB: labelsB.length,
+        exactMatches: finalMatches.filter(m => m.matchType === 'exact').length,
+        overlapMatches: finalMatches.filter(m => m.matchType === 'overlap').length,
+        noMatches: finalMatches.filter(m => m.matchType === 'no-match').length,
+        textBasedMatches: finalMatches.filter(m => m.matchMethod === 'text').length,
+        positionBasedMatches: finalMatches.filter(m => m.matchMethod === 'position').length
+      }
+    };
   }
   
   function matchLabelsByPosition(labelsA, labelsB, minOverlap = 0.3) {
@@ -808,8 +1055,17 @@
       console.log(`Extracted ${labelsA.length} labels from Document A`);
       console.log(`Extracted ${labelsB.length} labels from Document B`);
       
-      // Match labels based on position
-      const matchResults = matchLabelsByPosition(labelsA, labelsB, 0.3);
+      // Use hybrid matching (text-based with position fallback)
+      const matchingOptions = {
+        textSimilarityThreshold: 0.85,
+        positionOverlapThreshold: 0.3,
+        strictParams: false,
+        preferTextMatching: true
+      };
+      
+      const matchResults = matchLabelsHybrid(labelsA, labelsB, matchingOptions);
+      
+      console.log('Match Results Summary:', matchResults.summary);
       
       const results = {
         labelsA: labelsA,
@@ -1684,7 +1940,15 @@
             if (containerA && containerB) {
               const labelsA = extractLabelsWithPositions(containerA, 'a');
               const labelsB = extractLabelsWithPositions(containerB, 'b');
-              const matchResults = matchLabelsByPosition(labelsA, labelsB, 0.3);
+              
+              // Use hybrid matching (text-based with position fallback)
+              const matchingOptions = {
+                textSimilarityThreshold: 0.85,
+                positionOverlapThreshold: 0.3,
+                strictParams: false,
+                preferTextMatching: true
+              };
+              const matchResults = matchLabelsHybrid(labelsA, labelsB, matchingOptions);
               
               cachedResults = {
                 labelsA: labelsA,
