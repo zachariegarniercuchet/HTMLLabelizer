@@ -7079,7 +7079,15 @@ function navigateToPreviousMatch() {
     const deleteButtons = doc.querySelectorAll('.delete-btn');
     deleteButtons.forEach(button => button.remove());
 
-    // 2. Build JSON schema from your current labels tree
+    // 2. Clean class attributes from manual_label elements
+    const manualLabels = doc.querySelectorAll('manual_label');
+    manualLabels.forEach(label => {
+      if (label.hasAttribute('class')) {
+        label.removeAttribute('class');
+      }
+    });
+
+    // 3. Build JSON schema from your current labels tree
     const labeltree = buildSchemaFromLabels(labels);
 
     // Update meta.time with current timer (milliseconds)
@@ -7098,7 +7106,7 @@ function navigateToPreviousMatch() {
 
     const schemaJson = JSON.stringify(schemaWrapper, null, 2);
 
-    // 3. Find existing HTMLLabelizer comment
+    // 4. Find existing HTMLLabelizer comment
     let found = false;
     const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT, null);
     let commentNode;
@@ -7111,7 +7119,7 @@ function navigateToPreviousMatch() {
       }
     }
 
-    // 4. If not found, insert before <head>
+    // 5. If not found, insert before <head>
     if (!found) {
       const newComment = doc.createComment(" HTMLLabelizer\n" + schemaJson + "\n");
       const htmlEl = doc.documentElement;
@@ -7119,7 +7127,7 @@ function navigateToPreviousMatch() {
       htmlEl.insertBefore(newComment, headEl);
     }
 
-    // 5. Serialize back to HTML
+    // 6. Serialize back to HTML
     return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
   }
 
