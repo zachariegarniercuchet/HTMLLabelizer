@@ -3338,6 +3338,10 @@ function clearGroupFilter() {
     const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     labelElements.forEach(labelEl => {
       labelEl.classList.remove('group-filter-highlight', 'group-filter-dimmed');
+      // Remove the class attribute entirely if it's now empty
+      if (labelEl.className === '') {
+        labelEl.removeAttribute('class');
+      }
     });
     
     // Remove active state from group items
@@ -6094,6 +6098,10 @@ function updateCurrentHtmlFromDOM() {
   const labelElements = tempDiv.querySelectorAll('manual_label, auto_label');
   labelElements.forEach(el => {
     el.classList.remove('group-filter-highlight', 'group-filter-dimmed');
+    // Remove the class attribute entirely if it's now empty
+    if (el.className === '') {
+      el.removeAttribute('class');
+    }
   });
   
   const parser = new DOMParser();
