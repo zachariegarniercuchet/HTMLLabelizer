@@ -3337,11 +3337,10 @@ function clearGroupFilter() {
     // Remove all filter classes from labels
     const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     labelElements.forEach(labelEl => {
+      // Remove the filter classes
       labelEl.classList.remove('group-filter-highlight', 'group-filter-dimmed');
-      // Remove the class attribute entirely if it's now empty
-      if (labelEl.className === '') {
-        labelEl.removeAttribute('class');
-      }
+      // Remove the class attribute entirely to ensure clean state
+      labelEl.removeAttribute('class');
     });
     
     // Remove active state from group items
@@ -3351,6 +3350,9 @@ function clearGroupFilter() {
     });
     
     activeGroupFilter = null;
+    
+    // Sync changes back to source HTML
+    updateCurrentHtmlFromDOM();
   }
 }
 
@@ -6097,11 +6099,10 @@ function updateCurrentHtmlFromDOM() {
   // Remove group filter classes - these are temporary UI states that shouldn't be saved
   const labelElements = tempDiv.querySelectorAll('manual_label, auto_label');
   labelElements.forEach(el => {
+    // Remove the filter classes
     el.classList.remove('group-filter-highlight', 'group-filter-dimmed');
-    // Remove the class attribute entirely if it's now empty
-    if (el.className === '') {
-      el.removeAttribute('class');
-    }
+    // Remove the class attribute entirely to ensure clean state
+    el.removeAttribute('class');
   });
   
   const parser = new DOMParser();
