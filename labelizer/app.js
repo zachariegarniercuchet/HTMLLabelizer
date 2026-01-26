@@ -3352,7 +3352,14 @@ function clearGroupFilter() {
 
 // Add global click handler to clear group filter when clicking elsewhere
 document.addEventListener('click', function(e) {
-  // Don't clear if clicking within the groups section
+  // Always clear filter when clicking any button (especially download/save buttons)
+  const clickedButton = e.target.closest('button');
+  if (clickedButton && activeGroupFilter) {
+    clearGroupFilter();
+    return;
+  }
+  
+  // Don't clear if clicking within the groups section (and not a button)
   if (e.target.closest('#groups-section')) {
     return;
   }
@@ -3751,6 +3758,11 @@ function updateGroupInDocument(labelName, oldGroupId, newValues, newGroupId) {
 
 // ======= toggle view function =======
 function toggleView() {
+  // Clear group filter before toggling view
+  if (activeGroupFilter) {
+    clearGroupFilter();
+  }
+  
   if (!currentHtml) return;
   
   let currentScrollRatio = 0;
@@ -6078,6 +6090,12 @@ function updateCurrentHtmlFromDOM() {
   const deleteButtons = tempDiv.querySelectorAll('.delete-btn');
   deleteButtons.forEach(btn => btn.remove());
   
+  // Remove group filter classes - these are temporary UI states that shouldn't be saved
+  const labelElements = tempDiv.querySelectorAll('manual_label, auto_label');
+  labelElements.forEach(el => {
+    el.classList.remove('group-filter-highlight', 'group-filter-dimmed');
+  });
+  
   const parser = new DOMParser();
   const doc = parser.parseFromString(currentHtml, 'text/html');
   doc.body.innerHTML = tempDiv.innerHTML;
@@ -7098,6 +7116,13 @@ function navigateToPreviousMatch() {
   }
 
   function downloadFile() {
+    // Clear group filter before downloading
+    if (activeGroupFilter) {
+      clearGroupFilter();
+      // Force sync to currentHtml after clearing filter
+      updateCurrentHtmlFromDOM();
+    }
+    
     const finalHtml = prepareHtmlForDownload();
     if (!finalHtml) return;
 
@@ -7114,6 +7139,13 @@ function navigateToPreviousMatch() {
   }
 
   function saveAsFile() {
+    // Clear group filter before saving
+    if (activeGroupFilter) {
+      clearGroupFilter();
+      // Force sync to currentHtml after clearing filter
+      updateCurrentHtmlFromDOM();
+    }
+    
     const finalHtml = prepareHtmlForDownload();
     if (!finalHtml) return;
 
