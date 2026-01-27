@@ -4134,6 +4134,71 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(currentHtml, 'text/html');
 
+    // Remove any style tags from both head and body to prevent CSS pollution
+    const styleTags = doc.querySelectorAll('style');
+    styleTags.forEach(tag => tag.remove());
+    
+    // Remove link tags that reference external stylesheets
+    const linkTags = doc.querySelectorAll('link[rel="stylesheet"]');
+    linkTags.forEach(tag => tag.remove());
+
+    // Remove problematic wrapper divs (e.g., WordSection1 from MS Word documents)
+    // These can have @page CSS rules that cause layout issues
+    const wordSectionDivs = doc.body.querySelectorAll('div.WordSection1, DIV.WordSection1');
+    wordSectionDivs.forEach(div => {
+      // Move all children out of the div, then remove the div itself
+      while (div.firstChild) {
+        div.parentNode.insertBefore(div.firstChild, div);
+      }
+      div.remove();
+    });
+
+    // Fix tables with width="0" which can cause layout issues
+    const tables = doc.body.querySelectorAll('table[width="0"], TABLE[width="0"]');
+    tables.forEach(table => {
+      table.removeAttribute('width');
+    });
+
+    // Strip problematic inline styles that can cause width issues
+    const allElements = doc.body.querySelectorAll('*');
+    allElements.forEach(el => {
+      if (el.hasAttribute('style')) {
+        const style = el.getAttribute('style');
+        // Remove width, min-width, max-width from inline styles
+        const cleanedStyle = style
+          .replace(/width\s*:\s*[^;]+;?/gi, '')
+          .replace(/min-width\s*:\s*[^;]+;?/gi, '')
+          .replace(/max-width\s*:\s*[^;]+;?/gi, '')
+          .trim();
+        
+        if (cleanedStyle) {
+          el.setAttribute('style', cleanedStyle);
+        } else {
+          el.removeAttribute('style');
+        }
+      }
+      
+      // Remove width attributes from all elements
+      if (el.hasAttribute('width')) {
+        el.removeAttribute('width');
+      }
+      
+      // Force max-width directly on elements BEFORE injection
+      el.style.maxWidth = '100%';
+      el.style.boxSizing = 'border-box';
+      
+      // Force text wrapping and overflow handling
+      el.style.wordWrap = 'break-word';
+      el.style.overflowWrap = 'break-word';
+      el.style.wordBreak = 'break-word';
+      
+      // Prevent white-space from causing width issues
+      const currentWhiteSpace = window.getComputedStyle(el).whiteSpace;
+      if (currentWhiteSpace === 'nowrap' || currentWhiteSpace === 'pre') {
+        el.style.whiteSpace = 'normal';
+      }
+    });
+
     // Store filter state before re-rendering
     const filterState = new Map();
     if (activeGroupFilter) {
