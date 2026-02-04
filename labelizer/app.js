@@ -4182,21 +4182,6 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
       if (el.hasAttribute('width')) {
         el.removeAttribute('width');
       }
-      
-      // Force max-width directly on elements BEFORE injection
-      el.style.maxWidth = '100%';
-      el.style.boxSizing = 'border-box';
-      
-      // Force text wrapping and overflow handling
-      el.style.wordWrap = 'break-word';
-      el.style.overflowWrap = 'break-word';
-      el.style.wordBreak = 'break-word';
-      
-      // Prevent white-space from causing width issues
-      const currentWhiteSpace = window.getComputedStyle(el).whiteSpace;
-      if (currentWhiteSpace === 'nowrap' || currentWhiteSpace === 'pre') {
-        el.style.whiteSpace = 'normal';
-      }
     });
 
     // Store filter state before re-rendering
@@ -4227,7 +4212,7 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
         const deleteBtn = doc.createElement("button");
         deleteBtn.className = "delete-btn";
         deleteBtn.textContent = "×";
-        mention.appendChild(deleteBtn);
+        mention.insertBefore(deleteBtn, mention.firstChild);
       }
     });
 
@@ -5149,14 +5134,14 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   const fragment = range.extractContents();
   const processedContent = preserveFormattingInLabel(fragment);
   
-  // Add the processed content to the label
-  labelElement.appendChild(processedContent);
-
-  // Add delete button
+  // Add delete button first
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-btn";
   deleteBtn.textContent = "×";
   labelElement.appendChild(deleteBtn);
+
+  // Add the processed content to the label
+  labelElement.appendChild(processedContent);
 
   // Insert the label
   range.insertNode(labelElement);
@@ -5342,12 +5327,13 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
 
   const fragment = range.extractContents();
   const processedContent = preserveFormattingInLabel(fragment);
-  labelElement.appendChild(processedContent);
-
+  
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-btn";
   deleteBtn.textContent = "×";
   labelElement.appendChild(deleteBtn);
+  
+  labelElement.appendChild(processedContent);
 
   range.insertNode(labelElement);
 
@@ -5407,15 +5393,15 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
 
-  // Extract content from highlight span (excluding the highlight styling)
-  const textContent = highlightSpan.textContent;
-  labelElement.textContent = textContent;
-
-  // Add delete button
+  // Add delete button first
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-btn";
   deleteBtn.textContent = "×";
   labelElement.appendChild(deleteBtn);
+
+  // Extract content from highlight span (excluding the highlight styling)
+  const textContent = highlightSpan.textContent;
+  labelElement.appendChild(document.createTextNode(textContent));
 
   // Replace the highlight span with the label element
   highlightSpan.parentNode.replaceChild(labelElement, highlightSpan);
@@ -5502,11 +5488,11 @@ function createNestedLabelStructure(advancedLabel, originalContent) {
     mapAdvancedStructureToOriginalContent(advancedLabel, originalContent, labelElement);
   }
   
-  // Add delete button
+  // Add delete button at the beginning
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-btn";
   deleteBtn.textContent = "×";
-  labelElement.appendChild(deleteBtn);
+  labelElement.insertBefore(deleteBtn, labelElement.firstChild);
   
   return labelElement;
 }
@@ -5763,14 +5749,14 @@ function createSingleLabel(labelInfo, content) {
     labelElement.style.color = getContrastColor(labelData.color);
   }
   
-  // Add content
-  labelElement.appendChild(content);
-  
-  // Add delete button
+  // Add delete button first
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-btn";
   deleteBtn.textContent = "×";
   labelElement.appendChild(deleteBtn);
+  
+  // Add content
+  labelElement.appendChild(content);
   
   return labelElement;
 }
@@ -6094,11 +6080,11 @@ function addDeleteButtonToLabel(labelElement) {
     return;
   }
   
-  // Create and add delete button
+  // Create and add delete button at the beginning
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-btn";
   deleteBtn.textContent = "×";
-  labelElement.appendChild(deleteBtn);
+  labelElement.insertBefore(deleteBtn, labelElement.firstChild);
   
   // Also add delete buttons to any nested labels (both manual and auto)
   const nestedLabels = labelElement.querySelectorAll('manual_label, auto_label');
@@ -6107,7 +6093,7 @@ function addDeleteButtonToLabel(labelElement) {
       const nestedDeleteBtn = document.createElement("button");
       nestedDeleteBtn.className = "delete-btn";
       nestedDeleteBtn.textContent = "×";
-      nestedLabel.appendChild(nestedDeleteBtn);
+      nestedLabel.insertBefore(nestedDeleteBtn, nestedLabel.firstChild);
     }
   });
 }

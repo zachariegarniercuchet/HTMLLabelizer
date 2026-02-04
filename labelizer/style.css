@@ -555,12 +555,6 @@
     transition: background 0.3s ease;
   }
 
-    .html-content * {
-      max-width: 100% !important;
-      word-wrap: break-word !important;
-      overflow-wrap: break-word !important;
-    }
-
     /* Light theme HTML content */
     :root[data-theme="light"] .html-content {
       background: var(--html-content-bg, #ffffff);
