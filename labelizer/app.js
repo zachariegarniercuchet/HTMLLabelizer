@@ -1,6 +1,7 @@
 (() => {
   // ======= Configuration =======
   const ENHANCED_FORMATTING_SEARCH = true; // Set to false for simple text matching, true for enhanced matching across formatting tags
+  const SHOW_DELETE_CROSS_ON_LABELS = false; // Set to true to show delete cross (×) on labels, false to hide it (use right-click or parameter menu to delete)
   
   // ======= State =======
   let currentHtml = '';
@@ -50,6 +51,10 @@
   let multiSelectionMode = false;
   let multiSelections = []; // Array to store multiple selections
   let ctrlPressed = false;
+  
+  // ======= Boundary Move Mode =======
+  let boundaryMoveMode = false; // Track if we're in boundary move mode
+  let selectedLabelForBoundaryMove = null; // The label element to adjust
   
 
   // ======= DOM Elements =======
@@ -601,6 +606,69 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
           justify-content: center;
           font-size: 12px;
         }
+        
+        /* Boundary move notification styles */
+        .boundary-move-notification {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: linear-gradient(135deg, #ff9800, #ff6b00);
+          color: white;
+          padding: 12px 16px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          z-index: 9999;
+          max-width: 400px;
+          line-height: 1.4;
+          animation: slideInRight 0.3s ease-out;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .boundary-move-notification .notification-icon {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+        }
+        
+        .boundary-move-notification .notification-close {
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          color: white;
+          cursor: pointer;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-left: auto;
+          font-size: 16px;
+          line-height: 1;
+          padding: 0;
+          transition: background 0.2s;
+        }
+        
+        .boundary-move-notification .notification-close:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .boundary-move-active {
+          animation: pulse-outline 1s infinite;
+        }
+        
+        @keyframes pulse-outline {
+          0%, 100% { outline-offset: 0px; }
+          50% { outline-offset: 3px; }
+        }
       `;
       document.head.appendChild(style);
     }
@@ -938,6 +1006,770 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     }
     
     return false;
+  }
+
+  /**
+   * Move or adjust the boundary of an existing label element
+   * @param {HTMLElement} labelElement - The manual_label or auto_label element to adjust
+   * @param {string} boundary - Which boundary to adjust: 'start' or 'end'
+   * @param {number} direction - Direction to move: positive = expand/extend, negative = shrink/contract
+   * @param {Range} newRange - Optional: specific range to use for new boundaries (if not provided, uses direction)
+   * @returns {boolean} - Whether the boundary move was successful
+   */
+  function moveLabelBoundary(labelElement, boundary, direction, newRange = null, clickRange = null) {
+    console.log('\n╔══════════════════════════════════════════════════════════════');
+    console.log('║ MOVE LABEL BOUNDARY');
+    console.log('╠══════════════════════════════════════════════════════════════');
+    console.log('║ Boundary to move:', boundary);
+    console.log('║ Label text:', labelElement.textContent.substring(0, 50));
+    
+    if (!labelElement || (!labelElement.matches('manual_label') && !labelElement.matches('auto_label'))) {
+      console.error('❌ Invalid label element provided');
+      return false;
+    }
+
+    // Store original attributes
+    const labelName = labelElement.getAttribute('labelName');
+    const parent = labelElement.getAttribute('parent') || '';
+    const path = parent ? [parent, labelName] : [labelName];
+    const labelData = getLabelByPath(path);
+    
+    console.log('║ Label name:', labelName);
+    console.log('║ Parent:', parent || '(none)');
+    
+    if (!labelData) {
+      console.error('Label data not found for path:', path);
+      return false;
+    }
+
+    // Store all attributes
+    const storedAttributes = {};
+    Array.from(labelElement.attributes).forEach(attr => {
+      if (attr.name !== 'style') {
+        storedAttributes[attr.name] = attr.value;
+      }
+    });
+
+    if (!newRange) {
+      console.error('newRange is required');
+      return false;
+    }
+
+    // SIMPLE APPROACH:
+    // 1. Find where the label content starts and ends (as nodes/offsets)
+    // 2. Unwrap the label (remove tags, keep content)
+    // 3. Create a new range with new start OR new end (keeping the other boundary)
+    // 4. Extract that range and wrap it in a new label
+    
+    console.log('Finding label content boundaries...');
+    
+    // Get the actual first and last text positions in the label
+    const labelContentStart = document.createRange();
+    const labelContentEnd = document.createRange();
+    
+    // Find first content node (skip delete button)
+    let firstNode = null;
+    for (let node of labelElement.childNodes) {
+      if (node.className === 'delete-btn') continue;
+      firstNode = node;
+      break;
+    }
+    
+    // Find last content node
+    let lastNode = null;
+    for (let i = labelElement.childNodes.length - 1; i >= 0; i--) {
+      const node = labelElement.childNodes[i];
+      if (node.className === 'delete-btn') continue;
+      lastNode = node;
+      break;
+    }
+    
+    if (!firstNode || !lastNode) {
+      console.error('Label has no content');
+      return false;
+    }
+    
+    console.log('First node:', firstNode);
+    console.log('Last node:', lastNode);
+    
+    // Create a range for the current label to compare for extending/shrinking
+    const labelRange = document.createRange();
+    labelRange.selectNodeContents(labelElement);
+    
+    // Create a test range to validate BEFORE unwrapping
+    const testRange = document.createRange();
+    if (boundary === 'start') {
+      // Moving start - use NEW start, keep OLD end
+      testRange.setStart(newRange.startContainer, newRange.startOffset);
+      if (lastNode.nodeType === Node.TEXT_NODE) {
+        testRange.setEnd(lastNode, lastNode.textContent.length);
+      } else {
+        testRange.setEndAfter(lastNode);
+      }
+    } else {
+      // Moving end - keep OLD start, use NEW end
+      if (firstNode.nodeType === Node.TEXT_NODE) {
+        testRange.setStart(firstNode, 0);
+      } else {
+        testRange.setStartBefore(firstNode);
+      }
+      testRange.setEnd(newRange.endContainer, newRange.endOffset);
+    }
+    
+    // Determine if we're extending or shrinking
+    const isExtending = (boundary === 'start' && newRange.compareBoundaryPoints(Range.START_TO_START, labelRange) < 0) ||
+                        (boundary === 'end' && newRange.compareBoundaryPoints(Range.END_TO_END, labelRange) > 0);
+    
+    console.log('║ Operation type:', isExtending ? 'EXTENDING' : 'SHRINKING');
+    
+    // VALIDATION: Check if the test range crosses any label boundaries BEFORE unwrapping
+    // Also check if we're crossing our parent's boundary
+    if (!isRangeValidForBoundaryMove(testRange, labelElement, boundary, clickRange || newRange, isExtending)) {
+      console.log('╚══════════════════════════════════════════════════════════════\n');
+      return false;
+    }
+    
+    console.log('║');
+    console.log('║ Creating markers for unwrap/rewrap process...');
+    
+    // Create markers for the original label boundaries
+    const startMarker = document.createElement('span');
+    startMarker.id = 'boundary-start-marker-temp';
+    const endMarker = document.createElement('span');
+    endMarker.id = 'boundary-end-marker-temp';
+    
+    // Create marker for the new click position
+    const clickMarker = document.createElement('span');
+    clickMarker.id = 'boundary-click-marker-temp';
+    
+    // Insert boundary markers
+    labelElement.insertBefore(startMarker, firstNode);
+    labelElement.appendChild(endMarker);
+    console.log('║ ✓ Inserted start/end markers');
+    
+    // Insert click marker at the actual click position (this preserves the click position through unwrapping)
+    // For 'start' boundary: the click position is at newRange.start
+    // For 'end' boundary: the click position is at newRange.end
+    let clickContainer, clickOffset;
+    if (boundary === 'start') {
+      clickContainer = newRange.startContainer;
+      clickOffset = newRange.startOffset;
+      console.log('║ Click marker will use newRange.START');
+    } else {
+      clickContainer = newRange.endContainer;
+      clickOffset = newRange.endOffset;
+      console.log('║ Click marker will use newRange.END');
+    }
+    console.log('║ Click container:', clickContainer.nodeType === 3 ? 'TEXT:' + clickContainer.textContent.substring(0, 20) : clickContainer.nodeName);
+    console.log('║ Click offset:', clickOffset);
+    
+    if (clickContainer.nodeType === Node.TEXT_NODE) {
+      // Split the text node at the click position to insert marker
+      const textNode = clickContainer;
+      const offset = clickOffset;
+      
+      if (offset === 0) {
+        textNode.parentNode.insertBefore(clickMarker, textNode);
+      } else if (offset >= textNode.textContent.length) {
+        textNode.parentNode.insertBefore(clickMarker, textNode.nextSibling);
+      } else {
+        // Split text node
+        const afterText = textNode.splitText(offset);
+        textNode.parentNode.insertBefore(clickMarker, afterText);
+      }
+    } else {
+      // Insert at the specified child index
+      clickContainer.insertBefore(clickMarker, clickContainer.childNodes[clickOffset]);
+    }
+    
+    // Unwrap the label
+    console.log('║');
+    console.log('║ Unwrapping label (removing <manual_label> tags)...');
+    const fragment = document.createDocumentFragment();
+    while (labelElement.firstChild) {
+      if (labelElement.firstChild.className === 'delete-btn') {
+        labelElement.removeChild(labelElement.firstChild);
+        continue;
+      }
+      fragment.appendChild(labelElement.firstChild);
+    }
+    labelElement.parentNode.replaceChild(fragment, labelElement);
+    console.log('║ ✓ Label unwrapped');
+    
+    // Find all markers
+    console.log('║');
+    console.log('║ Finding markers in DOM...');
+    const startMarkerElement = document.getElementById('boundary-start-marker-temp');
+    const endMarkerElement = document.getElementById('boundary-end-marker-temp');
+    const clickMarkerElement = document.getElementById('boundary-click-marker-temp');
+    
+    if (!startMarkerElement || !endMarkerElement || !clickMarkerElement) {
+      console.error('║ ❌ Could not find markers!');
+      console.error('║ Start:', !!startMarkerElement, 'End:', !!endMarkerElement, 'Click:', !!clickMarkerElement);
+      console.log('╚══════════════════════════════════════════════════════════════\n');
+      return false;
+    }
+    console.log('║ ✓ All markers found');
+    
+    // Create final range using the markers
+    console.log('║');
+    console.log('║ Creating final range for new label...');
+    const finalRange = document.createRange();
+    
+    if (boundary === 'start') {
+      // Moving start: use click marker as new start, keep end marker as end
+      console.log('║ Moving START boundary:');
+      console.log('║   Range from AFTER click marker to BEFORE end marker');
+      finalRange.setStartAfter(clickMarkerElement);
+      finalRange.setEndBefore(endMarkerElement);
+    } else {
+      // Moving end: keep start marker as start, use click marker as new end
+      console.log('║ Moving END boundary:');
+      console.log('║   Range from AFTER start marker to BEFORE click marker');
+      finalRange.setStartAfter(startMarkerElement);
+      finalRange.setEndBefore(clickMarkerElement);
+    }
+    
+    // Log what will be extracted
+    const rangePreview = finalRange.cloneContents();
+    const previewDiv = document.createElement('div');
+    previewDiv.appendChild(rangePreview);
+    console.log('║');
+    console.log('║ Content to be re-labeled:');
+    console.log('║   Text:', finalRange.toString().substring(0, 50));
+    console.log('║   HTML:', previewDiv.innerHTML.substring(0, 100));
+    
+    // Remove all markers
+    console.log('║');
+    console.log('║ Removing markers...');
+    startMarkerElement.remove();
+    endMarkerElement.remove();
+    clickMarkerElement.remove();
+    
+    const extractedContent = finalRange.extractContents();
+    const processedContent = preserveFormattingInLabel(extractedContent);
+    
+    const newLabelElement = document.createElement('auto_label');
+    
+    Object.keys(storedAttributes).forEach(attrName => {
+      newLabelElement.setAttribute(attrName, storedAttributes[attrName]);
+    });
+    
+    newLabelElement.style.backgroundColor = labelData.color;
+    newLabelElement.style.color = getContrastColor(labelData.color);
+
+    if (SHOW_DELETE_CROSS_ON_LABELS) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "delete-btn";
+      deleteBtn.textContent = "×";
+      newLabelElement.appendChild(deleteBtn);
+    }
+
+    newLabelElement.appendChild(processedContent);
+    finalRange.insertNode(newLabelElement);
+
+    updateCurrentHtmlFromDOM();
+    window.getSelection().removeAllRanges();
+    attachLabelEventListeners();
+    updateStats();
+    refreshSearchAfterLabeling();
+    autoStartTimerOnActivity();
+    
+    console.log('║');
+    console.log('║ ✓✓✓ BOUNDARY MOVED SUCCESSFULLY ✓✓✓');
+    console.log('╚══════════════════════════════════════════════════════════════\n');
+    return true;
+  }
+
+  // Helper function to get preceding node for boundary expansion
+  function getPrecedingNode(element, count) {
+    let node = element.previousSibling;
+    let remaining = count;
+    
+    while (node && remaining > 0) {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        return node;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        return node;
+      }
+      node = node.previousSibling;
+      remaining--;
+    }
+    
+    return node;
+  }
+
+  // Helper function to get following node for boundary expansion
+  function getFollowingNode(element, count) {
+    let node = element.nextSibling;
+    let remaining = count;
+    
+    while (node && remaining > 0) {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        return node;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        return node;
+      }
+      node = node.nextSibling;
+      remaining--;
+    }
+    
+    return node;
+  }
+
+  // Helper function to get first text node in an element
+  function getFirstTextNode(element) {
+    for (let child of element.childNodes) {
+      if (child.className === 'delete-btn') continue;
+      if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+        return child;
+      }
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const textNode = getFirstTextNode(child);
+        if (textNode) return textNode;
+      }
+    }
+    return null;
+  }
+
+  // Helper function to get last text node in an element
+  function getLastTextNode(element) {
+    for (let i = element.childNodes.length - 1; i >= 0; i--) {
+      const child = element.childNodes[i];
+      if (child.className === 'delete-btn') continue;
+      if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+        return child;
+      }
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const textNode = getLastTextNode(child);
+        if (textNode) return textNode;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Enter boundary move mode - visually highlight the label and set up for boundary adjustment
+   */
+  function enterBoundaryMoveMode(labelElement) {
+    // Exit any previous boundary move mode
+    exitBoundaryMoveMode();
+    
+    boundaryMoveMode = true;
+    selectedLabelForBoundaryMove = labelElement;
+    
+    // Simple visual indicator - just a subtle outline, no animation
+    labelElement.style.outline = '2px solid #ff9800';
+    
+    // Change cursor for the entire content area
+    elements.htmlContent.style.cursor = 'crosshair';
+    
+    // Add keyup listener to exit mode when Ctrl is released
+    document.addEventListener('keyup', handleCtrlRelease);
+  }
+  
+  /**
+   * Handle Ctrl key release to exit boundary move mode
+   */
+  function handleCtrlRelease(e) {
+    if (e.key === 'Control' || e.key === 'Meta') {
+      exitBoundaryMoveMode();
+    }
+  }
+
+  /**
+   * Exit boundary move mode
+   */
+  function exitBoundaryMoveMode() {
+    if (!boundaryMoveMode) return;
+    
+    boundaryMoveMode = false;
+    
+    if (selectedLabelForBoundaryMove) {
+      selectedLabelForBoundaryMove.style.outline = '';
+      selectedLabelForBoundaryMove = null;
+    }
+    
+    elements.htmlContent.style.cursor = '';
+    
+    // Remove keyup listener
+    document.removeEventListener('keyup', handleCtrlRelease);
+  }
+
+  /**
+   * Validate that a range doesn't cross label boundaries
+   * CRITICAL: When shortening, ensure children stay inside parent!
+   */
+  function isRangeValidForBoundaryMove(range, currentLabel, boundary, clickRange, isExtending) {
+    console.log('\n║ ─── VALIDATION START ───');
+    console.log('║ Checking if boundary move is valid...');
+    console.log('║ Is extending:', isExtending);
+    
+    // CRITICAL CHECK 1: Check if there are any CHILD labels that would be left outside
+    // BUT ONLY WHEN SHRINKING! When extending, children will stay inside by definition
+    const currentLabelParent = currentLabel.getAttribute('parent');
+    const currentLabelName = currentLabel.getAttribute('labelName');
+    const childLabels = Array.from(currentLabel.querySelectorAll('manual_label, auto_label'));
+    
+    if (childLabels.length > 0 && !isExtending) {
+      console.log('║ Found', childLabels.length, 'child labels inside (checking because SHRINKING)');
+      
+      // Check if ANY child would fall outside the new range
+      for (const child of childLabels) {
+        const childRange = document.createRange();
+        childRange.selectNode(child);
+        
+        // Check if child is completely within the new range
+        const childStartCompare = range.compareBoundaryPoints(Range.START_TO_START, childRange);
+        const childEndCompare = range.compareBoundaryPoints(Range.END_TO_END, childRange);
+        
+        const childFullyInside = childStartCompare <= 0 && childEndCompare >= 0;
+        
+        if (!childFullyInside) {
+          console.log('║ ❌ BLOCKED: Child label would fall outside!');
+          console.log('║    Child:', child.getAttribute('labelName'));
+          console.log('║    Child text:', child.textContent.substring(0, 30));
+          console.log('║    This violates parent-child rule!');
+          console.log('╚══════════════════════════════════════════════════════════════\n');
+          return false;
+        }
+      }
+      console.log('║ ✓ All children will remain inside');
+    } else if (childLabels.length > 0 && isExtending) {
+      console.log('║ Found', childLabels.length, 'child labels inside (skipping check - EXTENDING)');
+    }
+    
+    // CRITICAL CHECK 2: Check if we're moving outside of OUR parent label
+    if (currentLabelParent) {
+      // Find the parent label element
+      let parentLabel = currentLabel.parentElement;
+      while (parentLabel && !parentLabel.matches('manual_label, auto_label')) {
+        parentLabel = parentLabel.parentElement;
+      }
+      
+      if (parentLabel && parentLabel.getAttribute('labelName') === currentLabelParent) {
+        console.log('║ This label has parent:', currentLabelParent);
+        const parentRange = document.createRange();
+        parentRange.selectNodeContents(parentLabel);
+        
+        // Check if new range stays inside parent
+        const startCompare = parentRange.compareBoundaryPoints(Range.START_TO_START, range);
+        const endCompare = parentRange.compareBoundaryPoints(Range.END_TO_END, range);
+        
+        const staysInsideParent = startCompare <= 0 && endCompare >= 0;
+        
+        if (!staysInsideParent) {
+          console.log('║ ❌ BLOCKED: Would move outside parent label!');
+          console.log('╚══════════════════════════════════════════════════════════════\n');
+          return false;
+        }
+        console.log('║ ✓ Stays inside parent label');
+      }
+    }
+    
+    // Check 3: Check if there are ANY label tags BETWEEN old and new boundary
+    const betweenRange = document.createRange();
+    
+    if (boundary === 'start') {
+      // Check from click position to just BEFORE the label element
+      betweenRange.setStart(clickRange.startContainer, clickRange.startOffset);
+      const parentNode = currentLabel.parentNode;
+      const labelIndex = Array.from(parentNode.childNodes).indexOf(currentLabel);
+      betweenRange.setEnd(parentNode, labelIndex);
+    } else {
+      // Check from just AFTER the label element to click position
+      const parentNode = currentLabel.parentNode;
+      const labelIndex = Array.from(parentNode.childNodes).indexOf(currentLabel);
+      betweenRange.setStart(parentNode, labelIndex + 1);
+      betweenRange.setEnd(clickRange.startContainer, clickRange.startOffset);
+    }
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(betweenRange.cloneContents());
+    const htmlContent = tempDiv.innerHTML;
+    
+    const hasLabelTags = 
+      htmlContent.includes('<manual_label') || 
+      htmlContent.includes('</manual_label>') ||
+      htmlContent.includes('<auto_label') || 
+      htmlContent.includes('</auto_label>');
+    
+    if (hasLabelTags) {
+      console.log('║ ❌ BLOCKED: Label tags found between boundaries!');
+      console.log('║    HTML:', htmlContent.substring(0, 100));
+      console.log('╚══════════════════════════════════════════════════════════════\n');
+      return false;
+    }
+    
+    console.log('║ ✓ VALIDATION PASSED');
+    console.log('║ ─── VALIDATION END ───');
+    
+    return true;
+  }
+
+  /**
+   * Check if a label element contains child label elements
+   */
+  function labelHasChildren(labelElement) {
+    const childLabels = labelElement.querySelectorAll('manual_label, auto_label');
+    return childLabels.length > 0;
+  }
+
+  /**
+   * Check if moving the end (closing) boundary would orphan any children
+   * Returns true if the move is safe (no children would be orphaned)
+   */
+  function canMoveEndBoundary(labelElement, newEndContainer, newEndOffset) {
+    // If there are no children, end boundary can always move
+    if (!labelHasChildren(labelElement)) {
+      return true;
+    }
+
+    // Check if all children would remain inside the new boundary
+    const childLabels = Array.from(labelElement.querySelectorAll('manual_label, auto_label'));
+    
+    // Create a range representing the proposed new label
+    const labelRange = document.createRange();
+    labelRange.selectNodeContents(labelElement);
+    const proposedRange = document.createRange();
+    proposedRange.setStart(labelRange.startContainer, labelRange.startOffset);
+    proposedRange.setEnd(newEndContainer, newEndOffset);
+
+    // Check if all children are fully contained within the proposed range
+    for (const child of childLabels) {
+      const childRange = document.createRange();
+      childRange.selectNode(child);
+      
+      // Check if child's end is before or at the proposed end
+      const comparison = childRange.compareBoundaryPoints(Range.END_TO_END, proposedRange);
+      if (comparison > 0) {
+        // Child extends beyond the proposed end boundary - would be orphaned
+        console.log('║ ⚠ End boundary cannot move: child label would be orphaned');
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  /**
+   * Check if moving the start (opening) boundary would orphan any children
+   * Returns true if the move is safe (no children would be orphaned)
+   */
+  function canMoveStartBoundary(labelElement, newStartContainer, newStartOffset) {
+    // If there are no children, start boundary can always move
+    if (!labelHasChildren(labelElement)) {
+      return true;
+    }
+
+    // Check if all children would remain inside the new boundary
+    const childLabels = Array.from(labelElement.querySelectorAll('manual_label, auto_label'));
+    
+    // Create a range representing the proposed new label
+    const labelRange = document.createRange();
+    labelRange.selectNodeContents(labelElement);
+    const proposedRange = document.createRange();
+    proposedRange.setStart(newStartContainer, newStartOffset);
+    proposedRange.setEnd(labelRange.endContainer, labelRange.endOffset);
+
+    // Check if all children are fully contained within the proposed range
+    for (const child of childLabels) {
+      const childRange = document.createRange();
+      childRange.selectNode(child);
+      
+      // Check if child's start is after or at the proposed start
+      const comparison = childRange.compareBoundaryPoints(Range.START_TO_START, proposedRange);
+      if (comparison < 0) {
+        // Child starts before the proposed start boundary - would be orphaned
+        console.log('║ ⚠ Start boundary cannot move: child label would be orphaned');
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+
+  /**
+   * Handle click in text during boundary move mode
+   */
+  function handleBoundaryMoveClick(event) {
+    console.log('=== HANDLE BOUNDARY MOVE CLICK ===');
+    console.log('boundaryMoveMode:', boundaryMoveMode);
+    console.log('selectedLabelForBoundaryMove:', selectedLabelForBoundaryMove);
+    console.log('event:', event);
+    
+    if (!boundaryMoveMode || !selectedLabelForBoundaryMove) {
+      console.log('Not in boundary move mode or no label selected, returning');
+      return;
+    }
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    console.log('Processing boundary move click...');
+    
+    // Get the click position
+    const clickRange = document.caretRangeFromPoint(event.clientX, event.clientY);
+    if (!clickRange) {
+      console.warn('Could not determine click position');
+      exitBoundaryMoveMode();
+      return;
+    }
+    
+    // Determine which boundary (start or end) is closest to the click
+    const labelElement = selectedLabelForBoundaryMove;
+    const labelRange = document.createRange();
+    labelRange.selectNodeContents(labelElement); // Select CONTENTS, not the element itself
+    
+    console.log('Click range:', clickRange.startContainer, clickRange.startOffset);
+    console.log('Label range:', labelRange.startContainer, labelRange.startOffset, 'to', labelRange.endContainer, labelRange.endOffset);
+    
+    // Determine if click is before, inside, or after the label
+    const compareToStart = clickRange.compareBoundaryPoints(Range.START_TO_START, labelRange);
+    const compareToEnd = clickRange.compareBoundaryPoints(Range.START_TO_END, labelRange);
+    
+    console.log('compareToStart:', compareToStart, 'compareToEnd:', compareToEnd);
+    
+    let closestBoundary;
+    let newRange = document.createRange();
+    
+    if (compareToStart < 0) {
+      // Click is BEFORE the label - typically expanding start backward
+      console.log('Click is before label - typically expanding start backward');
+      // But check if it could actually be shrinking (if we have nested structure issues)
+      closestBoundary = 'start';
+      newRange.setStart(clickRange.startContainer, clickRange.startOffset);
+      newRange.setEnd(labelRange.endContainer, labelRange.endOffset);
+      
+      // Verify this boundary can move (in case it's actually a shrink operation)
+      if (!canMoveStartBoundary(labelElement, clickRange.startContainer, clickRange.startOffset)) {
+        console.log('✗ Start boundary cannot move - trying end boundary instead');
+        if (canMoveEndBoundary(labelElement, clickRange.startContainer, clickRange.startOffset)) {
+          console.log('✓ End boundary can move');
+          closestBoundary = 'end';
+          newRange.setStart(labelRange.startContainer, labelRange.startOffset);
+          newRange.setEnd(clickRange.startContainer, clickRange.startOffset);
+        } else {
+          console.error('✗ Neither boundary can move to this position');
+          alert('Cannot move label boundary to this position: would orphan child labels.');
+          exitBoundaryMoveMode();
+          return;
+        }
+      }
+    } else if (compareToEnd > 0) {
+      // Click is AFTER the label - typically expanding end forward
+      console.log('Click is after label - typically expanding end forward');
+      // But check if it could actually be shrinking (range comparison can be misleading)
+      closestBoundary = 'end';
+      newRange.setStart(labelRange.startContainer, labelRange.startOffset);
+      newRange.setEnd(clickRange.startContainer, clickRange.startOffset);
+      
+      // Verify this boundary can move (in case it's actually a shrink operation)
+      if (!canMoveEndBoundary(labelElement, clickRange.startContainer, clickRange.startOffset)) {
+        console.log('✗ End boundary cannot move - trying start boundary instead');
+        if (canMoveStartBoundary(labelElement, clickRange.startContainer, clickRange.startOffset)) {
+          console.log('✓ Start boundary can move');
+          closestBoundary = 'start';
+          newRange.setStart(clickRange.startContainer, clickRange.startOffset);
+          newRange.setEnd(labelRange.endContainer, labelRange.endOffset);
+        } else {
+          console.error('✗ Neither boundary can move to this position');
+          alert('Cannot move label boundary to this position: would orphan child labels.');
+          exitBoundaryMoveMode();
+          return;
+        }
+      }
+    } else {
+      // Click is INSIDE the label - SHORTENING operation
+      // Determine which boundary is closer
+      const rangeToStart = document.createRange();
+      rangeToStart.setStart(labelRange.startContainer, labelRange.startOffset);
+      rangeToStart.setEnd(clickRange.startContainer, clickRange.startOffset);
+      const distanceToStart = rangeToStart.toString().length;
+      
+      const rangeToEnd = document.createRange();
+      rangeToEnd.setStart(clickRange.startContainer, clickRange.startOffset);
+      rangeToEnd.setEnd(labelRange.endContainer, labelRange.endOffset);
+      const distanceToEnd = rangeToEnd.toString().length;
+      
+      console.log('Click inside label. distanceToStart:', distanceToStart, 'distanceToEnd:', distanceToEnd);
+      
+      // NEW LOGIC: Check which boundary CAN actually move
+      // Priority: Try closest first, but if it would orphan children, try the other boundary
+      
+      const preferClosest = distanceToStart < distanceToEnd;
+      let primaryBoundary = preferClosest ? 'start' : 'end';
+      let secondaryBoundary = preferClosest ? 'end' : 'start';
+      
+      console.log(`Primary choice: ${primaryBoundary} (closer), Secondary: ${secondaryBoundary}`);
+      
+      // Check if primary boundary can move
+      let canMovePrimary = false;
+      if (primaryBoundary === 'end') {
+        canMovePrimary = canMoveEndBoundary(labelElement, clickRange.startContainer, clickRange.startOffset);
+      } else {
+        canMovePrimary = canMoveStartBoundary(labelElement, clickRange.startContainer, clickRange.startOffset);
+      }
+      
+      if (canMovePrimary) {
+        console.log(`✓ Primary boundary (${primaryBoundary}) can move`);
+        closestBoundary = primaryBoundary;
+        if (primaryBoundary === 'start') {
+          newRange.setStart(clickRange.startContainer, clickRange.startOffset);
+          newRange.setEnd(labelRange.endContainer, labelRange.endOffset);
+        } else {
+          newRange.setStart(labelRange.startContainer, labelRange.startOffset);
+          newRange.setEnd(clickRange.startContainer, clickRange.startOffset);
+        }
+      } else {
+        // Primary can't move, try secondary
+        console.log(`✗ Primary boundary (${primaryBoundary}) cannot move - checking secondary`);
+        
+        let canMoveSecondary = false;
+        if (secondaryBoundary === 'end') {
+          canMoveSecondary = canMoveEndBoundary(labelElement, clickRange.startContainer, clickRange.startOffset);
+        } else {
+          canMoveSecondary = canMoveStartBoundary(labelElement, clickRange.startContainer, clickRange.startOffset);
+        }
+        
+        if (canMoveSecondary) {
+          console.log(`✓ Secondary boundary (${secondaryBoundary}) can move`);
+          closestBoundary = secondaryBoundary;
+          if (secondaryBoundary === 'start') {
+            newRange.setStart(clickRange.startContainer, clickRange.startOffset);
+            newRange.setEnd(labelRange.endContainer, labelRange.endOffset);
+          } else {
+            newRange.setStart(labelRange.startContainer, labelRange.startOffset);
+            newRange.setEnd(clickRange.startContainer, clickRange.startOffset);
+          }
+        } else {
+          // Neither boundary can move
+          console.error('✗ Neither boundary can move to this position');
+          alert('Cannot move label boundary to this position: would orphan child labels. Please select a position that keeps all children inside the label.');
+          exitBoundaryMoveMode();
+          return;
+        }
+      }
+    }
+    
+    // Call moveLabelBoundary with the new range
+    console.log('Calling moveLabelBoundary with:', {
+      labelElement,
+      closestBoundary,
+      newRange
+    });
+    
+    const success = moveLabelBoundary(labelElement, closestBoundary, 1, newRange, clickRange);
+    
+    if (success) {
+      console.log(`✓ Successfully moved ${closestBoundary} boundary to click position`);
+    } else {
+      console.warn('✗ Failed to move boundary');
+    }
+    
+    // Exit boundary move mode
+    exitBoundaryMoveMode();
   }
 
   function deleteParameter(labelPath, paramName) {
@@ -2452,7 +3284,7 @@ function showParameterMenu(labelElement, x, y) {
   const path = parent ? [parent, labelName] : [labelName];
   const labelData = getLabelByPath(path);
 
-  if (!labelData || labelData.params.size === 0) {
+  if (!labelData) {
     return;
   }
 
@@ -2470,6 +3302,15 @@ function showParameterMenu(labelElement, x, y) {
       hideParameterMenu();
     };
     elements.paramMenu.appendChild(closeBtn);
+  }
+  
+  // Add delete instruction text if it doesn't exist
+  let deleteInfo = elements.paramMenu.querySelector('.param-delete-info');
+  if (!deleteInfo) {
+    deleteInfo = document.createElement('div');
+    deleteInfo.className = 'param-delete-info';
+    deleteInfo.textContent = 'Right-click on label to delete it';
+    elements.paramMenu.insertBefore(deleteInfo, elements.paramMenuTitle.nextSibling);
   }
 
   // Collect group attribute names to exclude them
@@ -4209,10 +5050,12 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
       }
 
       if (!mention.querySelector('.delete-btn')) {
-        const deleteBtn = doc.createElement("button");
-        deleteBtn.className = "delete-btn";
-        deleteBtn.textContent = "×";
-        mention.insertBefore(deleteBtn, mention.firstChild);
+        if (SHOW_DELETE_CROSS_ON_LABELS) {
+          const deleteBtn = doc.createElement("button");
+          deleteBtn.className = "delete-btn";
+          deleteBtn.textContent = "×";
+          mention.insertBefore(deleteBtn, mention.firstChild);
+        }
       }
     });
 
@@ -4305,72 +5148,109 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
   function attachLabelEventListeners() {
     const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
     labelElements.forEach(labelElement => {
+      // Function to delete a label and preserve its content
+      const deleteLabelHandler = () => {
+        // Extract content while preserving formatting
+        const contentToPreserve = extractLabelContentWithFormatting(labelElement);
+        
+        if (labelElement.parentNode) {
+          // Insert the preserved content before the label
+          if (contentToPreserve.childNodes.length > 0) {
+            Array.from(contentToPreserve.childNodes).forEach(node => {
+              labelElement.parentNode.insertBefore(node, labelElement);
+            });
+          }
+          
+          // Remove the label element
+          labelElement.parentNode.removeChild(labelElement);
+          
+        } else {
+          elements.htmlContent.innerHTML = '';
+        }
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = elements.htmlContent.innerHTML;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(currentHtml, 'text/html');
+        doc.body.innerHTML = tempDiv.innerHTML;
+        currentHtml = doc.documentElement.outerHTML;
+
+        attachLabelEventListeners();
+        updateStats();
+        refreshGroupsDisplay();
+        
+        // Refresh search if there's text in advanced content, preserving current match position
+        const advancedText = getCleanAdvancedText();
+        if (advancedText) {
+          const currentMatchIndex = currentSearchSelection?.matchIndex ?? 0;
+          console.log('Refreshing search after label deletion, preserving match index:', currentMatchIndex);
+          
+          // Re-run search
+          const matches = searchInHtmlContent(advancedText);
+          
+          // Try to preserve the current match position
+          if (matches.length > 0 && currentMatchIndex < matches.length) {
+            setCurrentSearchSelection(matches[currentMatchIndex], currentMatchIndex);
+          } else if (matches.length > 0) {
+            // If current index is out of bounds, go to the last available match
+            const lastIndex = matches.length - 1;
+            setCurrentSearchSelection(matches[lastIndex], lastIndex);
+          }
+        }
+      };
+      
       const deleteBtn = labelElement.querySelector('.delete-btn');
       if (deleteBtn) {
         deleteBtn.onclick = (e) => {
           e.stopPropagation();
-          
-          // Extract content while preserving formatting
-          const contentToPreserve = extractLabelContentWithFormatting(labelElement);
-          
-          if (labelElement.parentNode) {
-            // Insert the preserved content before the label
-            if (contentToPreserve.childNodes.length > 0) {
-              Array.from(contentToPreserve.childNodes).forEach(node => {
-                labelElement.parentNode.insertBefore(node, labelElement);
-              });
-            }
-            
-            // Remove the label element
-            labelElement.parentNode.removeChild(labelElement);
-            
-          } else {
-            elements.htmlContent.innerHTML = '';
-          }
-
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = elements.htmlContent.innerHTML;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(currentHtml, 'text/html');
-          doc.body.innerHTML = tempDiv.innerHTML;
-          currentHtml = doc.documentElement.outerHTML;
-
-          attachLabelEventListeners();
-          updateStats();
-          refreshGroupsDisplay();
-          
-          // Refresh search if there's text in advanced content, preserving current match position
-          const advancedText = getCleanAdvancedText();
-          if (advancedText) {
-            const currentMatchIndex = currentSearchSelection?.matchIndex ?? 0;
-            console.log('Refreshing search after label deletion, preserving match index:', currentMatchIndex);
-            
-            // Re-run search
-            const matches = searchInHtmlContent(advancedText);
-            
-            // Try to preserve the current match position
-            if (matches.length > 0 && currentMatchIndex < matches.length) {
-              setCurrentSearchSelection(matches[currentMatchIndex], currentMatchIndex);
-            } else if (matches.length > 0) {
-              // If current index is out of bounds, go to the last available match
-              const lastIndex = matches.length - 1;
-              setCurrentSearchSelection(matches[lastIndex], lastIndex);
-            }
-          }
+          deleteLabelHandler();
         };
       }
 
-      // Click to edit parameters
-      labelElement.onclick = (e) => {
-        // Don't trigger if clicking delete button
-        if (e.target.classList.contains('delete-btn')) return;
+      // Right-click to delete label
+      labelElement.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteLabelHandler();
+      };
 
-        // If there was a selection, do NOT open parameter menu!
+      // Click to edit parameters OR enter boundary move mode (Ctrl+click)
+      labelElement.onclick = (e) => {
+        console.log('Label clicked. Ctrl pressed:', e.ctrlKey, 'metaKey:', e.metaKey);
+        
+        // If we're already in boundary move mode, don't handle this click
+        // Let it bubble up to htmlContent click handler
+        if (boundaryMoveMode) {
+          console.log('Already in boundary move mode, letting click bubble to htmlContent');
+          return;
+        }
+        
+        // Don't trigger if clicking delete button
+        if (e.target.classList.contains('delete-btn')) {
+          console.log('Clicked delete button, returning');
+          return;
+        }
+
+        // Check if Ctrl key is pressed FIRST (or Cmd on Mac)
+        if (e.ctrlKey || e.metaKey) {
+          console.log('Ctrl/Cmd detected, entering boundary move mode');
+          e.stopPropagation();
+          // Enter boundary move mode
+          enterBoundaryMoveMode(labelElement);
+          return;
+        }
+
+        // For normal clicks: check selection before opening parameter menu
         const sel = window.getSelection();
-        if (!sel.isCollapsed || multiSelectionMode) return;
+        console.log('Selection collapsed:', sel.isCollapsed, 'multiSelectionMode:', multiSelectionMode);
+        if (!sel.isCollapsed || multiSelectionMode) {
+          console.log('Selection active or multi-selection mode, returning');
+          return;
+        }
         
         e.stopPropagation();
-
+        
+        // Normal behavior: show parameter menu
         showParameterMenu(labelElement, e.clientX, e.clientY);
       };
     });
@@ -5135,10 +6015,12 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   const processedContent = preserveFormattingInLabel(fragment);
   
   // Add delete button first
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "delete-btn";
-  deleteBtn.textContent = "×";
-  labelElement.appendChild(deleteBtn);
+  if (SHOW_DELETE_CROSS_ON_LABELS) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "×";
+    labelElement.appendChild(deleteBtn);
+  }
 
   // Add the processed content to the label
   labelElement.appendChild(processedContent);
@@ -5164,27 +6046,38 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
 function attachAdvancedLabelEventListeners() {
   const labelElements = elements.advancedContent.querySelectorAll('manual_label, auto_label');
   labelElements.forEach(labelElement => {
+    // Function to delete a label and preserve its content
+    const deleteLabelHandler = () => {
+      // Extract content while preserving formatting
+      const contentToPreserve = extractLabelContentWithFormatting(labelElement);
+      
+      if (labelElement.parentNode) {
+        if (contentToPreserve.childNodes.length > 0) {
+          Array.from(contentToPreserve.childNodes).forEach(node => {
+            labelElement.parentNode.insertBefore(node, labelElement);
+          });
+        }
+        labelElement.parentNode.removeChild(labelElement);
+      }
+
+      attachAdvancedLabelEventListeners();
+      // Note: We don't call updateStats() here because this is purely advanced content manipulation
+    };
+    
     const deleteBtn = labelElement.querySelector('.delete-btn');
     if (deleteBtn) {
       deleteBtn.onclick = (e) => {
         e.stopPropagation();
-        
-        // Extract content while preserving formatting
-        const contentToPreserve = extractLabelContentWithFormatting(labelElement);
-        
-        if (labelElement.parentNode) {
-          if (contentToPreserve.childNodes.length > 0) {
-            Array.from(contentToPreserve.childNodes).forEach(node => {
-              labelElement.parentNode.insertBefore(node, labelElement);
-            });
-          }
-          labelElement.parentNode.removeChild(labelElement);
-        }
-
-        attachAdvancedLabelEventListeners();
-        // Note: We don't call updateStats() here because this is purely advanced content manipulation
+        deleteLabelHandler();
       };
     }
+
+    // Right-click to delete label
+    labelElement.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteLabelHandler();
+    };
 
     // Click to edit parameters
     labelElement.onclick = (e) => {
@@ -5201,10 +6094,7 @@ function attachAdvancedLabelEventListeners() {
       const path = parent ? [parent, labelName] : [labelName];
       const labelData = getLabelByPath(path);
 
-      if (!labelData || labelData.params.size === 0) {
-        //alert("This label has no parameters to edit");
-        return;
-      }
+      // Always show parameter menu, even if no parameters (will show delete button)
       showParameterMenu(labelElement, e.clientX, e.clientY);
     };
   });
@@ -5328,10 +6218,12 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   const fragment = range.extractContents();
   const processedContent = preserveFormattingInLabel(fragment);
   
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "delete-btn";
-  deleteBtn.textContent = "×";
-  labelElement.appendChild(deleteBtn);
+  if (SHOW_DELETE_CROSS_ON_LABELS) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "×";
+    labelElement.appendChild(deleteBtn);
+  }
   
   labelElement.appendChild(processedContent);
 
@@ -5394,10 +6286,12 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
   labelElement.style.color = getContrastColor(labelData.color);
 
   // Add delete button first
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "delete-btn";
-  deleteBtn.textContent = "×";
-  labelElement.appendChild(deleteBtn);
+  if (SHOW_DELETE_CROSS_ON_LABELS) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "×";
+    labelElement.appendChild(deleteBtn);
+  }
 
   // Extract content from highlight span (excluding the highlight styling)
   const textContent = highlightSpan.textContent;
@@ -5489,10 +6383,12 @@ function createNestedLabelStructure(advancedLabel, originalContent) {
   }
   
   // Add delete button at the beginning
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "delete-btn";
-  deleteBtn.textContent = "×";
-  labelElement.insertBefore(deleteBtn, labelElement.firstChild);
+  if (SHOW_DELETE_CROSS_ON_LABELS) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "×";
+    labelElement.insertBefore(deleteBtn, labelElement.firstChild);
+  }
   
   return labelElement;
 }
@@ -5750,10 +6646,12 @@ function createSingleLabel(labelInfo, content) {
   }
   
   // Add delete button first
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "delete-btn";
-  deleteBtn.textContent = "×";
-  labelElement.appendChild(deleteBtn);
+  if (SHOW_DELETE_CROSS_ON_LABELS) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "×";
+    labelElement.appendChild(deleteBtn);
+  }
   
   // Add content
   labelElement.appendChild(content);
@@ -6075,6 +6973,11 @@ function replaceSelectionWithStructure(range, structure) {
 }
 
 function addDeleteButtonToLabel(labelElement) {
+  // Check if we should show delete buttons based on configuration
+  if (!SHOW_DELETE_CROSS_ON_LABELS) {
+    return; // Don't add delete buttons if disabled
+  }
+  
   // Check if delete button already exists
   if (labelElement.querySelector('.delete-btn')) {
     return;
@@ -7366,7 +8269,15 @@ document.addEventListener('mouseup', (e) => {
         selection.removeAllRanges();
         return;
       } else if (!multiSelectionMode) {
-        // Single selection mode
+        // Single selection mode - validate before showing context menu
+        const validation = isValidSelection(range);
+        if (!validation.valid) {
+          // Don't show context menu for invalid selections
+          console.log('Invalid selection detected:', validation.reason);
+          selection.removeAllRanges();
+          return;
+        }
+        
         if (isInAdvancedContent) {
           console.log('Advanced content mouse selection made:', selection.toString().trim());
           // Advanced content mouse selection - DON'T interfere with search selection
@@ -8050,6 +8961,16 @@ window.addEventListener('click', (event) => {
   
   // Click handler for placing page savers
   elements.htmlContent.addEventListener('click', (e) => {
+    console.log('htmlContent clicked. boundaryMoveMode:', boundaryMoveMode, 'target:', e.target);
+    
+    // Handle boundary move mode first
+    if (boundaryMoveMode) {
+      console.log('In boundary move mode, calling handleBoundaryMoveClick');
+      handleBoundaryMoveClick(e);
+      return;
+    }
+    
+    // Handle page saver placement mode
     if (pageSaverPlacementMode) {
       placePageSaver(e);
     }
@@ -8066,11 +8987,16 @@ window.addEventListener('click', (event) => {
     }
   });
   
-  // Escape key to exit placement mode
+  // Escape key to exit placement mode or boundary move mode
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && pageSaverPlacementMode) {
-      exitPageSaverPlacementMode();
-      showTemporaryMessage('Page saver placement cancelled', 2000);
+    if (e.key === 'Escape') {
+      if (boundaryMoveMode) {
+        exitBoundaryMoveMode();
+        showTemporaryMessage('Boundary move mode cancelled', 2000);
+      } else if (pageSaverPlacementMode) {
+        exitPageSaverPlacementMode();
+        showTemporaryMessage('Page saver placement cancelled', 2000);
+      }
     }
   });
   

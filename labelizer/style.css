@@ -1257,6 +1257,26 @@
       cursor: grabbing;
     }
 
+    /* Delete info text in parameter menu */
+    .param-delete-info {
+      display: block;
+      margin: 12px 0;
+      padding: 8px 12px;
+      background: rgba(52, 152, 219, 0.1);
+      color: var(--accent);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+    }
+
+    :root[data-theme="light"] .param-delete-info {
+      background: rgba(52, 152, 219, 0.15);
+      color: #2980b9;
+      border-left-color: #2980b9;
+    }
+
     .param-close-btn {
       position: absolute;
       top: 12px;

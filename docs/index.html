@@ -10,16 +10,24 @@
   <link rel="stylesheet" href="../shared/settings-modal.css">
   <link rel="icon" type="image/png" href="../favicon.png">
   <style>
+    /* Override common.css height restriction for sticky positioning */
+    html, body {
+      height: auto !important;
+      min-height: 100%;
+    }
+
     /* Documentation-specific styles */
     .docs-layout {
       display: flex;
       min-height: calc(100vh - 70px);
-      overflow: hidden;
     }
 
     /* Sidebar Navigation */
     .sidebar {
+      position: sticky;
+      top: 70px;
       width: 280px;
+      height: calc(100vh - 70px);
       background: var(--card);
       border-right: 1px solid var(--border);
       overflow-y: auto;
@@ -869,6 +877,39 @@ Instead, set it once in the Co-reference panel, and all group members receive th
             <li>Click the delete button (×) on a label to remove it</li>
             <li>Deleting a parent label removes all nested children</li>
           </ul>
+
+          <h3>Adjusting Label Boundaries</h3>
+          <p>
+            After applying a label, you can easily extend or shorten its boundaries without having to delete and reapply it.
+          </p>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <video autoplay loop muted playsinline style="max-width: 90%; width: 800px; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);">
+              <source src="include/ctr_extand_label.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          <h4>How to Adjust Boundaries</h4>
+          <ol>
+            <li>Hold <strong>Ctrl</strong> (or <strong>Cmd</strong> on Mac)</li>
+            <li>Click on the label you want to adjust</li>
+            <li>Click elsewhere in the text to set the new boundary</li>
+            <li>The label will expand or contract to include the new selection</li>
+          </ol>
+
+          <div class="alert">
+            <div class="alert-title">Quick Editing</div>
+            <p>
+              This is especially useful when you initially apply a label but realize you need to include 
+              a bit more context or remove extra words from the selection. No need to delete and recreate—just 
+              Ctrl+click to adjust!
+            </p>
+            <p>
+              This feature is particularly valuable for correcting annotations generated automatically by LLMs, 
+              which may not always capture the exact boundaries correctly.
+            </p>
+          </div>
         </section>
 
         <section id="managing-groups">
