@@ -74,7 +74,7 @@
               <button class="tab-btn active" data-tab="labels">Labels</button>
               <button class="tab-btn" data-tab="coref">Co-reference</button>
               <button class="tab-btn" data-tab="advanced">Advanced</button>
-              <button class="tab-btn" data-tab="statistics">Statistics</button>
+              <button class="tab-btn" data-tab="verification">Verification</button>
             </div>
           </div>
         </div>
@@ -137,19 +137,84 @@
             </div>
           </div>
 
-          <!-- Statistics Tab -->
-          <div class="tab-content" id="tab-statistics">
-            <div class="stats-grid">
-              <div class="stat-item">
-                <span class="stat-number" id="total-mentions">0</span>
-                <div class="stat-label">Total Mentions</div>
+          <!-- Verification Tab -->
+          <div class="tab-content" id="tab-verification">
+            <div class="verification-section">
+              <!-- Filter Menu Bar -->
+              <div class="filter-menu-bar">
+                <button class="filter-menu-btn" data-filter="label-type">
+                  <span class="filter-btn-text">Type</span>
+                  <span class="filter-count" id="filter-type-count">(2)</span>
+                  <span class="filter-arrow">▼</span>
+                </button>
+                
+                <button class="filter-menu-btn" data-filter="label-name">
+                  <span class="filter-btn-text">Name</span>
+                  <span class="filter-count" id="filter-name-count">(0)</span>
+                  <span class="filter-arrow">▼</span>
+                </button>
+                
+                <button class="filter-menu-btn" data-filter="status">
+                  <span class="filter-btn-text">Status</span>
+                  <span class="filter-count" id="filter-status-count">(2)</span>
+                  <span class="filter-arrow">▼</span>
+                </button>
               </div>
-              <div class="stat-item">
-                <span class="stat-number" id="total-labels">0</span>
-                <div class="stat-label">Total Labels</div>
+              
+              <!-- Filter Dropdowns -->
+              <div class="filter-dropdown" id="filter-dropdown-label-type">
+                <div class="filter-dropdown-content">
+                  <label class="filter-checkbox">
+                    <input type="checkbox" class="filter-type" value="manual" checked>
+                    <span>Manual</span>
+                  </label>
+                  <label class="filter-checkbox">
+                    <input type="checkbox" class="filter-type" value="auto" checked>
+                    <span>Auto</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="filter-dropdown" id="filter-dropdown-label-name">
+                <div class="filter-dropdown-content" id="filter-label-names">
+                  <!-- Will be populated dynamically -->
+                </div>
+              </div>
+              
+              <div class="filter-dropdown" id="filter-dropdown-status">
+                <div class="filter-dropdown-content">
+                  <label class="filter-checkbox">
+                    <input type="checkbox" class="filter-verified" value="False" checked>
+                    <span>Unverified</span>
+                  </label>
+                  <label class="filter-checkbox">
+                    <input type="checkbox" class="filter-verified" value="True" checked>
+                    <span>Verified</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="verification-stats">
+                <div class="stat-item">
+                  <span class="stat-number" id="verified-count">0</span>
+                  <div class="stat-label">Verified</div>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-number" id="unverified-count">0</span>
+                  <div class="stat-label">Unverified</div>
+                </div>
+              </div>
+              
+              <!-- Bulk Actions -->
+              <div class="verification-bulk-actions">
+                <button id="bulk-verify-btn" class="bulk-action-btn bulk-verify">
+                  Set All Filtered as Verified
+                </button>
+                <button id="bulk-unverify-btn" class="bulk-action-btn bulk-unverify">
+                  Set All Filtered as Unverified
+                </button>
               </div>
             </div>
-            <div id="parent-labels-stats" class="parent-labels-breakdown"></div>
           </div>
         </div>
       </div>
@@ -233,5 +298,6 @@
   </div>
 
   <script src="app.js"></script> <!-- <script src="app.js"></script>   |    <script type="module" src="js/core/app.js"></script>-->
+  <script src="verification.js"></script>
 </body>
 </html>

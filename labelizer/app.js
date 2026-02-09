@@ -75,9 +75,6 @@
     paramMenu: document.getElementById('param-menu'),
     paramMenuTitle: document.getElementById('param-menu-title'),
     paramForm: document.getElementById('param-form'),
-    totalMentions: document.getElementById('total-mentions'),
-    totalLabels: document.getElementById('total-labels'),
-    parentLabelsStats: document.getElementById('parent-labels-stats'),
     sourceView: document.getElementById('source-view'),
     viewToggle: document.getElementById('view-toggle'),
     dropZone: document.getElementById('drop-zone'),
@@ -5275,89 +5272,9 @@ function extractLabelContentWithFormatting(labelElement) {
 
 
 function updateStats() {
-    const manualLabels = elements.htmlContent.querySelectorAll('manual_label, auto_label');
-    elements.totalMentions.textContent = manualLabels.length;
-    
-    // Count total label types (including sublabels)
-    let totalLabelTypes = 0;
-    function countLabelsRecursive(labelMap) {
-      labelMap.forEach((label) => {
-        totalLabelTypes++;
-        countLabelsRecursive(label.sublabels);
-      });
-    }
-    countLabelsRecursive(labels);
-    
-    if (elements.totalLabels) {
-      elements.totalLabels.textContent = totalLabelTypes;
-    }
-    
-    // Count mentions per parent label (root labels only)
-    const parentLabelCounts = new Map();
-    
-    manualLabels.forEach(labelEl => {
-      const labelName = labelEl.getAttribute('labelName');
-      const parent = labelEl.getAttribute('parent');
-      
-      // Find the root/parent label for this mention
-      let rootLabel = labelName;
-      if (parent) {
-        // If it has a parent, the parent is the root
-        rootLabel = parent;
-      } else {
-        // Check if this label itself is a parent (has sublabels)
-        const label = getLabelByPath([labelName]);
-        if (label && label.sublabels && label.sublabels.size > 0) {
-          rootLabel = labelName;
-        } else {
-          // It's a root label without sublabels
-          rootLabel = labelName;
-        }
-      }
-      
-      parentLabelCounts.set(rootLabel, (parentLabelCounts.get(rootLabel) || 0) + 1);
-    });
-    
-    // Display parent label breakdown
-    if (elements.parentLabelsStats) {
-      elements.parentLabelsStats.innerHTML = '';
-      
-      if (parentLabelCounts.size > 0) {
-        const breakdownTitle = document.createElement('div');
-        breakdownTitle.className = 'stats-breakdown-title';
-        breakdownTitle.textContent = 'Parent Labels Breakdown:';
-        elements.parentLabelsStats.appendChild(breakdownTitle);
-        
-        // Sort by count (descending)
-        const sortedCounts = Array.from(parentLabelCounts.entries())
-          .sort((a, b) => b[1] - a[1]);
-        
-        sortedCounts.forEach(([labelName, count]) => {
-          const label = getLabelByPath([labelName]);
-          const labelColor = label ? label.color : '#6aa3ff';
-          
-          const labelStat = document.createElement('div');
-          labelStat.className = 'parent-label-stat';
-          
-          const colorIndicator = document.createElement('div');
-          colorIndicator.className = 'stat-color-indicator';
-          colorIndicator.style.backgroundColor = labelColor;
-          
-          const labelNameSpan = document.createElement('span');
-          labelNameSpan.className = 'stat-label-name';
-          labelNameSpan.textContent = labelName;
-          
-          const countBadge = document.createElement('span');
-          countBadge.className = 'stat-count-badge';
-          countBadge.textContent = count;
-          
-          labelStat.appendChild(colorIndicator);
-          labelStat.appendChild(labelNameSpan);
-          labelStat.appendChild(countBadge);
-          
-          elements.parentLabelsStats.appendChild(labelStat);
-        });
-      }
+    // Update verification stats if available
+    if (typeof window.updateVerificationStats === 'function') {
+      window.updateVerificationStats();
     }
 }
 
@@ -6007,6 +5924,9 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
     });
   }
   
+  // Add verified attribute (not part of label schema, like style or class)
+  labelElement.setAttribute("verified", "False");
+  
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
 
@@ -6211,6 +6131,10 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
       labelElement.setAttribute(attrName, initialValue);
     });
   }
+  
+  // Add verified attribute (not part of label schema, like style or class)
+  labelElement.setAttribute("verified", "False");
+  
   console.log("Final label element before insertion:", labelElement); // ZAG COMMENT
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -6281,6 +6205,9 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
       labelElement.setAttribute(attrName, initialValue);
     });
   }
+  
+  // Add verified attribute (not part of label schema, like style or class)
+  labelElement.setAttribute("verified", "False");
   
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -9089,6 +9016,13 @@ window.addEventListener('click', (event) => {
       }
     });
   }
+  
+  // ======= Expose Functions for External Modules =======
+  // Make functions and state available for verification.js
+  window.updateCurrentHtmlFromDOM = updateCurrentHtmlFromDOM;
+  window.getLabels = () => labels;
+  window.getLabelByPath = getLabelByPath;
+  window.getHtmlContent = () => elements.htmlContent;
   
   console.log('Enhanced HTML Labelizer ready!');
 
