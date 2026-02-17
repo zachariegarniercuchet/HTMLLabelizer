@@ -442,30 +442,36 @@
     const htmlContent = window.getHtmlContent();
     if (!htmlContent) return;
     
-    // Find first parent label that has instances matching the filters
-    let foundMatch = false;
+    // Collect ALL instances matching filters from all parent labels
+    let allFilteredInstances = [];
     
-    for (let i = 0; i < allParentLabels.length; i++) {
-      const parentLabelName = allParentLabels[i];
-      
+    allParentLabels.forEach(parentLabelName => {
       // Apply label name filter
       if (!activeFilters.labelNames.has(parentLabelName)) {
-        continue;
+        return;
       }
       
       // Get instances for this label
       const instances = collectFilteredInstances(parentLabelName);
-      
-      if (instances.length > 0) {
-        currentParentLabelIndex = i;
-        parentLabels = allParentLabels;
-        foundMatch = true;
-        showParentLabelDetails(parentLabelName);
-        break;
-      }
-    }
+      allFilteredInstances.push(...instances);
+    });
     
-    if (!foundMatch) {
+    if (allFilteredInstances.length > 0) {
+      // Sort by document order (position in DOM)
+      allFilteredInstances.sort((a, b) => {
+        // Compare positions in the document
+        const position = a.compareDocumentPosition(b);
+        if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+        if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+        return 0;
+      });
+      
+      // Set the unified list and show first instance
+      currentLabelInstances = allFilteredInstances;
+      currentInstanceIndex = 0;
+      parentLabels = allParentLabels;
+      showCurrentInstance();
+    } else {
       // No matching labels found
       showNoLabelsMessage();
     }
@@ -569,7 +575,7 @@
   }
   
   /**
-   * Start verification mode - find first unverified label
+   * Start verification mode - collect all filtered instances in document order
    */
   function startVerification() {
     verificationMode = true;
@@ -585,27 +591,28 @@
     populateLabelNameFilters();
     
     parentLabels = Array.from(labels.keys());
-    currentParentLabelIndex = 0;
     
     if (parentLabels.length === 0) {
       showNoLabelsMessage();
       return;
     }
     
-    // Apply filters to find first matching label
+    // Apply filters to collect all matching instances in document order
     applyFilters();
   }
   
   /**
-   * Show details for a parent label with all its instances
+   * Show details for the current instance (based on currentInstanceIndex)
    */
-  function showParentLabelDetails(parentLabelName) {
+  function showCurrentInstance() {
+    if (currentLabelInstances.length === 0 || currentInstanceIndex >= currentLabelInstances.length) {
+      showNoLabelsMessage();
+      return;
+    }
+    
     const labels = window.getLabels();
     const htmlContent = window.getHtmlContent();
     if (!labels || !htmlContent) return;
-    
-    const labelData = labels.get(parentLabelName);
-    if (!labelData) return;
     
     // Remove existing no-labels message if present
     const existingMessage = document.querySelector('.no-labels-message');
@@ -613,9 +620,12 @@
       existingMessage.remove();
     }
     
-    // Use filtered instances
-    currentLabelInstances = collectFilteredInstances(parentLabelName);
-    currentInstanceIndex = 0;
+    // Get current instance and its parent label name
+    const currentInstance = currentLabelInstances[currentInstanceIndex];
+    const parentLabelName = currentInstance.getAttribute('labelName');
+    const labelData = labels.get(parentLabelName);
+    
+    if (!labelData) return;
     
     // Helper function to collect label instances (for sublabels)
     function collectLabelInstances(labelName, parentName = '') {
@@ -625,13 +635,11 @@
       return Array.from(htmlContent.querySelectorAll(`manual_label${selector}, auto_label${selector}`));
     }
     
-    // Display the label inspector
+    // Display the label inspector with all filtered instances
     displayLabelInspector(parentLabelName, labelData, currentLabelInstances, collectLabelInstances);
     
-    // Highlight first instance if exists
-    if (currentLabelInstances.length > 0) {
-      highlightLabelInstance(currentLabelInstances[0]);
-    }
+    // Highlight current instance
+    highlightLabelInstance(currentInstance);
   }
   
   /**
@@ -690,7 +698,7 @@
     
     const instanceCount = document.createElement('span');
     instanceCount.className = 'instance-count';
-    instanceCount.textContent = `${instances.length} instance${instances.length !== 1 ? 's' : ''}`;
+    instanceCount.textContent = `${instances.length} total filtered`;
     header.appendChild(instanceCount);
     
     inspector.appendChild(header);
@@ -703,7 +711,7 @@
       const prevBtn = document.createElement('button');
       prevBtn.textContent = '◀ Previous';
       prevBtn.onclick = () => navigateToPreviousInstance();
-      prevBtn.disabled = currentInstanceIndex === 0;
+      prevBtn.disabled = false; // Always enabled, loops around
       
       const instanceInfo = document.createElement('span');
       instanceInfo.className = 'instance-info';
@@ -712,7 +720,7 @@
       const nextBtn = document.createElement('button');
       nextBtn.textContent = 'Next ▶';
       nextBtn.onclick = () => navigateToNextInstance();
-      nextBtn.disabled = currentInstanceIndex >= instances.length - 1;
+      nextBtn.disabled = false; // Always enabled, loops around
       
       instanceNav.appendChild(prevBtn);
       instanceNav.appendChild(instanceInfo);
@@ -943,48 +951,30 @@
   }
   
   /**
-   * Navigate to next instance of current parent label
+   * Navigate to next instance in document order
    */
   function navigateToNextInstance() {
     if (currentInstanceIndex < currentLabelInstances.length - 1) {
       currentInstanceIndex++;
-      const parentLabelName = parentLabels[currentParentLabelIndex];
-      const labels = window.getLabels();
-      const labelData = labels.get(parentLabelName);
-      
-      const htmlContent = window.getHtmlContent();
-      function collectLabelInstances(labelName, parentName = '') {
-        const selector = parentName 
-          ? `[labelName="${labelName}"][parent="${parentName}"]`
-          : `[labelName="${labelName}"][parent=""]`;
-        return Array.from(htmlContent.querySelectorAll(`manual_label${selector}, auto_label${selector}`));
-      }
-      
-      displayLabelInspector(parentLabelName, labelData, currentLabelInstances, collectLabelInstances);
-      highlightLabelInstance(currentLabelInstances[currentInstanceIndex]);
+      showCurrentInstance();
+    } else {
+      // Already at the last instance, loop to first
+      currentInstanceIndex = 0;
+      showCurrentInstance();
     }
   }
   
   /**
-   * Navigate to previous instance of current parent label
+   * Navigate to previous instance in document order
    */
   function navigateToPreviousInstance() {
     if (currentInstanceIndex > 0) {
       currentInstanceIndex--;
-      const parentLabelName = parentLabels[currentParentLabelIndex];
-      const labels = window.getLabels();
-      const labelData = labels.get(parentLabelName);
-      
-      const htmlContent = window.getHtmlContent();
-      function collectLabelInstances(labelName, parentName = '') {
-        const selector = parentName 
-          ? `[labelName="${labelName}"][parent="${parentName}"]`
-          : `[labelName="${labelName}"][parent=""]`;
-        return Array.from(htmlContent.querySelectorAll(`manual_label${selector}, auto_label${selector}`));
-      }
-      
-      displayLabelInspector(parentLabelName, labelData, currentLabelInstances, collectLabelInstances);
-      highlightLabelInstance(currentLabelInstances[currentInstanceIndex]);
+      showCurrentInstance();
+    } else {
+      // Already at the first instance, loop to last
+      currentInstanceIndex = currentLabelInstances.length - 1;
+      showCurrentInstance();
     }
   }
   
@@ -1078,20 +1068,7 @@
     updateVerificationStats();
     
     // Refresh the inspector display to show updated status
-    const parentLabelName = parentLabels[currentParentLabelIndex];
-    const labels = window.getLabels();
-    const labelData = labels.get(parentLabelName);
-    
-    const htmlContent = window.getHtmlContent();
-    function collectLabelInstances(labelName, parentName = '') {
-      const selector = parentName 
-        ? `[labelName="${labelName}"][parent="${parentName}"]`
-        : `[labelName="${labelName}"][parent=""]`;
-      return Array.from(htmlContent.querySelectorAll(`manual_label${selector}, auto_label${selector}`));
-    }
-    
-    displayLabelInspector(parentLabelName, labelData, currentLabelInstances, collectLabelInstances);
-    highlightLabelInstance(currentLabelInstances[currentInstanceIndex]);
+    showCurrentInstance();
   }
   
   /**
@@ -1122,20 +1099,7 @@
     updateVerificationStats();
     
     // Update the inspector display
-    const parentLabelName = parentLabels[currentParentLabelIndex];
-    const labels = window.getLabels();
-    const labelData = labels.get(parentLabelName);
-    
-    const htmlContent = window.getHtmlContent();
-    function collectLabelInstances(labelName, parentName = '') {
-      const selector = parentName 
-        ? `[labelName=\"${labelName}\"][parent=\"${parentName}\"]`
-        : `[labelName=\"${labelName}\"][parent=\"\"]`;
-      return Array.from(htmlContent.querySelectorAll(`manual_label${selector}, auto_label${selector}`));
-    }
-    
-    displayLabelInspector(parentLabelName, labelData, currentLabelInstances, collectLabelInstances);
-    highlightLabelInstance(currentLabelInstances[currentInstanceIndex]);
+    showCurrentInstance();
   }
   
   /**

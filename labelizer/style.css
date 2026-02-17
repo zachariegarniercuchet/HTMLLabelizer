@@ -555,6 +555,14 @@
     transition: background 0.3s ease;
   }
 
+    /* Constrain all elements within html-content to prevent overflow */
+    .html-content * {
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
     /* Light theme HTML content */
     :root[data-theme="light"] .html-content {
       background: var(--html-content-bg, #ffffff);
