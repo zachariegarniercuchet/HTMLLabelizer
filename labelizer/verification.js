@@ -13,7 +13,7 @@
   let activeFilters = {
     labelTypes: new Set(['manual', 'auto']), // manual, auto
     labelNames: new Set(), // parent label names
-    verifiedStatus: new Set(['True', 'False']) // True, False
+    verifiedStatus: new Set(['true', 'false']) // true, false
   };
   
   // ======= DOM Elements =======
@@ -290,7 +290,7 @@
     showBulkActionConfirmation(shouldVerify, totalCount, (confirmed) => {
       if (confirmed && totalCount > 0) {
         // Apply verification to all filtered instances
-        const newStatus = shouldVerify ? 'True' : 'False';
+        const newStatus = shouldVerify ? 'true' : 'false';
         
         allFilteredInstances.forEach(instance => {
           // Set verified attribute for parent label
@@ -408,7 +408,7 @@
   function clearAllFilters() {
     // Reset filter state
     activeFilters.labelTypes = new Set(['manual', 'auto']);
-    activeFilters.verifiedStatus = new Set(['True', 'False']);
+    activeFilters.verifiedStatus = new Set(['true', 'false']);
     
     // Get all parent labels and add them to filter
     const labels = window.getLabels ? window.getLabels() : null;
@@ -676,7 +676,7 @@
     // Add status badge to header
     if (instances.length > 0) {
       const currentInstance = instances[currentInstanceIndex];
-      const isVerified = currentInstance.getAttribute('verified') === 'True';
+      const isVerified = currentInstance.getAttribute('verified') === 'true';
       const statusBadge = document.createElement('span');
       statusBadge.className = isVerified ? 'verified-badge' : 'unverified-badge';
       statusBadge.textContent = isVerified ? '✓ Verified' : '✗ Unverified';
@@ -1048,7 +1048,7 @@
     
     const currentInstance = currentLabelInstances[currentInstanceIndex];
     const currentStatus = currentInstance.getAttribute('verified');
-    const newStatus = currentStatus === 'True' ? 'False' : 'True';
+    const newStatus = currentStatus === 'true' ? 'false' : 'true';
     
     // Toggle verified attribute for parent label
     currentInstance.setAttribute('verified', newStatus);
@@ -1079,13 +1079,13 @@
     
     const currentInstance = currentLabelInstances[currentInstanceIndex];
     
-    // Set verified attribute to True for parent label
-    currentInstance.setAttribute('verified', 'True');
+    // Set verified attribute to true for parent label
+    currentInstance.setAttribute('verified', 'true');
     
     // Also mark all nested sublabels as verified
     const nestedSublabels = currentInstance.querySelectorAll('manual_label, auto_label');
     nestedSublabels.forEach(sublabel => {
-      sublabel.setAttribute('verified', 'True');
+      sublabel.setAttribute('verified', 'true');
     });
     
     currentInstance.classList.remove('verification-highlight');
@@ -1110,8 +1110,8 @@
     if (!htmlContent) return;
     
     const allLabels = htmlContent.querySelectorAll('manual_label, auto_label');
-    const verifiedLabels = htmlContent.querySelectorAll('manual_label[verified="True"], auto_label[verified="True"]');
-    const unverifiedLabels = htmlContent.querySelectorAll('manual_label[verified="False"], auto_label[verified="False"]');
+    const verifiedLabels = htmlContent.querySelectorAll('manual_label[verified="true"], auto_label[verified="true"]');
+    const unverifiedLabels = htmlContent.querySelectorAll('manual_label[verified="false"], auto_label[verified="false"]');
     
     if (verificationElements.verifiedCount) {
       verificationElements.verifiedCount.textContent = verifiedLabels.length;
