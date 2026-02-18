@@ -84,25 +84,46 @@
 
 /* Bookmark Button and Menu Styling */
 .page-saver-btn {
-  padding: 6px 12px;
-  font-size: 16px;
-  border: none;
   background: var(--accent);
   color: white;
-  border-radius: 6px;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 16px;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 36px;
+}
+
+.page-saver-btn .bookmark-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .page-saver-btn:hover:not(:disabled) {
-  background: var(--accent-2);
+  background: #5a8fff;
   transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(106, 163, 255, 0.3);
+}
+
+.page-saver-btn:active {
+  transform: translateY(0);
 }
 
 .page-saver-btn:disabled {
-  opacity: 0.4;
+  background: var(--hover);
   cursor: not-allowed;
-  background: var(--card);
+  opacity: 0.5;
+}
+
+.page-saver-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .page-saver-menu {

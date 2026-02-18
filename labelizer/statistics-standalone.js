@@ -281,9 +281,57 @@
     }
   }
 
+  function downloadStatistics() {
+    const doc = getCurrentDocument();
+    
+    if (!doc.htmlContent) {
+      console.warn('No document loaded to export statistics');
+      return;
+    }
+    
+    const stats = calculateDocumentStats(doc.htmlContent, doc.labels);
+    
+    // Build detailed statistics object
+    const exportData = {
+      documentName: doc.filename || 'Document',
+      exportDate: new Date().toISOString(),
+      totalLabels: stats.totalLabels,
+      labelParents: stats.labelTree.length,
+      labels: stats.labelTree.map(parent => {
+        return {
+          name: parent.name,
+          color: parent.color,
+          manual: parent.manual,
+          auto: parent.auto,
+          total: parent.total,
+          sublabels: parent.children.map(child => ({
+            name: child.name,
+            color: child.color,
+            manual: child.manual,
+            auto: child.auto,
+            total: child.total
+          }))
+        };
+      })
+    };
+    
+    // Create and trigger download
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(doc.filename || 'document').replace('.html', '')}_statistics.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   function initializeStatistics() {
     const statsBtn = document.getElementById('stats-btn');
     const statsClose = document.getElementById('stats-close');
+    const statsDownload = document.getElementById('stats-download');
     const statsOverlay = document.getElementById('stats-overlay');
     
     if (statsBtn) {
@@ -292,6 +340,10 @@
     
     if (statsClose) {
       statsClose.addEventListener('click', toggleStatistics);
+    }
+    
+    if (statsDownload) {
+      statsDownload.addEventListener('click', downloadStatistics);
     }
     
     if (statsOverlay) {
@@ -306,5 +358,6 @@
   // Expose to window
   window.updateStatistics = updateStatistics;
   window.toggleStatistics = toggleStatistics;
+  window.downloadStatistics = downloadStatistics;
   window.initializeStatistics = initializeStatistics;
 })();

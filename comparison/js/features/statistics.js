@@ -5,24 +5,7 @@ import { domElements } from '../core/domElements.js';
 import { getDocumentA, getDocumentB } from '../core/state.js';
 import { 
   calculateDocumentStats, 
-  renderStats, 
-  downloadStatisticsJSON 
-} from '../../../shared/statistics.js';
-
-/**
- * Update statistics for a specific document
- * @param {string} side - 'a' or 'b'
- */
-export function updateStatistics(side) {
-// Statistics Module
-// Wrapper for shared statistics functionality
-
-import { domElements } from '../core/domElements.js';
-import { getDocumentA, getDocumentB } from '../core/state.js';
-import { 
-  calculateDocumentStats, 
-  renderStats, 
-  downloadStatisticsJSON 
+  renderStats
 } from '../../../shared/statistics.js';
 
 /**
@@ -76,8 +59,43 @@ function downloadStatistics(side) {
     return;
   }
   
-  // Use shared download function
-  downloadStatisticsJSON(doc, doc.filename || `document_${side}`);
+  const stats = calculateDocumentStats(doc.htmlContent, doc.labels);
+  
+  // Build detailed statistics object
+  const exportData = {
+    documentName: doc.filename || `document_${side}`,
+    exportDate: new Date().toISOString(),
+    totalLabels: stats.totalLabels,
+    labelParents: stats.labelTree.length,
+    labels: stats.labelTree.map(parent => {
+      return {
+        name: parent.name,
+        color: parent.color,
+        manual: parent.manual,
+        auto: parent.auto,
+        total: parent.total,
+        sublabels: parent.children.map(child => ({
+          name: child.name,
+          color: child.color,
+          manual: child.manual,
+          auto: child.auto,
+          total: child.total
+        }))
+      };
+    })
+  };
+  
+  // Create and trigger download
+  const dataStr = JSON.stringify(exportData, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${(doc.filename || `document_${side}`).replace('.html', '')}_statistics.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**
