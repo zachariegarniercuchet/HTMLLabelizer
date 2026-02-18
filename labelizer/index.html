@@ -6,6 +6,7 @@
   <title>HTML Labelizer</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="timer-styles.css">
+  <link rel="stylesheet" href="../shared/statistics.css">
   <link rel="icon" type="image/png" href="../assets/favicon.png">
 </head>
 <body>
@@ -17,10 +18,7 @@
       </a>
     </div>
     <div class="controls">
-      <div class="file-input">
-        <input type="file" id="html-file-input" accept=".html,.htm" style="display:none">
-        <button type="button" onclick="document.getElementById('html-file-input').click()">Load HTML File</button>
-      </div>
+      <input type="file" id="html-file-input" accept=".html,.htm" style="display:none">
       <button id="download-html" disabled>Download</button>
       <button id="save-as" disabled>Save As...</button>
       <button id="clear-all">Clear All</button>
@@ -35,23 +33,29 @@
       <div class="card">
         <div class="card-header">
           <div class="title">
-            <div class="html-header-controls">
-                <h2>HTML Content</h2>
-                <button id="view-toggle" class="view-toggle" disabled>View Source</button>
-            </div>
+            <h2>HTML Content</h2>
             <span class="filename" id="current-filename"></span>
           </div>
-          <div class="timer-controls">
-            <button id="page-saver-btn" class="page-saver-btn" title="Page Savers" disabled>🔖</button>
-            <div id="page-saver-menu" class="page-saver-menu">
-              <button id="new-page-saver" class="page-saver-new">+ New</button>
-              <div class="page-saver-divider"></div>
-              <div id="page-saver-list" class="page-saver-list">
-                <!-- Page savers list will be populated here -->
+          <div class="header-controls">
+            <button class="stats-btn" id="stats-btn" title="Show Statistics" disabled>
+              <img src="../assets/icons-statistics.png" alt="Statistics" class="stats-icon">
+            </button>
+            <button class="upload-btn" id="upload-btn" title="Upload File">
+              <img src="../assets/icons-folder.png" alt="Upload" class="upload-icon">
+            </button>
+            <div class="timer-controls">
+              <button id="page-saver-btn" class="page-saver-btn" title="Page Savers" disabled>🔖</button>
+              <div id="page-saver-menu" class="page-saver-menu">
+                <button id="new-page-saver" class="page-saver-new">+ New</button>
+                <div class="page-saver-divider"></div>
+                <div id="page-saver-list" class="page-saver-list">
+                  <!-- Page savers list will be populated here -->
+                </div>
               </div>
+              <button id="toggle-timer" class="timer-btn" title="Start/Stop timer" disabled>Start</button>
+              <div id="timer-display" class="timer-display" aria-live="polite">00:00:00</div>
             </div>
-            <button id="toggle-timer" class="timer-btn" title="Start/Stop timer" disabled>Start</button>
-            <div id="timer-display" class="timer-display" aria-live="polite">00:00:00</div>
+            <button id="view-toggle" class="view-toggle" disabled>View Source</button>
           </div>
         </div>
         <div class="card-body">
@@ -62,6 +66,28 @@
             </div>
           </div>
           <textarea class="source-view" id="source-view" placeholder="HTML source will appear here..."></textarea>
+        </div>
+        
+        <!-- Statistics Overlay -->
+        <div class="stats-overlay hidden" id="stats-overlay">
+          <div class="stats-modal">
+            <div class="stats-modal-header">
+              <h3>Document Statistics</h3>
+              <div class="stats-header-buttons">
+                <button class="stats-download-btn" id="stats-download" title="Download Analysis">
+                  <img src="../assets/icons-download.png" alt="Download" class="download-icon">
+                </button>
+                <button class="stats-close-btn" id="stats-close">×</button>
+              </div>
+            </div>
+            <div class="stats-modal-body">
+              <div class="stats-container" id="stats-content">
+                <div class="stats-empty">
+                  <p>Loading statistics...</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -297,6 +323,9 @@
     </div>
   </div>
 
+  <!-- Include Statistics - Standalone version (non-module) -->
+  <script src="statistics-standalone.js"></script>
+  <!-- Include Main App --> 
   <script src="app.js"></script> <!-- <script src="app.js"></script>   |    <script type="module" src="js/core/app.js"></script>-->
   <script src="verification.js"></script>
 </body>

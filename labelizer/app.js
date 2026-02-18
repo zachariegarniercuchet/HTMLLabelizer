@@ -5276,7 +5276,20 @@ function updateStats() {
     if (typeof window.updateVerificationStats === 'function') {
       window.updateVerificationStats();
     }
+    
+    // Enable stats button if there are labels
+    const statsBtn = document.getElementById('stats-btn');
+    if (statsBtn) {
+      const hasLabels = elements.htmlContent.querySelectorAll('manual_label, auto_label').length > 0;
+      statsBtn.disabled = !hasLabels;
+    }
 }
+
+  // ======= Statistics Functions =======
+  // NOTE: Statistics functionality has been moved to js/features/statistics.js
+  // which uses the shared statistics module from ../shared/statistics.js
+  
+  // The statistics modal is initialized automatically when the page loads
 
   // ======= Selection and Labeling =======
   function showContextMenu(x, y) {
@@ -7875,6 +7888,9 @@ function navigateToPreviousMatch() {
       elements.downloadBtn.disabled = false;
       elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
+      // Enable stats button
+      const statsBtnInput = document.getElementById('stats-btn');
+      if (statsBtnInput) statsBtnInput.disabled = false;
       // Enable timer button when file is loaded
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
       // Enable page saver button when file is loaded
@@ -7892,6 +7908,16 @@ function navigateToPreviousMatch() {
     e.target.value = '';
   }
   });
+
+  // Upload button - triggers file input
+  const uploadBtn = document.getElementById('upload-btn');
+  if (uploadBtn) {
+    uploadBtn.addEventListener('click', () => {
+      elements.htmlFileInput.click();
+    });
+  }
+
+  // Statistics button - see js/features/statistics.js for statistics functionality
 
   // Upload link removed - now using proper button in HTML
 
@@ -7938,6 +7964,9 @@ function navigateToPreviousMatch() {
       elements.downloadBtn.disabled = false;
       elements.saveAsBtn.disabled = false;
       elements.viewToggle.disabled = false;
+      // Enable stats button
+      const statsBtn = document.getElementById('stats-btn');
+      if (statsBtn) statsBtn.disabled = false;
       // Enable timer button when file is loaded
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
       // Enable page saver button when file is loaded
@@ -9018,11 +9047,40 @@ window.addEventListener('click', (event) => {
   }
   
   // ======= Expose Functions for External Modules =======
-  // Make functions and state available for verification.js
+  // Make functions and state available for verification.js and statistics.js
   window.updateCurrentHtmlFromDOM = updateCurrentHtmlFromDOM;
   window.getLabels = () => labels;
   window.getLabelByPath = getLabelByPath;
   window.getHtmlContent = () => elements.htmlContent;
+  
+  // Expose state for statistics module
+  Object.defineProperty(window, 'currentHtml', {
+    get: () => currentHtml,
+    set: (value) => { currentHtml = value; }
+  });
+  Object.defineProperty(window, 'currentFileName', {
+    get: () => currentFileName,
+    set: (value) => { currentFileName = value; }
+  });
+  Object.defineProperty(window, 'labels', {
+    get: () => labels
+  });
+  
+  // Initialize statistics module when available
+  let statsInitAttempts = 0;
+  const maxStatsInitAttempts = 10;
+  
+  function tryInitializeStatistics() {
+    statsInitAttempts++;
+    if (typeof window.initializeStatistics === 'function') {
+      window.initializeStatistics();
+    } else if (statsInitAttempts < maxStatsInitAttempts) {
+      setTimeout(tryInitializeStatistics, 100);
+    }
+  }
+  
+  // Start trying immediately
+  tryInitializeStatistics();
   
   console.log('Enhanced HTML Labelizer ready!');
 

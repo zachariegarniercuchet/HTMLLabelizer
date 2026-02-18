@@ -3,7 +3,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: auto;
   position: relative; /* Needed for absolute positioning of page-saver-menu */
 }
 

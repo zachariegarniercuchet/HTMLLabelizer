@@ -328,6 +328,10 @@
       filter: brightness(0) invert(1);
     }
 
+    /* Statistics and Upload Buttons - Styles moved to shared/statistics.css */
+
+    /* Statistics Overlay - Styles moved to shared/statistics.css */
+
     /* Text Contrast Control - Apply to text elements */
     .tree-label, .tree-param-value, .card-header .filename, 
     .empty-state p, .stat-label, .no-labels, .html-content,
@@ -411,6 +415,12 @@
       width: 100%;
       display: flex;
       flex-direction: column;
+    }
+
+    .card-header .title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .card-header .title h2 {
@@ -2672,14 +2682,14 @@
       background: var(--accent-2) !important;
       border-color: var(--accent-2) !important;
       color: white !important;
-    }.html-header-controls {
+    }
+
+/* Card Header Controls */
+.header-controls {
   display: flex;
+  gap: 8px;
   align-items: center;
-  gap: 1rem;
 }
-
-
-
 
 #upload-link {
   color: #007bff;
