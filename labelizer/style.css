@@ -2328,13 +2328,14 @@
     manual_label, auto_label {
       position: relative;
       display: inline;
-      padding: 2px 6px;
-      border-radius: 6px;
+      padding: 0px 4px;
+      border-radius: 4px;
       font-weight: 500;
-      margin: 0 2px;
+      margin: 0 1px;
       cursor: pointer;
       transition: opacity 0.2s ease;
       border: 1px solid rgba(255, 255, 255, 0.1);
+      line-height: 1.2;
     }
 
     manual_label:hover, auto_label:hover {
