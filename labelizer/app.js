@@ -5925,7 +5925,7 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   }
   
   // Add verified attribute (not part of label schema, like style or class)
-  labelElement.setAttribute("verified", "False");
+  labelElement.setAttribute("verified", "false");
   
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -6133,7 +6133,7 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   }
   
   // Add verified attribute (not part of label schema, like style or class)
-  labelElement.setAttribute("verified", "False");
+  labelElement.setAttribute("verified", "false");
   
   console.log("Final label element before insertion:", labelElement); // ZAG COMMENT
   labelElement.style.backgroundColor = labelData.color;
@@ -6207,7 +6207,7 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
   }
   
   // Add verified attribute (not part of label schema, like style or class)
-  labelElement.setAttribute("verified", "False");
+  labelElement.setAttribute("verified", "false");
   
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -8962,10 +8962,10 @@ window.addEventListener('click', (event) => {
       const icon = elements.fullscreenBtn.querySelector('.fullscreen-icon');
       if (icon) {
         if (document.fullscreenElement || document.webkitFullscreenElement) {
-          icon.src = 'icons-exit-full-screen.png';
+          icon.src = '../assets/icons-exit-full-screen.png';
           elements.fullscreenBtn.title = 'Exit Full Screen (Esc)';
         } else {
-          icon.src = 'icons-full-screen.png';
+          icon.src = '../assets/icons-full-screen.png';
           elements.fullscreenBtn.title = 'Full Screen (F11 or Esc to exit)';
         }
       }
