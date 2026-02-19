@@ -62,7 +62,6 @@
     htmlFileInput: document.getElementById('html-file-input'),
     downloadBtn: document.getElementById('download-html'),
     saveAsBtn: document.getElementById('save-as'),
-    clearBtn: document.getElementById('clear-all'),
     fullscreenBtn: document.getElementById('fullscreen-btn'),
     htmlContent: document.getElementById('html-content'),
     currentFilename: document.getElementById('current-filename'),
@@ -1246,7 +1245,7 @@ function mapSourceToRendered(sourceRatio, sourceContent) {
     const extractedContent = finalRange.extractContents();
     const processedContent = preserveFormattingInLabel(extractedContent);
     
-    const newLabelElement = document.createElement('auto_label');
+    const newLabelElement = document.createElement('manual_label');
     
     Object.keys(storedAttributes).forEach(attrName => {
       newLabelElement.setAttribute(attrName, storedAttributes[attrName]);
@@ -4173,7 +4172,7 @@ function applyGroupFilter(labelName, groupId, groupIdAttr) {
 function clearGroupFilter() {
   if (activeGroupFilter) {
     // Remove all filter classes from labels
-    const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
+    const labelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label, htmllabelizer_bookmark');
     labelElements.forEach(labelEl => {
       // Remove the filter classes
       labelEl.classList.remove('group-filter-highlight', 'group-filter-dimmed');
@@ -6991,7 +6990,7 @@ function updateCurrentHtmlFromDOM() {
   deleteButtons.forEach(btn => btn.remove());
   
   // Remove group filter classes - these are temporary UI states that shouldn't be saved
-  const labelElements = tempDiv.querySelectorAll('manual_label, auto_label');
+  const labelElements = tempDiv.querySelectorAll('manual_label, auto_label, htmllabelizer_bookmark');
   labelElements.forEach(el => {
     // Remove the filter classes
     el.classList.remove('group-filter-highlight', 'group-filter-dimmed');
@@ -7990,9 +7989,9 @@ function navigateToPreviousMatch() {
     const deleteButtons = doc.querySelectorAll('.delete-btn');
     deleteButtons.forEach(button => button.remove());
 
-    // 2. Clean class attributes from manual_label elements
-    const manualLabels = doc.querySelectorAll('manual_label');
-    manualLabels.forEach(label => {
+    // 2. Clean class attributes from manual_label, auto_label, and htmllabelizer_bookmark elements
+    const labelElements = doc.querySelectorAll('manual_label, auto_label, htmllabelizer_bookmark');
+    labelElements.forEach(label => {
       if (label.hasAttribute('class')) {
         label.removeAttribute('class');
       }
@@ -8139,41 +8138,6 @@ function navigateToPreviousMatch() {
 
   // Save As button event listener
   elements.saveAsBtn.addEventListener('click', saveAsFile);
-
-
-  // Clear all
-  elements.clearBtn.addEventListener('click', () => {
-    if (confirm('Clear all content and labels?')) {
-      currentHtml = '';
-      currentFileName = '';
-      labels.clear();
-      expandedNodes.clear();
-      selectedNode = null;
-      sourceViewModified = false;
-      isSourceView = false;
-      elements.viewToggle.textContent = 'View Source';
-      elements.viewToggle.classList.remove('active');
-      
-      // Clear advanced content section
-      elements.advancedContent.innerHTML = '';
-      clearSearchOverlays();
-      
-      // Reset timer
-      stopTimer(); // Stop timer if running
-      accumulatedMs = 0; // Reset accumulated time
-      meta = {}; // Clear metadata
-      updateTimerDisplay();
-      
-      renderHtmlContent();
-      refreshTreeUI();
-      elements.downloadBtn.disabled = true;
-      elements.saveAsBtn.disabled = true;
-      elements.viewToggle.disabled = true;
-      // Disable timer button when no file is loaded
-      if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = true;
-      refreshGroupsDisplay();
-    }
-  });
 
   // Add root label
   elements.addRootLabel.addEventListener('click', () => {

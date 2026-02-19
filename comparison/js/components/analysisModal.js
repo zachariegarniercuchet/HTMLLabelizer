@@ -3,7 +3,7 @@
 
 import { domElements } from '../core/domElements.js';
 import { getIsDragging, setIsDragging, getDragState, updateDragState, getDocumentA, getDocumentB, getCachedIAAResults, setCachedIAAResults } from '../core/state.js';
-import { runIAAAnalysis as runClientSideIAA, clearMatchHighlighting } from '../features/iaaAnalysis.js';
+import { runIAAAnalysis as runClientSideIAA } from '../features/iaaAnalysis.js';
 
 export function initializeAnalysisModal() {
   const { analysisModal, analysisCloseBtn, iaaAnalysisBtn, analysisModalHeader } = domElements;
@@ -91,125 +91,20 @@ async function runIAAAnalysis() {
 function displayIAAResults(results, container) {
   console.log('[IAA] Displaying results:', results);
   
-  const matchResults = results.matchResults;
-  const summary = matchResults.summary;
-  
-  // Create summary section
-  let html = `
-    <div class="iaa-section">
-      <h3>📊 Match Summary</h3>
-      <div class="iaa-summary-grid">
-        <div class="iaa-summary-card exact">
-          <div class="iaa-summary-number">${summary.exactMatches}</div>
-          <div class="iaa-summary-label">Exact Matches</div>
-          <div class="iaa-summary-color" style="background: #22c55e;"></div>
-        </div>
-        <div class="iaa-summary-card overlap">
-          <div class="iaa-summary-number">${summary.overlapMatches}</div>
-          <div class="iaa-summary-label">Overlap Matches</div>
-          <div class="iaa-summary-color" style="background: #f97316;"></div>
-        </div>
-        <div class="iaa-summary-card no-match">
-          <div class="iaa-summary-number">${summary.noMatches}</div>
-          <div class="iaa-summary-label">No Matches</div>
-          <div class="iaa-summary-color" style="background: #ef4444;"></div>
-        </div>
-      </div>
-      <div class="iaa-totals">
-        <div>Document A: <strong>${summary.totalA}</strong> labels</div>
-        <div>Document B: <strong>${summary.totalB}</strong> labels</div>
-      </div>
-    </div>
-    
-    <div class="iaa-section">
-      <h3>🎯 Agreement Metrics</h3>
-      <div class="iaa-method">
-        Labels are matched based on position overlap (Intersection over Union). 
-        <strong style="color: #22c55e;">Green</strong> = exact position match, 
-        <strong style="color: #f97316;">Orange</strong> = partial overlap, 
-        <strong style="color: #ef4444;">Red</strong> = no match found.
-      </div>
-      <div class="iaa-metrics">
-        <div class="iaa-metric-row">
-          <span class="iaa-metric-label">Agreement Rate:</span>
-          <span class="iaa-metric-value">${((summary.exactMatches + summary.overlapMatches) / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
-        </div>
-        <div class="iaa-metric-row">
-          <span class="iaa-metric-label">Exact Match Rate:</span>
-          <span class="iaa-metric-value">${(summary.exactMatches / Math.max(summary.totalA, summary.totalB) * 100).toFixed(1)}%</span>
-        </div>
-      </div>
-    </div>
-    
-    <div class="iaa-section">
-      <h3>📋 Detailed Matches</h3>
-      <div class="iaa-matches-list">
-  `;
-  
-  // Add detailed match list
-  matchResults.matches.forEach((match, index) => {
-    const matchTypeClass = match.matchType.replace('-', '_');
-    const matchTypeLabel = match.matchType === 'exact' ? 'Exact Match' : 
-                           match.matchType === 'overlap' ? 'Overlap Match' : 'No Match';
-    const matchColor = match.matchType === 'exact' ? '#22c55e' : 
-                       match.matchType === 'overlap' ? '#f97316' : '#ef4444';
-    
-    if (match.labelA && match.labelB) {
-      html += `
-        <div class="iaa-match-item ${matchTypeClass}">
-          <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
-            <span class="iaa-match-badge" style="background: ${matchColor};">${matchTypeLabel}</span>
-            <span class="iaa-match-overlap">${(match.overlap * 100).toFixed(0)}% overlap</span>
-          </div>
-          <div class="iaa-match-details">
-            <div class="iaa-match-side">
-              <strong>Doc A:</strong> ${match.labelA.type || 'Label'} 
-              <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
-            </div>
-            <div class="iaa-match-side">
-              <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
-              <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
-            </div>
-          </div>
-        </div>
-      `;
-    } else if (match.labelA) {
-      html += `
-        <div class="iaa-match-item no_match">
-          <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
-            <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc A</span>
-          </div>
-          <div class="iaa-match-details">
-            <div class="iaa-match-side">
-              <strong>Doc A:</strong> ${match.labelA.type || 'Label'}
-              <span class="iaa-match-text">"${match.labelA.text.substring(0, 50)}${match.labelA.text.length > 50 ? '...' : ''}"</span>
-            </div>
-          </div>
-        </div>
-      `;
-    } else if (match.labelB) {
-      html += `
-        <div class="iaa-match-item no_match">
-          <div class="iaa-match-header" style="border-left: 4px solid ${matchColor};">
-            <span class="iaa-match-badge" style="background: ${matchColor};">Only in Doc B</span>
-          </div>
-          <div class="iaa-match-details">
-            <div class="iaa-match-side">
-              <strong>Doc B:</strong> ${match.labelB.type || 'Label'}
-              <span class="iaa-match-text">"${match.labelB.text.substring(0, 50)}${match.labelB.text.length > 50 ? '...' : ''}"</span>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-  });
-  
-  html += `
+  // Display placeholder message
+  container.innerHTML = `
+    <div class="iaa-section" style="padding: 40px; text-align: center;">
+      <h3 style="margin: 0 0 16px 0; font-size: 24px; color: var(--text);">
+        📊 IAA Analysis
+      </h3>
+      <p style="color: var(--sub); font-size: 14px; margin-bottom: 20px;">
+        Analysis results will be displayed here.
+      </p>
+      <div style="padding: 20px; background: rgba(255,255,255,0.05); border-radius: 8px; font-family: monospace; font-size: 12px; text-align: left; color: var(--text);">
+        <pre>${JSON.stringify(results, null, 2)}</pre>
       </div>
     </div>
   `;
-  
-  container.innerHTML = html;
 }
 
 function setupDraggable() {
