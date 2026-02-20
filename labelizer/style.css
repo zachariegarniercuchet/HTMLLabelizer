@@ -3354,3 +3354,409 @@
 
 
 
+
+/* ==============================================
+   METADATA MODAL STYLES
+   ============================================== */
+
+/* Filename container - inline layout */
+.filename-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Info Button */
+.meta-info-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.meta-info-btn.visible {
+  display: inline-flex;
+}
+
+.meta-info-btn .info-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  filter: brightness(0) invert(1);
+}
+
+.meta-info-btn:hover:not(:disabled) {
+  background: #5a8fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(106, 163, 255, 0.3);
+}
+
+.meta-info-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.meta-info-btn:disabled {
+  background: var(--hover);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.meta-info-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Metadata Overlay */
+.meta-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  transition: opacity 0.4s ease;
+}
+
+.meta-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Metadata Modal */
+.meta-modal {
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: 90%;
+  max-width: 500px;
+  max-height: 85%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.92) translateY(20px);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  opacity: 0;
+}
+
+.meta-overlay:not(.hidden) .meta-modal {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* Modal Header */
+.meta-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.meta-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.meta-header-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.meta-close-btn {
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 24px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.meta-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+/* Modal Body */
+.meta-modal-body {
+  padding: 20px;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Metadata List */
+.meta-list-container {
+  max-height: 300px;
+  min-height: 100px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+/* Scrollbar styling for metadata list */
+.meta-list-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.meta-list-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+
+.meta-list-container::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.meta-list-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.meta-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  color: var(--sub);
+  text-align: center;
+  font-size: 14px;
+}
+
+.meta-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Compact metadata item - key and value on same line */
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.meta-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+}
+
+.meta-key {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.meta-value-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  transition: all 0.2s ease;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.meta-value-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(106, 163, 255, 0.08);
+}
+
+.meta-value-input[readonly] {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.meta-readonly-badge {
+  font-size: 10px;
+  background: var(--accent-2);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.meta-delete-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 18px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.meta-delete-btn:hover {
+  background: rgba(255, 107, 107, 0.15);
+  opacity: 1;
+}
+
+/* Add New Metadata Section - cleaner design */
+.meta-add-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.meta-add-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.meta-input-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.meta-input-row input {
+  padding: 8px 10px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.meta-input-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(106, 163, 255, 0.08);
+}
+
+.meta-input-row input::placeholder {
+  color: var(--sub);
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.meta-input-row button {
+  padding: 8px 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  height: 34px;
+}
+
+.meta-input-row button:hover {
+  background: #5a8fff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(106, 163, 255, 0.3);
+}
+
+.meta-input-row button:active {
+  transform: translateY(0);
+}
+
+/* Light theme adjustments */
+:root[data-theme="light"] .meta-info-btn {
+  background: #e3f2fd;
+  color: var(--accent);
+}
+
+:root[data-theme="light"] .meta-info-btn .info-icon {
+  filter: none;
+  opacity: 0.8;
+}
+
+:root[data-theme="light"] .meta-info-btn:hover:not(:disabled) {
+  background: #bbdefb;
+}
+
+:root[data-theme="light"] .meta-info-btn:disabled {
+  background: #f5f5f5;
+  opacity: 0.6;
+}
+
+:root[data-theme="light"] .meta-item {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="light"] .meta-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .meta-modal-header {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="light"] .meta-value-input[readonly] {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Light theme scrollbar */
+:root[data-theme="light"] .meta-list-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .meta-list-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="light"] .meta-list-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}

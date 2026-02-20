@@ -4947,6 +4947,12 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
         elements.currentFilename.textContent = '';
       }
       
+      // Hide metadata info button when no file
+      const metaInfoBtnEmpty = document.getElementById('meta-info-btn');
+      if (metaInfoBtnEmpty) {
+        metaInfoBtnEmpty.classList.remove('visible');
+      }
+      
       // Re-attach event listeners for the newly created elements
       attachEmptyStateEventListeners();
       return;
@@ -5075,6 +5081,12 @@ function buildLabelsFromSchema(schema, parent = null, map = labels) {
     // Update filename display
     if (elements.currentFilename) {
       elements.currentFilename.textContent = currentFileName || '';
+    }
+    
+    // Show metadata info button when file is loaded
+    const metaInfoBtnLoaded = document.getElementById('meta-info-btn');
+    if (metaInfoBtnLoaded && currentFileName) {
+      metaInfoBtnLoaded.classList.add('visible');
     }
     
     attachLabelEventListeners();
@@ -5281,6 +5293,18 @@ function updateStats() {
     if (statsBtn) {
       const hasLabels = elements.htmlContent.querySelectorAll('manual_label, auto_label').length > 0;
       statsBtn.disabled = !hasLabels;
+    }
+    
+    // Enable/show meta info button if a file is loaded
+    const metaInfoBtn = document.getElementById('meta-info-btn');
+    if (metaInfoBtn) {
+      const hasFile = currentFileName && currentFileName.length > 0;
+      metaInfoBtn.disabled = !hasFile;
+      if (hasFile) {
+        metaInfoBtn.classList.add('visible');
+      } else {
+        metaInfoBtn.classList.remove('visible');
+      }
     }
 }
 
@@ -7890,6 +7914,12 @@ function navigateToPreviousMatch() {
       // Enable stats button
       const statsBtnInput = document.getElementById('stats-btn');
       if (statsBtnInput) statsBtnInput.disabled = false;
+      // Enable meta info button
+      const metaInfoBtnInput = document.getElementById('meta-info-btn');
+      if (metaInfoBtnInput) {
+        metaInfoBtnInput.disabled = false;
+        metaInfoBtnInput.classList.add('visible');
+      }
       // Enable timer button when file is loaded
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
       // Enable page saver button when file is loaded
@@ -7966,6 +7996,12 @@ function navigateToPreviousMatch() {
       // Enable stats button
       const statsBtn = document.getElementById('stats-btn');
       if (statsBtn) statsBtn.disabled = false;
+      // Enable meta info button
+      const metaInfoBtn = document.getElementById('meta-info-btn');
+      if (metaInfoBtn) {
+        metaInfoBtn.disabled = false;
+        metaInfoBtn.classList.add('visible');
+      }
       // Enable timer button when file is loaded
       if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = false;
       // Enable page saver button when file is loaded
@@ -9030,6 +9066,13 @@ window.addEventListener('click', (event) => {
     get: () => labels
   });
   
+  // Expose meta object and update function for metadata module
+  Object.defineProperty(window, 'meta', {
+    get: () => meta,
+    set: (value) => { meta = value; }
+  });
+  window.updateSchemaInSourceView = updateSchemaInSourceView;
+  
   // Initialize statistics module when available
   let statsInitAttempts = 0;
   const maxStatsInitAttempts = 10;
@@ -9043,8 +9086,22 @@ window.addEventListener('click', (event) => {
     }
   }
   
+  // Initialize metadata module when available
+  let metadataInitAttempts = 0;
+  const maxMetadataInitAttempts = 10;
+  
+  function tryInitializeMetadata() {
+    metadataInitAttempts++;
+    if (typeof window.initializeMetadataModal === 'function') {
+      window.initializeMetadataModal();
+    } else if (metadataInitAttempts < maxMetadataInitAttempts) {
+      setTimeout(tryInitializeMetadata, 100);
+    }
+  }
+  
   // Start trying immediately
   tryInitializeStatistics();
+  tryInitializeMetadata();
   
   console.log('Enhanced HTML Labelizer ready!');
 

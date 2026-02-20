@@ -33,7 +33,12 @@
         <div class="card-header">
           <div class="title">
             <h2>HTML Content</h2>
-            <span class="filename" id="current-filename"></span>
+            <div class="filename-container">
+              <span class="filename" id="current-filename"></span>
+              <button class="meta-info-btn" id="meta-info-btn" title="Document Metadata" disabled>
+                <img src="../assets/icons-information.png" alt="Info" class="info-icon">
+              </button>
+            </div>
           </div>
           <div class="header-controls">
             <button class="stats-btn" id="stats-btn" title="Show Statistics" disabled>
@@ -83,6 +88,33 @@
               <div class="stats-container" id="stats-content">
                 <div class="stats-empty">
                   <p>Loading statistics...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata Overlay -->
+        <div class="meta-overlay hidden" id="meta-overlay">
+          <div class="meta-modal">
+            <div class="meta-modal-header">
+              <h3>Document Metadata</h3>
+              <div class="meta-header-buttons">
+                <button class="meta-close-btn" id="meta-close">×</button>
+              </div>
+            </div>
+            <div class="meta-modal-body">
+              <div class="meta-list-container" id="meta-list">
+                <div class="meta-empty">
+                  <p>Loading metadata...</p>
+                </div>
+              </div>
+              <div class="meta-add-section">
+                <h4>Add New Metadata</h4>
+                <div class="meta-input-row">
+                  <input type="text" id="meta-new-key" placeholder="Key">
+                  <input type="text" id="meta-new-value" placeholder="Value">
+                  <button id="meta-add-btn">Add</button>
                 </div>
               </div>
             </div>
@@ -324,7 +356,9 @@
 
   <!-- Include Statistics - Standalone version (non-module) -->
   <script src="statistics-standalone.js"></script>
-  <!-- Include Main App --> 
+  <!-- Include Metadata - Standalone version (non-module) -->
+  <script src="metadata-standalone.js"></script>
+  <!-- Include Main App -->
   <script src="app.js"></script> <!-- <script src="app.js"></script>   |    <script type="module" src="js/core/app.js"></script>-->
   <script src="verification.js"></script>
 </body>
