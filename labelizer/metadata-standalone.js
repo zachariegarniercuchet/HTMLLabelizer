@@ -78,16 +78,13 @@
       return;
     }
 
-    // Sort keys: auto metadata (like 'time') first, then user-defined metadata alphabetically
+    // Separate auto metadata (like 'time') from user-defined metadata
     const autoKeys = ['time'];
-    const sortedKeys = keys.sort((a, b) => {
-      const aIsAuto = autoKeys.includes(a);
-      const bIsAuto = autoKeys.includes(b);
-      
-      if (aIsAuto && !bIsAuto) return -1;
-      if (!aIsAuto && bIsAuto) return 1;
-      return a.localeCompare(b);
-    });
+    const autoMetaKeys = keys.filter(key => autoKeys.includes(key));
+    const userMetaKeys = keys.filter(key => !autoKeys.includes(key));
+    
+    // Display auto keys first, then user keys in insertion order
+    const sortedKeys = [...autoMetaKeys, ...userMetaKeys];
 
     let html = '<div class="meta-items">';
     sortedKeys.forEach(key => {
