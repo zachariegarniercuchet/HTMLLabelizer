@@ -144,6 +144,20 @@
 }
 
 /* IAA Results Display */
+.comparison-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
 .iaa-loading {
   display: flex;
   flex-direction: column;
@@ -1739,3 +1753,338 @@ auto_label[data-iaa-match="no-match"] {
   background: #e9ecef;
 }
 
+/* IAA Results Display - New Styles */
+.iaa-results {
+  padding: 10px;
+}
+
+.iaa-summary h3 {
+  color: var(--accent);
+  font-size: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.metric-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card.highlight {
+  background: linear-gradient(135deg, var(--accent) 0%, #4a90e2 100%);
+  border-color: var(--accent);
+}
+
+.metric-card.highlight .metric-label,
+.metric-card.highlight .metric-value,
+.metric-card.highlight .metric-subtitle {
+  color: white;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.metric-value {
+  font-size: 28px;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.metric-value.f1-score {
+  font-size: 32px;
+}
+
+.metric-subtitle {
+  font-size: 11px;
+  color: var(--sub);
+  margin-bottom: 8px;
+}
+
+.metric-percentage {
+  font-size: 18px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.metric-card.highlight .metric-percentage {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.iaa-details {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.iaa-details h4 {
+  color: var(--accent);
+  font-size: 16px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.detail-text {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.match-list {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.match-list h4 {
+  color: var(--accent);
+  font-size: 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.matches-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.match-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.match-item:hover {
+  background: var(--hover);
+  transform: translateX(4px);
+}
+
+.match-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.match-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.match-text {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match-score {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.matches-note {
+  margin-top: 12px;
+  text-align: center;
+  color: var(--sub);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Light theme adjustments for new styles */
+:root[data-theme="light"] .metric-card {
+  background: #f8f9fa;
+}
+
+:root[data-theme="light"] .iaa-details,
+:root[data-theme="light"] .match-list {
+  background: #f8f9fa;
+}
+
+:root[data-theme="light"] .match-item {
+  background: white;
+}
+
+:root[data-theme="light"] .match-item:hover {
+  background: #f1f3f5;
+}
+
+/* Label Breakdown Table */
+.label-breakdown {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.label-breakdown h4 {
+  color: var(--accent);
+  font-size: 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.breakdown-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.breakdown-table thead {
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.breakdown-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--accent);
+  border-bottom: 2px solid var(--border);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.breakdown-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.breakdown-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.breakdown-table tbody tr:hover {
+  background: var(--hover);
+}
+
+.breakdown-table tbody tr.parent-label {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.breakdown-table tbody tr.parent-label:hover {
+  background: var(--hover);
+}
+
+.breakdown-table tbody tr.sublabel td {
+  padding-left: 8px;
+}
+
+.breakdown-table .label-name {
+  font-weight: 500;
+}
+
+.breakdown-table .label-name strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.breakdown-table .label-name .indent {
+  color: var(--text);
+  padding-left: 12px;
+  display: inline-block;
+}
+
+.breakdown-table .count {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.breakdown-table .f1-cell {
+  padding: 8px 16px;
+}
+
+.f1-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  width: 100%;
+}
+
+.f1-bar {
+  height: 20px;
+  background: linear-gradient(90deg, var(--accent), #4a90e2);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.f1-text {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+  min-width: 45px;
+  text-align: right;
+}
+
+/* Light theme adjustments for table */
+:root[data-theme="light"] .label-breakdown {
+  background: #f8f9fa;
+}
+
+:root[data-theme="light"] .breakdown-table thead {
+  background: #e9ecef;
+}
+
+:root[data-theme="light"] .breakdown-table tbody tr.parent-label {
+  background: #f1f3f5;
+}
+
+:root[data-theme="light"] .breakdown-table tbody tr:hover {
+  background: #dee2e6;
+}

@@ -507,9 +507,6 @@
   
   function initializeAnalysisModal() {
     domElements.iaaAnalysisBtn?.addEventListener('click', async () => {
-      // Clear any navigation highlights before analysis
-      clearNavigationHighlights();
-      
       domElements.analysisModal?.classList.remove('hidden');
       await runIAAAnalysis();
     });
@@ -517,9 +514,6 @@
     domElements.analysisCloseBtn?.addEventListener('click', () => {
       domElements.analysisModal?.classList.add('hidden');
     });
-    
-    setupAnalysisModalDraggable();
-    setupAnalysisModalResizable();
   }
   
   // ===== IAA ANALYSIS FUNCTIONS (Client-Side) =====
@@ -621,7 +615,7 @@
       return { matches: false, type: 'different-label' };
     }
     
-    const ignoredAttrs = ['style', 'class', 'labelname', 'label', 'parent'];
+    const ignoredAttrs = ['style', 'class', 'labelname', 'label', 'parent', 'verified'];
     const paramsA = Object.keys(labelA.params).filter(k => !ignoredAttrs.includes(k));
     const paramsB = Object.keys(labelB.params).filter(k => !ignoredAttrs.includes(k));
     
@@ -638,14 +632,23 @@
       
       return { matches: true, type: 'exact' };
     } else {
-      const keyParams = ['docid', 'fragmentid', 'titletype', 'uri', 'non_standard'];
+      // Lenient mode: check all non-ignored attributes match
+      // Get union of all attribute keys
+      const allKeys = new Set([...paramsA, ...paramsB]);
       
-      for (let key of keyParams) {
-        const hasA = paramsA.includes(key);
-        const hasB = paramsB.includes(key);
+      for (let key of allKeys) {
+        const valueA = labelA.params[key];
+        const valueB = labelB.params[key];
         
-        if (hasA && hasB && labelA.params[key] !== labelB.params[key]) {
-          return { matches: false, type: 'different-key-params' };
+        // If attribute exists in both, values must match
+        if (valueA !== undefined && valueB !== undefined) {
+          if (valueA !== valueB) {
+            return { matches: false, type: 'different-values' };
+          }
+        }
+        // If attribute exists in only one document, it's still a mismatch
+        else if (valueA !== undefined || valueB !== undefined) {
+          return { matches: false, type: 'different-attrs' };
         }
       }
       
@@ -719,9 +722,10 @@
       if (bestMatch) {
         matchedBIndices.add(bestMatchIndex);
         
-        if (bestSimilarity === 1.0 && bestAttrResult.type === 'exact') {
+        // Exact match: perfect text similarity AND all attributes match
+        if (bestSimilarity === 1.0 && bestAttrResult.matches) {
           matchType = 'exact';
-        } else if (bestSimilarity >= minSimilarity || bestAttrResult.type === 'lenient') {
+        } else if (bestSimilarity >= minSimilarity) {
           matchType = 'overlap';
         } else {
           matchType = 'no-match';
@@ -732,7 +736,7 @@
           labelB: bestMatch,
           matchType: matchType,
           textSimilarity: bestSimilarity,
-          attributesMatch: bestAttrResult.type === 'exact',
+          attributesMatch: bestAttrResult.matches,
           matchMethod: 'text'
         });
       } else {
@@ -964,8 +968,6 @@
     });
   }
   
-  // ===== CO-REFERENCE / CLUSTER ANALYSIS =====
-  
   function extractLabelTreeSchema(doc) {
     const iterator = doc.createNodeIterator(doc, NodeFilter.SHOW_COMMENT);
     let commentNode;
@@ -1020,6 +1022,40 @@
     }
     
     return groupIdMap;
+  }
+  
+  /**
+   * Extract all valid attributes for each label from the schema
+   * Returns Map of labelName -> array of valid attribute names
+   */
+  function extractValidAttributesFromSchema(labelTree) {
+    const attributeMap = new Map();
+    
+    function processLabel(labelName, labelDef) {
+      const validAttrs = [];
+      
+      if (labelDef.attributes) {
+        for (const [attrName, attrDef] of Object.entries(labelDef.attributes)) {
+          validAttrs.push(attrName);
+        }
+      }
+      
+      if (validAttrs.length > 0) {
+        attributeMap.set(labelName, validAttrs);
+      }
+      
+      if (labelDef.sublabels) {
+        for (const [sublabelName, sublabelDef] of Object.entries(labelDef.sublabels)) {
+          processLabel(sublabelName, sublabelDef);
+        }
+      }
+    }
+    
+    for (const [labelName, labelDef] of Object.entries(labelTree)) {
+      processLabel(labelName, labelDef);
+    }
+    
+    return attributeMap;
   }
   
   function compareLabelTreeSchemas(schemaA, schemaB) {
@@ -1275,6 +1311,18 @@
   }
   
   function applyHighlightToElement(element, matchType) {
+    // Save original styles before applying highlights (only if not already saved)
+    if (!element.hasAttribute('data-iaa-match')) {
+      element.setAttribute('data-original-boxShadow', element.style.boxShadow || '');
+      element.setAttribute('data-original-backgroundColor', element.style.backgroundColor || '');
+      element.setAttribute('data-original-color', element.style.color || '');
+      element.setAttribute('data-original-fontWeight', element.style.fontWeight || '');
+      element.setAttribute('data-original-borderRadius', element.style.borderRadius || '');
+      element.setAttribute('data-original-padding', element.style.padding || '');
+      element.setAttribute('data-original-position', element.style.position || '');
+      element.setAttribute('data-original-zIndex', element.style.zIndex || '');
+    }
+    
     element.setAttribute('data-iaa-match', matchType);
     
     let highlightColor, textColor;
@@ -1317,15 +1365,26 @@
       
       const highlightedLabels = container.querySelectorAll('[data-iaa-match]');
       highlightedLabels.forEach(element => {
+        // Restore original styles
+        element.style.boxShadow = element.getAttribute('data-original-boxShadow') || '';
+        element.style.backgroundColor = element.getAttribute('data-original-backgroundColor') || '';
+        element.style.color = element.getAttribute('data-original-color') || '';
+        element.style.fontWeight = element.getAttribute('data-original-fontWeight') || '';
+        element.style.borderRadius = element.getAttribute('data-original-borderRadius') || '';
+        element.style.padding = element.getAttribute('data-original-padding') || '';
+        element.style.position = element.getAttribute('data-original-position') || '';
+        element.style.zIndex = element.getAttribute('data-original-zIndex') || '';
+        
+        // Remove all data attributes
         element.removeAttribute('data-iaa-match');
-        element.style.boxShadow = '';
-        element.style.backgroundColor = '';
-        element.style.color = '';
-        element.style.fontWeight = '';
-        element.style.borderRadius = '';
-        element.style.padding = '';
-        element.style.position = '';
-        element.style.zIndex = '';
+        element.removeAttribute('data-original-boxShadow');
+        element.removeAttribute('data-original-backgroundColor');
+        element.removeAttribute('data-original-color');
+        element.removeAttribute('data-original-fontWeight');
+        element.removeAttribute('data-original-borderRadius');
+        element.removeAttribute('data-original-padding');
+        element.removeAttribute('data-original-position');
+        element.removeAttribute('data-original-zIndex');
       });
     });
   }
@@ -1348,16 +1407,41 @@
       return;
     }
     
-    // Show loading state
+    // Check if we have cached results
+    const cachedResults = getCachedIAAResults();
+    if (cachedResults) {
+      console.log('[IAA] Using cached results from:', cachedResults.timestamp);
+      
+      // Show brief loading message for cached results
+      modalBody.innerHTML = `
+        <div class="iaa-loading">
+          <div class="spinner"></div>
+          <p>Loading cached results...</p>
+        </div>
+        <div class="resize-handle" id="resize-handle"></div>
+      `;
+      
+      // Use setTimeout to allow the UI to update before rendering
+      setTimeout(() => {
+        displayIAAResults(cachedResults, modalBody);
+      }, 100);
+      
+      return;
+    }
+    
+    // Show loading state for new computation
     modalBody.innerHTML = `
       <div class="iaa-loading">
         <div class="spinner"></div>
         <p>Analyzing inter-annotator agreement...</p>
+        <p style="font-size: 12px; color: var(--sub); margin-top: 8px;">This may take a moment for large documents</p>
       </div>
       <div class="resize-handle" id="resize-handle"></div>
     `;
     
-    try {
+    // Use setTimeout to allow the loading UI to render before heavy computation
+    setTimeout(async () => {
+      try {
       // Parse HTML to extract label tree schemas
       const parserA = new DOMParser();
       const parserB = new DOMParser();
@@ -1381,6 +1465,11 @@
       }
       
       console.log('✓ Label tree schemas match');
+      
+      // Extract valid attributes from schema for comparison
+      const validAttributesMap = extractValidAttributesFromSchema(schemaA);
+      console.log(`Found ${validAttributesMap.size} label types with attributes:`, 
+        Array.from(validAttributesMap.entries()).map(([label, attrs]) => `${label}: [${attrs.join(', ')}]`).join(', '));
       
       // Extract groupID attributes from schema
       const groupIdMap = extractGroupIdAttributesFromSchema(schemaA);
@@ -1414,20 +1503,11 @@
       
       console.log('Match Results Summary:', matchResults.summary);
       
-      // Perform co-reference cluster analysis (using schema-based groupID attributes)
-      const coRefAnalysis = analyzeCoReferenceClusters(matchResults.matches, labelsA, labelsB, groupIdMap);
-      
-      if (coRefAnalysis.hasGrouping === false) {
-        console.log('⚠ No co-reference analysis: ' + coRefAnalysis.message);
-      } else {
-        console.log('Co-Reference Analysis Summary:', coRefAnalysis.summary);
-      }
-      
       const results = {
         labelsA: labelsA,
         labelsB: labelsB,
         matchResults: matchResults,
-        coRefAnalysis: coRefAnalysis,
+        validAttributesMap: validAttributesMap,
         timestamp: new Date().toISOString()
       };
       
@@ -1437,20 +1517,168 @@
       // Display results in modal
       displayIAAResults(results, modalBody);
       
-    } catch (error) {
-      console.error('IAA Analysis Error:', error);
-      modalBody.innerHTML = `
-        <div class="iaa-error">
-          <h3>⚠ Analysis Failed</h3>
-          <p>${error.message}</p>
-          <details style="margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-            <summary style="cursor: pointer; color: var(--sub);">Technical Details</summary>
-            <pre style="margin-top: 8px; font-size: 11px; color: var(--text); overflow-x: auto;">${error.stack || 'No additional details'}</pre>
-          </details>
+      } catch (error) {
+        console.error('IAA Analysis Error:', error);
+        modalBody.innerHTML = `
+          <div class="iaa-error">
+            <h3>⚠ Analysis Failed</h3>
+            <p>${error.message}</p>
+            <details style="margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+              <summary style="cursor: pointer; color: var(--sub);">Technical Details</summary>
+              <pre style="margin-top: 8px; font-size: 11px; color: var(--text); overflow-x: auto;">${error.stack || 'No additional details'}</pre>
+            </details>
+          </div>
+          <div class="resize-handle" id="resize-handle"></div>
+        `;
+      }
+    }, 50); // Small delay to allow loading UI to render
+  }
+  
+  /**
+   * Generate per-label breakdown table
+   */
+  function generateLabelBreakdownTable(results) {
+    const labelsA = results.labelsA || [];
+    const labelsB = results.labelsB || [];
+    const matches = results.matchResults.matches.filter(m => m.labelA && m.labelB);
+    
+    const labelStats = new Map();
+    
+    // Count labels in DocA
+    labelsA.forEach(label => {
+      const labelName = label.type || 'Unknown';
+      const parent = label.params.parent || null;
+      const key = parent ? `${parent}>${labelName}` : labelName;
+      
+      if (!labelStats.has(key)) {
+        labelStats.set(key, {
+          labelName: labelName,
+          parent: parent,
+          countA: 0,
+          countB: 0,
+          matches: 0,
+          isParent: !parent
+        });
+      }
+      labelStats.get(key).countA++;
+    });
+    
+    // Count labels in DocB
+    labelsB.forEach(label => {
+      const labelName = label.type || 'Unknown';
+      const parent = label.params.parent || null;
+      const key = parent ? `${parent}>${labelName}` : labelName;
+      
+      if (!labelStats.has(key)) {
+        labelStats.set(key, {
+          labelName: labelName,
+          parent: parent,
+          countA: 0,
+          countB: 0,
+          matches: 0,
+          isParent: !parent
+        });
+      }
+      labelStats.get(key).countB++;
+    });
+    
+    // Count matches
+    matches.forEach(match => {
+      const labelName = match.labelA.type || 'Unknown';
+      const parent = match.labelA.params.parent || null;
+      const key = parent ? `${parent}>${labelName}` : labelName;
+      
+      if (labelStats.has(key)) {
+        labelStats.get(key).matches++;
+      }
+    });
+    
+    // Calculate F1 for each label
+    const breakdown = [];
+    labelStats.forEach((stats, key) => {
+      const precision = stats.countA > 0 ? stats.matches / stats.countA : 0;
+      const recall = stats.countB > 0 ? stats.matches / stats.countB : 0;
+      const f1 = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+      
+      breakdown.push({
+        ...stats,
+        f1: f1
+      });
+    });
+    
+    // Sort to group parents with their sublabels
+    breakdown.sort((a, b) => {
+      // If both are parents, sort alphabetically
+      if (a.isParent && b.isParent) {
+        return a.labelName.localeCompare(b.labelName);
+      }
+      
+      // If a is parent and b is sublabel
+      if (a.isParent && !b.isParent) {
+        // If b is a child of a, a comes first
+        if (b.parent === a.labelName) return -1;
+        // Otherwise compare a with b's parent
+        return a.labelName.localeCompare(b.parent || '');
+      }
+      
+      // If a is sublabel and b is parent
+      if (!a.isParent && b.isParent) {
+        // If a is a child of b, b comes first
+        if (a.parent === b.labelName) return 1;
+        // Otherwise compare a's parent with b
+        return (a.parent || '').localeCompare(b.labelName);
+      }
+      
+      // Both are sublabels - sort by parent first, then by label name
+      if (a.parent === b.parent) {
+        return a.labelName.localeCompare(b.labelName);
+      }
+      return (a.parent || '').localeCompare(b.parent || '');
+    });
+    
+    const percentFormat = (num) => (num * 100).toFixed(1) + '%';
+    const escapeHtml = (text) => {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    return `
+      <div class="iaa-section">
+        <h3>Per-Label Breakdown</h3>
+        <div class="breakdown-table-container">
+          <table class="breakdown-table">
+            <thead>
+              <tr>
+                <th>Label Name</th>
+                <th>Doc A</th>
+                <th>Doc B</th>
+                <th>Matches</th>
+                <th>F1 Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${breakdown.map(stat => `
+                <tr class="${stat.isParent ? 'parent-label' : 'sublabel'}">
+                  <td class="label-name">
+                    ${stat.isParent ? `<strong>${escapeHtml(stat.labelName)}</strong>` : `<span class="indent">↳ ${escapeHtml(stat.labelName)}</span>`}
+                  </td>
+                  <td class="count">${stat.countA}</td>
+                  <td class="count">${stat.countB}</td>
+                  <td class="count">${stat.matches}</td>
+                  <td class="f1-cell">
+                    <div class="f1-bar-container">
+                      <div class="f1-bar" style="width: ${stat.f1 * 100}%"></div>
+                      <span class="f1-text">${percentFormat(stat.f1)}</span>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
-        <div class="resize-handle" id="resize-handle"></div>
-      `;
-    }
+      </div>
+    `;
   }
   
   function displayIAAResults(results, container) {
@@ -1470,14 +1698,13 @@
     const recall = tp > 0 ? tp / (tp + fn) : 0;
     const f1_span = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0;
     
-    // Calculate attribute F1 (from matched spans only)
-    const matchedSpans = exactMatches.length;
-    const attributeMatches = matchResults.matches.filter(m => m.matchType === 'exact').length;
-    const attributeMismatches = matchResults.matches.filter(m => m.matchType === 'overlap').length;
+    // Calculate attribute statistics (from matched spans only)
+    const matchedPairs = matchResults.matches.filter(m => m.labelA && m.labelB);
+    const matchedSpans = matchedPairs.length;
     
-    const attr_precision = matchedSpans > 0 ? attributeMatches / matchedSpans : 0;
-    const attr_recall = matchedSpans > 0 ? attributeMatches / matchedSpans : 0;
-    const f1_attr = matchedSpans > 0 ? (attributeMatches / matchedSpans) : 0;
+    // Will be calculated in generateAttributeBreakdownHTML and passed back
+    let totalAttributesCompared = 0;
+    let matchingAttributeValues = 0;
     
     let html = `
       <div class="iaa-section">
@@ -1485,17 +1712,17 @@
         <div class="iaa-summary-grid">
           <div class="iaa-summary-card exact">
             <div class="iaa-summary-number">${summary.exactMatches}</div>
-            <div class="iaa-summary-label">Exact + Same Attributes</div>
+            <div class="iaa-summary-label">Perfect Match (Text + Attributes)</div>
             <div class="iaa-summary-color" style="background: #22c55e;"></div>
           </div>
           <div class="iaa-summary-card overlap">
             <div class="iaa-summary-number">${summary.overlapMatches}</div>
-            <div class="iaa-summary-label">Exact + Mismatch Attributes</div>
+            <div class="iaa-summary-label">Partial Match (Text or Attributes Differ)</div>
             <div class="iaa-summary-color" style="background: #f97316;"></div>
           </div>
           <div class="iaa-summary-card no-match">
             <div class="iaa-summary-number">${summary.noMatches}</div>
-            <div class="iaa-summary-label">Not Exact</div>
+            <div class="iaa-summary-label">No Match</div>
             <div class="iaa-summary-color" style="background: #ef4444;"></div>
           </div>
         </div>
@@ -1528,6 +1755,8 @@
             <span class="iaa-metric-value">${tp} / ${fp} / ${fn}</span>
           </div>
         </div>
+        
+        ${generateLabelBreakdownHTML(results)}
       </div>
       
       <div class="iaa-section">
@@ -1537,169 +1766,339 @@
         </div>
         <div class="iaa-metrics">
           <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Attribute F1:</span>
-            <span class="iaa-metric-value">${f1_attr.toFixed(3)}</span>
-          </div>
-          <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Matched Spans:</span>
+            <span class="iaa-metric-label">Matched Spans (from Level 1):</span>
             <span class="iaa-metric-value">${matchedSpans}</span>
           </div>
           <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Same Attributes:</span>
-            <span class="iaa-metric-value">${attributeMatches}</span>
+            <span class="iaa-metric-label">Total Attributes Compared:</span>
+            <span class="iaa-metric-value" id="total-attrs-compared">-</span>
           </div>
           <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Different Attributes:</span>
-            <span class="iaa-metric-value">${attributeMismatches}</span>
+            <span class="iaa-metric-label">Matching Attribute Values:</span>
+            <span class="iaa-metric-value" id="matching-attr-values">-</span>
           </div>
         </div>
+        
+        ${generateAttributeBreakdownHTML(results)}
       </div>
     `;
-    
-    // Add co-reference analysis section if available
-    if (results.coRefAnalysis) {
-      const coRef = results.coRefAnalysis;
-      
-      // Check if grouping is available
-      if (coRef.hasGrouping === false) {
-        html += `
-      <div class="iaa-section" style="opacity: 0.6;">
-        <h3>Co-Reference / Cluster Agreement</h3>
-        <div class="iaa-method" style="color: var(--sub);">
-          ⚠️ ${coRef.message}
-        </div>
-        <p style="margin-top: 12px; font-size: 13px; color: var(--sub);">
-          To enable co-reference analysis, add attributes with <code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">groupRole: "groupID"</code> to your label tree schema.
-        </p>
-      </div>
-      `;
-      } else {
-        const summary = coRef.summary;
-      
-      html += `
-      <div class="iaa-section">
-        <h3>Co-Reference / Cluster Agreement</h3>
-        <div class="iaa-method">
-          Analyzes if labels with the same groupID (cluster) in one document correspond to labels in the same cluster in the other document.
-        </div>
-        <div class="iaa-summary-grid">
-          <div class="iaa-summary-card">
-            <div class="iaa-summary-number">${summary.totalClustersA}</div>
-            <div class="iaa-summary-label">Clusters in Doc A</div>
-          </div>
-          <div class="iaa-summary-card">
-            <div class="iaa-summary-number">${summary.totalClustersB}</div>
-            <div class="iaa-summary-label">Clusters in Doc B</div>
-          </div>
-          <div class="iaa-summary-card">
-            <div class="iaa-summary-number">${summary.oneToOneMappings}</div>
-            <div class="iaa-summary-label">1:1 Cluster Mappings</div>
-          </div>
-        </div>
-        <div class="iaa-metrics">
-          <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Avg Cluster F1:</span>
-            <span class="iaa-metric-value">${summary.avgF1Score.toFixed(3)}</span>
-          </div>
-          <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Mapped Clusters (A → B):</span>
-            <span class="iaa-metric-value">${summary.mappedClustersA} / ${summary.totalClustersA} (${(summary.clusterCoverageA * 100).toFixed(1)}%)</span>
-          </div>
-          <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Mapped Clusters (B → A):</span>
-            <span class="iaa-metric-value">${summary.mappedClustersB} / ${summary.totalClustersB} (${(summary.clusterCoverageB * 100).toFixed(1)}%)</span>
-          </div>
-          <div class="iaa-metric-row">
-            <span class="iaa-metric-label">Matched Labels with Clusters:</span>
-            <span class="iaa-metric-value">${summary.matchesWithClustersBoth}</span>
-          </div>
-        </div>
-        ${coRef.correspondences.length > 0 ? `
-        <details style="margin-top: 16px;">
-          <summary style="cursor: pointer; font-weight: 600; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-            View Cluster Correspondences (${coRef.correspondences.length})
-          </summary>
-          <div style="margin-top: 12px; max-height: 300px; overflow-y: auto;">
-            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-              <thead style="background: rgba(255,255,255,0.1); position: sticky; top: 0;">
-                <tr>
-                  <th style="padding: 8px; text-align: left;">Group A → Group B</th>
-                  <th style="padding: 8px; text-align: center;">Name Sim</th>
-                  <th style="padding: 8px; text-align: center;">Size A/B</th>
-                  <th style="padding: 8px; text-align: center;">Matched</th>
-                  <th style="padding: 8px; text-align: center;">F1</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${coRef.correspondences.map(c => `
-                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <td style="padding: 8px;">
-                      <div style="font-family: monospace; font-size: 11px;">
-                        <div style="color: #76CEDE;">${c.groupIdA}</div>
-                        <div style="color: #999; margin: 2px 0;">→</div>
-                        <div style="color: #6aa3ff;">${c.groupIdB}</div>
-                      </div>
-                    </td>
-                    <td style="padding: 8px; text-align: center; font-weight: 600; color: ${c.nameSimilarity > 0.7 ? '#22c55e' : c.nameSimilarity > 0.3 ? '#f97316' : '#ef4444'};">
-                      ${c.nameSimilarity.toFixed(3)}
-                    </td>
-                    <td style="padding: 8px; text-align: center;">
-                      ${c.sizeA} / ${c.sizeB}
-                    </td>
-                    <td style="padding: 8px; text-align: center;">
-                      ${c.crossMatches}
-                    </td>
-                    <td style="padding: 8px; text-align: center; font-weight: 600; color: ${c.f1Score > 0.8 ? '#22c55e' : c.f1Score > 0.5 ? '#f97316' : '#ef4444'};">
-                      ${c.f1Score.toFixed(3)}
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </details>
-        ` : ''}
-        ${(coRef.unmatchedClustersA.length > 0 || coRef.unmatchedClustersB.length > 0) ? `
-        <details style="margin-top: 12px;">
-          <summary style="cursor: pointer; font-weight: 600; padding: 8px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; color: #ef4444;">
-            Unmatched Clusters (${coRef.unmatchedClustersA.length + coRef.unmatchedClustersB.length})
-          </summary>
-          <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            ${coRef.unmatchedClustersA.length > 0 ? `
-            <div>
-              <h4 style="font-size: 13px; color: #76CEDE; margin-bottom: 8px;">Document A (${coRef.unmatchedClustersA.length})</h4>
-              <ul style="list-style: none; padding: 0; font-size: 12px; font-family: monospace;">
-                ${coRef.unmatchedClustersA.map(c => `
-                  <li style="padding: 4px 8px; background: rgba(239, 68, 68, 0.1); margin-bottom: 4px; border-radius: 4px;">
-                    ${c.groupId} <span style="color: #999;">(${c.size} labels)</span>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-            ` : ''}
-            ${coRef.unmatchedClustersB.length > 0 ? `
-            <div>
-              <h4 style="font-size: 13px; color: #6aa3ff; margin-bottom: 8px;">Document B (${coRef.unmatchedClustersB.length})</h4>
-              <ul style="list-style: none; padding: 0; font-size: 12px; font-family: monospace;">
-                ${coRef.unmatchedClustersB.map(c => `
-                  <li style="padding: 4px 8px; background: rgba(239, 68, 68, 0.1); margin-bottom: 4px; border-radius: 4px;">
-                    ${c.groupId} <span style="color: #999;">(${c.size} labels)</span>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-            ` : ''}
-          </div>
-        </details>
-        ` : ''}
-      </div>
-      `;
-      }
-    }
     
     html += `<div class="resize-handle" id="resize-handle"></div>`;
     
     container.innerHTML = html;
+  }
+  
+  /**
+   * Generate HTML for per-label breakdown (used inline in Span-Level Agreement)
+   */
+  function generateLabelBreakdownHTML(results) {
+    const labelsA = results.labelsA || [];
+    const labelsB = results.labelsB || [];
+    const matches = results.matchResults.matches.filter(m => m.labelA && m.labelB);
+    
+    const labelStats = new Map();
+    
+    // Count labels in DocA
+    labelsA.forEach(label => {
+      const labelName = label.type || 'Unknown';
+      const parent = label.params.parent || null;
+      const key = parent ? `${parent}>${labelName}` : labelName;
+      
+      if (!labelStats.has(key)) {
+        labelStats.set(key, {
+          labelName: labelName,
+          parent: parent,
+          countA: 0,
+          countB: 0,
+          matches: 0,
+          isParent: !parent
+        });
+      }
+      labelStats.get(key).countA++;
+    });
+    
+    // Count labels in DocB
+    labelsB.forEach(label => {
+      const labelName = label.type || 'Unknown';
+      const parent = label.params.parent || null;
+      const key = parent ? `${parent}>${labelName}` : labelName;
+      
+      if (!labelStats.has(key)) {
+        labelStats.set(key, {
+          labelName: labelName,
+          parent: parent,
+          countA: 0,
+          countB: 0,
+          matches: 0,
+          isParent: !parent
+        });
+      }
+      labelStats.get(key).countB++;
+    });
+    
+    // Count matches
+    matches.forEach(match => {
+      const labelName = match.labelA.type || 'Unknown';
+      const parent = match.labelA.params.parent || null;
+      const key = parent ? `${parent}>${labelName}` : labelName;
+      
+      if (labelStats.has(key)) {
+        labelStats.get(key).matches++;
+      }
+    });
+    
+    // Calculate F1 for each label
+    const breakdown = [];
+    labelStats.forEach((stats, key) => {
+      const precision = stats.countA > 0 ? stats.matches / stats.countA : 0;
+      const recall = stats.countB > 0 ? stats.matches / stats.countB : 0;
+      const f1 = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+      
+      breakdown.push({
+        ...stats,
+        f1: f1
+      });
+    });
+    
+    // Sort to group parents with their sublabels
+    breakdown.sort((a, b) => {
+      // If both are parents, sort alphabetically
+      if (a.isParent && b.isParent) {
+        return a.labelName.localeCompare(b.labelName);
+      }
+      
+      // If a is parent and b is sublabel
+      if (a.isParent && !b.isParent) {
+        // If b is a child of a, a comes first
+        if (b.parent === a.labelName) return -1;
+        // Otherwise compare a with b's parent
+        return a.labelName.localeCompare(b.parent || '');
+      }
+      
+      // If a is sublabel and b is parent
+      if (!a.isParent && b.isParent) {
+        // If a is a child of b, b comes first
+        if (a.parent === b.labelName) return 1;
+        // Otherwise compare a's parent with b
+        return (a.parent || '').localeCompare(b.labelName);
+      }
+      
+      // Both are sublabels - sort by parent first, then by label name
+      if (a.parent === b.parent) {
+        return a.labelName.localeCompare(b.labelName);
+      }
+      return (a.parent || '').localeCompare(b.parent || '');
+    });
+    
+    const percentFormat = (num) => (num * 100).toFixed(1) + '%';
+    const escapeHtml = (text) => {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    return `
+      <div style="margin-top: 20px;">
+        <h4 style="color: var(--accent); font-size: 15px; margin-bottom: 12px; font-weight: 600;">Per-Label Breakdown</h4>
+        <div class="breakdown-table-container">
+          <table class="breakdown-table">
+            <thead>
+              <tr>
+                <th>Label Name</th>
+                <th>Doc A</th>
+                <th>Doc B</th>
+                <th>Matches</th>
+                <th>F1 Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${breakdown.map(stat => `
+                <tr class="${stat.isParent ? 'parent-label' : 'sublabel'}">
+                  <td class="label-name">
+                    ${stat.isParent ? `<strong>${escapeHtml(stat.labelName)}</strong>` : `<span class="indent">↳ ${escapeHtml(stat.labelName)}</span>`}
+                  </td>
+                  <td class="count">${stat.countA}</td>
+                  <td class="count">${stat.countB}</td>
+                  <td class="count">${stat.matches}</td>
+                  <td class="count">${percentFormat(stat.f1)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+  
+  /**
+   * Generate HTML for per-attribute breakdown (used inline in Attribute Agreement)
+   */
+  function generateAttributeBreakdownHTML(results) {
+    const matchedPairs = results.matchResults.matches.filter(m => m.labelA && m.labelB);
+    const validAttributesMap = results.validAttributesMap || new Map();
+    
+    if (matchedPairs.length === 0) {
+      return `<div style=\"margin-top: 20px; color: var(--sub); font-style: italic;\">No matched labels to compare attributes</div>`;
+    }
+    
+    const ignoredAttrs = ['style', 'class', 'labelname', 'label', 'parent', 'verified'];
+    const attributeStats = new Map();
+    
+    // Check if we have a schema to work with
+    const hasSchema = validAttributesMap.size > 0;
+    
+    // Collect all attribute occurrences from matched pairs
+    matchedPairs.forEach(match => {
+      const labelA = match.labelA;
+      const labelB = match.labelB;
+      const labelName = labelA.type || 'Unknown';
+      const parent = labelA.params.parent || null;
+      const labelPath = parent ? `${parent}>${labelName}` : labelName;
+      
+      let validAttrs = [];
+      
+      if (hasSchema) {
+        // If we have a schema, ONLY use attributes defined in schema
+        validAttrs = validAttributesMap.get(labelName) || [];
+      } else {
+        // No schema: use all attributes except ignored ones
+        const attrsA = Object.keys(labelA.params).filter(k => !ignoredAttrs.includes(k));
+        const attrsB = Object.keys(labelB.params).filter(k => !ignoredAttrs.includes(k));
+        validAttrs = [...new Set([...attrsA, ...attrsB])];
+      }
+      
+      validAttrs.forEach(attrName => {
+        // Skip if it's an ignored attribute
+        if (ignoredAttrs.includes(attrName)) return;
+        
+        const key = `${labelPath}|${attrName}`;
+        
+        if (!attributeStats.has(key)) {
+          attributeStats.set(key, {
+            labelName: labelName,
+            parent: parent,
+            attrName: attrName,
+            count: 0,
+            matches: 0,
+            isParent: !parent
+          });
+        }
+        
+        const stats = attributeStats.get(key);
+        
+        // Count pairs where both documents have this attribute
+        const valueA = labelA.params[attrName];
+        const valueB = labelB.params[attrName];
+        
+        // Only count if attribute exists in BOTH documents
+        if (valueA !== undefined && valueB !== undefined) {
+          stats.count++;
+          
+          // Check if values match
+          if (valueA === valueB) {
+            stats.matches++;
+          }
+        }
+      });
+    });
+    
+    // Convert to array and calculate agreement
+    const breakdown = [];
+    let totalAttributesCompared = 0;
+    let matchingAttributeValues = 0;
+    
+    attributeStats.forEach((stats, key) => {
+      const agreement = stats.count > 0 ? stats.matches / stats.count : 0;
+      
+      totalAttributesCompared += stats.count;
+      matchingAttributeValues += stats.matches;
+      
+      breakdown.push({
+        ...stats,
+        agreement: agreement
+      });
+    });
+    
+    // Update the statistics in the DOM after rendering
+    setTimeout(() => {
+      const totalAttrsElem = document.getElementById('total-attrs-compared');
+      const matchingAttrsElem = document.getElementById('matching-attr-values');
+      if (totalAttrsElem) totalAttrsElem.textContent = totalAttributesCompared;
+      if (matchingAttrsElem) matchingAttrsElem.textContent = matchingAttributeValues;
+    }, 0);
+    
+    // Sort to group parents with their sublabels, then by attribute name
+    breakdown.sort((a, b) => {
+      // First, sort by label (parent grouping)
+      if (a.isParent && b.isParent) {
+        const labelCompare = a.labelName.localeCompare(b.labelName);
+        if (labelCompare !== 0) return labelCompare;
+        return a.attrName.localeCompare(b.attrName);
+      }
+      
+      if (a.isParent && !b.isParent) {
+        if (b.parent === a.labelName) return -1;
+        return a.labelName.localeCompare(b.parent || '');
+      }
+      
+      if (!a.isParent && b.isParent) {
+        if (a.parent === b.labelName) return 1;
+        return (a.parent || '').localeCompare(b.labelName);
+      }
+      
+      // Both sublabels - sort by parent first, then label, then attribute
+      if (a.parent !== b.parent) {
+        return (a.parent || '').localeCompare(b.parent || '');
+      }
+      if (a.labelName !== b.labelName) {
+        return a.labelName.localeCompare(b.labelName);
+      }
+      return a.attrName.localeCompare(b.attrName);
+    });
+    
+    const percentFormat = (num) => (num * 100).toFixed(1) + '%';
+    const escapeHtml = (text) => {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    return `
+      <div style="margin-top: 20px;">
+        <h4 style="color: var(--accent); font-size: 15px; margin-bottom: 12px; font-weight: 600;">Per-Attribute Breakdown</h4>
+        <div class="breakdown-table-container">
+          <table class="breakdown-table">
+            <thead>
+              <tr>
+                <th>Label + Attribute</th>
+                <th>Count</th>
+                <th>Matches</th>
+                <th>Agreement</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${breakdown.map(stat => {
+                const labelDisplay = stat.isParent ? 
+                  `<strong>${escapeHtml(stat.labelName)}</strong>` : 
+                  `<span class="indent">↳ ${escapeHtml(stat.labelName)}</span>`;
+                const attrDisplay = `<span style="color: var(--accent); font-family: monospace; font-size: 12px; margin-left: 8px;">${escapeHtml(stat.attrName)}</span>`;
+                
+                return `
+                  <tr class="${stat.isParent ? 'parent-label' : 'sublabel'}">
+                    <td class="label-name">
+                      ${labelDisplay}${attrDisplay}
+                    </td>
+                    <td class="count">${stat.count}</td>
+                    <td class="count">${stat.matches}</td>
+                    <td class="count">${percentFormat(stat.agreement)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }
   
   function setupAnalysisModalDraggable() {
@@ -2390,6 +2789,37 @@
   let comparisonViewActive = false;
   let savedHtmlStateA = null;
   let savedHtmlStateB = null;
+  let comparisonLoadingOverlay = null;
+  
+  function showComparisonLoading(message = 'Analyzing documents...') {
+    // Create overlay if it doesn't exist
+    if (!comparisonLoadingOverlay) {
+      comparisonLoadingOverlay = document.createElement('div');
+      comparisonLoadingOverlay.className = 'comparison-loading-overlay';
+      comparisonLoadingOverlay.innerHTML = `
+        <div class="iaa-loading">
+          <div class="spinner"></div>
+          <p id="comparison-loading-message"></p>
+        </div>
+      `;
+      document.body.appendChild(comparisonLoadingOverlay);
+    }
+    
+    // Update message
+    const messageEl = comparisonLoadingOverlay.querySelector('#comparison-loading-message');
+    if (messageEl) {
+      messageEl.textContent = message;
+    }
+    
+    // Show overlay
+    comparisonLoadingOverlay.style.display = 'flex';
+  }
+  
+  function hideComparisonLoading() {
+    if (comparisonLoadingOverlay) {
+      comparisonLoadingOverlay.style.display = 'none';
+    }
+  }
   
   function clearNavigationHighlights() {
     // Clear highlight from Document A
@@ -2405,6 +2835,138 @@
     }
   }
   
+  async function runComparisonView() {
+    const docA = getDocumentA();
+    const docB = getDocumentB();
+    
+    if (!docA || !docB) {
+      hideComparisonLoading();
+      alert('Please load at least 2 annotated HTML files to perform comparison.');
+      const toggleInput = document.getElementById('comparison-view-toggle');
+      if (toggleInput) {
+        toggleInput.classList.remove('active');
+        comparisonViewActive = false;
+      }
+      return;
+    }
+    
+    // Check if we have cached results
+    let results = getCachedIAAResults();
+    
+    if (!results) {
+      // Need to run analysis first
+      try {
+        // Parse HTML to extract label tree schemas
+        const parserA = new DOMParser();
+        const parserB = new DOMParser();
+        const parsedDocA = parserA.parseFromString(docA.htmlContent, 'text/html');
+        const parsedDocB = parserB.parseFromString(docB.htmlContent, 'text/html');
+        
+        const schemaA = extractLabelTreeSchema(parsedDocA);
+        const schemaB = extractLabelTreeSchema(parsedDocB);
+        
+        // Validate that both documents have label tree schemas
+        if (!schemaA || !schemaB) {
+          throw new Error('Both documents must have HTMLLabelizer label tree schema.');
+        }
+        
+        // Compare schemas - they must match
+        const schemaComparison = compareLabelTreeSchemas(schemaA, schemaB);
+        if (!schemaComparison.matches) {
+          throw new Error('Cannot compare documents with different label tree schemas.');
+        }
+        
+        // Extract valid attributes from schema for comparison
+        const validAttributesMap = extractValidAttributesFromSchema(schemaA);
+        
+        // Get HTML content containers
+        const containerA = document.getElementById('html-content-a');
+        const containerB = document.getElementById('html-content-b');
+        
+        if (!containerA || !containerB) {
+          throw new Error('Document containers not found');
+        }
+        
+        // Extract labels with positions
+        const labelsA = extractLabelsWithPositions(containerA, 'a');
+        const labelsB = extractLabelsWithPositions(containerB, 'b');
+        
+        // Use hybrid matching (text-based with position fallback)
+        const matchingOptions = {
+          textSimilarityThreshold: 0.85,
+          positionOverlapThreshold: 0.3,
+          strictParams: false,
+          preferTextMatching: true
+        };
+        
+        const matchResults = matchLabelsHybrid(labelsA, labelsB, matchingOptions);
+        
+        results = {
+          labelsA: labelsA,
+          labelsB: labelsB,
+          matchResults: matchResults,
+          validAttributesMap: validAttributesMap,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Cache the results
+        setCachedIAAResults(results);
+        
+      } catch (error) {
+        console.error('Comparison View Error:', error);
+        hideComparisonLoading();
+        alert(`Comparison failed: ${error.message}`);
+        const toggleInput = document.getElementById('comparison-view-toggle');
+        if (toggleInput) {
+          toggleInput.classList.remove('active');
+          comparisonViewActive = false;
+        }
+        return;
+      }
+    }
+    
+    // Apply highlighting to matched labels
+    const matches = results.matchResults.matches || [];
+    
+    // First, clear any existing highlights
+    clearMatchHighlighting();
+    
+    // Track which elements have been highlighted
+    const highlightedA = new Set();
+    const highlightedB = new Set();
+    
+    // Apply highlights for matched pairs
+    matches.forEach(match => {
+      if (match.labelA && match.labelA.element) {
+        applyHighlightToElement(match.labelA.element, match.matchType);
+        highlightedA.add(match.labelA.element);
+      }
+      
+      if (match.labelB && match.labelB.element) {
+        applyHighlightToElement(match.labelB.element, match.matchType);
+        highlightedB.add(match.labelB.element);
+      }
+    });
+    
+    // Highlight unmatched labels in red
+    results.labelsA.forEach(label => {
+      if (label.element && !highlightedA.has(label.element)) {
+        applyHighlightToElement(label.element, 'no-match');
+      }
+    });
+    
+    results.labelsB.forEach(label => {
+      if (label.element && !highlightedB.has(label.element)) {
+        applyHighlightToElement(label.element, 'no-match');
+      }
+    });
+    
+    console.log(`[Comparison View] Highlighted ${matches.length} matched pairs, ${results.labelsA.length - highlightedA.size} unmatched in A, ${results.labelsB.length - highlightedB.size} unmatched in B`);
+    
+    // Hide loading overlay
+    hideComparisonLoading();
+  }
+  
   function setupComparisonViewToggle() {
     const toggleInput = document.getElementById('comparison-view-toggle');
     if (!toggleInput) return;
@@ -2412,99 +2974,23 @@
     toggleInput.addEventListener('click', async () => {
       // Toggle the active state
       comparisonViewActive = !comparisonViewActive;
-      toggleInput.classList.toggle('active', comparisonViewActive);
       
       if (comparisonViewActive) {
-        // Clear navigation highlights FIRST (before saving HTML)
-        clearNavigationHighlights();
+        toggleInput.classList.add('active');
         
-        // NOW save current HTML state (without highlights)
-        const contentA = document.getElementById('html-content-a');
-        const contentB = document.getElementById('html-content-b');
-        
-        if (contentA) savedHtmlStateA = contentA.innerHTML;
-        if (contentB) savedHtmlStateB = contentB.innerHTML;
-        
-        // Run analysis if not already cached
-        let cachedResults = getCachedIAAResults();
+        // Only show loading if there's nothing in cache
+        const cachedResults = getCachedIAAResults();
         if (!cachedResults) {
-          const docA = getDocumentA();
-          const docB = getDocumentB();
-          
-          if (docA && docB) {
-            const containerA = document.getElementById('html-content-a');
-            const containerB = document.getElementById('html-content-b');
-            
-            if (containerA && containerB) {
-              // Parse HTML to extract schemas for cached results
-              const parserA = new DOMParser();
-              const parserB = new DOMParser();
-              const parsedDocA = parserA.parseFromString(docA.htmlContent, 'text/html');
-              const parsedDocB = parserB.parseFromString(docB.htmlContent, 'text/html');
-              
-              const schemaA = extractLabelTreeSchema(parsedDocA);
-              const groupIdMap = schemaA ? extractGroupIdAttributesFromSchema(schemaA) : new Map();
-              
-              const labelsA = extractLabelsWithPositions(containerA, 'a');
-              const labelsB = extractLabelsWithPositions(containerB, 'b');
-              
-              // Use hybrid matching (text-based with position fallback)
-              const matchingOptions = {
-                textSimilarityThreshold: 0.85,
-                positionOverlapThreshold: 0.3,
-                strictParams: false,
-                preferTextMatching: true
-              };
-              const matchResults = matchLabelsHybrid(labelsA, labelsB, matchingOptions);
-              
-              // Perform co-reference cluster analysis
-              const coRefAnalysis = analyzeCoReferenceClusters(matchResults.matches, labelsA, labelsB, groupIdMap);
-              
-              cachedResults = {
-                labelsA: labelsA,
-                labelsB: labelsB,
-                matchResults: matchResults,
-                coRefAnalysis: coRefAnalysis,
-                timestamp: new Date().toISOString()
-              };
-              
-              setCachedIAAResults(cachedResults);
-            }
-          }
+          showComparisonLoading('Analyzing documents...');
+          // Small delay to ensure loading UI renders
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
         
-        // Apply highlighting
-        if (cachedResults && cachedResults.matchResults) {
-          applyMatchHighlighting(cachedResults.matchResults);
-        }
+        await runComparisonView();
       } else {
-        // Restore saved HTML state
-        const contentA = document.getElementById('html-content-a');
-        const contentB = document.getElementById('html-content-b');
-        
-        if (contentA && savedHtmlStateA) {
-          contentA.innerHTML = savedHtmlStateA;
-          // Reattach event listeners after restoring HTML
-          const docA = getDocumentA();
-          if (docA && docA.labels) {
-            attachReadOnlyLabelEventListeners(contentA, docA.labels);
-          }
-        }
-        
-        if (contentB && savedHtmlStateB) {
-          contentB.innerHTML = savedHtmlStateB;
-          // Reattach event listeners after restoring HTML
-          const docB = getDocumentB();
-          if (docB && docB.labels) {
-            attachReadOnlyLabelEventListeners(contentB, docB.labels);
-          }
-        }
-        
-        // Clear cached results since DOM elements have been replaced
-        clearCachedIAAResults();
-        
-        // Clear any remaining highlights (but keep currentLabelIndexA/B intact for next navigation)
-        clearNavigationHighlights();
+        toggleInput.classList.remove('active');
+        clearMatchHighlighting();
+        console.log('[Comparison View] Cleared all highlights');
       }
     });
   }
