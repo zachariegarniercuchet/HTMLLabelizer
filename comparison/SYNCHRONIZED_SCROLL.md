@@ -17,15 +17,21 @@ The synchronized scroll functionality is implemented in:
 - Prevents infinite scroll loops with intelligent throttling
 
 ### Toggle Controls
-1. **Button**: Click the `⇅` button in the header toolbar
+1. **Button**: Click the connect/disconnect icon button in the header toolbar
+   - **Connected icon** (🔗): Synchronization is ON
+   - **Disconnected icon** (⛓️‍💥): Synchronization is OFF
 2. **Keyboard Shortcut**: Press `Ctrl+Shift+S` to toggle on/off
 3. **Visual Feedback**: 
-   - Active state shows blue highlight on button
+   - Active state shows blue highlight on button with connect icon
+   - Inactive state shows disconnect icon
    - Toast notification appears when toggling
+   - Button is disabled until both documents are loaded
 
 ### Default State
-- Synchronized scrolling is **ENABLED by default**
-- Initial state can be changed in the code if needed
+- Synchronized scrolling is **DISABLED by default**
+- Automatically **ENABLES when both documents are loaded**
+- Automatically **DISABLES when documents are cleared**
+- Cannot be enabled manually unless both documents are loaded
 
 ## How It Works
 
@@ -54,7 +60,8 @@ import {
   isSyncScrollEnabled,
   scrollBothTo,
   scrollBothToTop,
-  scrollBothToBottom
+  scrollBothToBottom,
+  checkAndEnableSyncButton
 } from './js/features/synchronizedScroll.js';
 
 // Toggle on/off
@@ -67,6 +74,9 @@ disableSyncScroll();
 // Check status
 const isEnabled = isSyncScrollEnabled();
 
+// Check document state and enable/disable button
+checkAndEnableSyncButton();
+
 // Programmatic scrolling
 scrollBothToTop();           // Scroll both to top
 scrollBothToBottom();        // Scroll both to bottom
@@ -76,9 +86,19 @@ scrollBothTo(0.5, 0);       // Scroll to 50% vertical, 0% horizontal
 ## Styling
 
 The sync button styling is defined in `comparison/style.css`:
-- `.sync-scroll-btn` - Base button styles
-- `.sync-scroll-btn.active` - Active state (blue highlight)
+- `.sync-scroll-btn` - Base button styles with flexbox for icon centering
+- `.sync-icon` - Icon image styling (18x18px)
+- `.sync-scroll-btn.active` - Active state (blue highlight with connect icon)
+- `.sync-scroll-btn:not(.active)` - Inactive state (disconnect icon)
 - Theme-specific styles for light/dark modes
+
+## Button Order in UI
+The buttons in the comparison tool header are ordered as follows (left to right):
+1. **Sync Scroll Toggle** (⛓️/🔗) - First position for quick access
+2. **Comparison View Toggle** (⚏) - Second position
+3. **IAA Analysis** - Third position
+4. **Clear All** - Fourth position
+5. **Settings** (⚙) - Last position
 
 ## Browser Compatibility
 - Works in all modern browsers (Chrome, Firefox, Safari, Edge)

@@ -26,6 +26,7 @@ export const domElements = {
   clearAllBtn: document.getElementById('clear-all'),
   iaaAnalysisBtn: document.getElementById('iaa-analysis-btn'),
   syncScrollToggle: document.getElementById('sync-scroll-toggle'),
+  fullscreenBtn: document.getElementById('fullscreen-btn'),
   
   // Document A Elements
   htmlContentA: document.getElementById('html-content-a'),

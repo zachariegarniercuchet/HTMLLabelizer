@@ -9,6 +9,7 @@ import { initializeViewToggle } from '../features/viewToggle.js';
 import { initializeStatistics } from '../features/statistics.js';
 import { initializeComparisonView } from '../features/comparisonView.js';
 import { initializeSynchronizedScroll } from '../features/synchronizedScroll.js';
+import { initializeFullscreen } from '../features/fullscreen.js';
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeStatistics();
   initializeComparisonView();
   initializeSynchronizedScroll();
+  initializeFullscreen();
   
   console.log('Comparison Tool initialized - JavaScript functionality loaded');
 });
