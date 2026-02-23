@@ -6,6 +6,7 @@ import { setDocumentA, setDocumentB, setComparisonResults, getDocumentA, getDocu
 import { readFileAsText, isHtmlFile, processFiles } from '../utils/fileLoader.js';
 import { extractExistingLabels, buildLabelsFromSchema, getHtmlStatistics, attachReadOnlyLabelEventListeners } from './htmlProcessor.js';
 import { updateStatistics as updateCardStatistics } from './statistics.js';
+import { checkAndEnableSyncButton } from './synchronizedScroll.js';
 
 export function initializeFileOperations() {
   setupClearAll();
@@ -25,6 +26,7 @@ function setupClearAll() {
       disableDownloadButtons();
       clearCachedIAAResults(); // Clear IAA cache when documents are cleared
       checkAndEnableIAAButton(); // Disable IAA button when clearing
+      checkAndEnableSyncButton(); // Disable sync button when clearing
       
       // Re-attach upload links after clearing
       setTimeout(() => setupUploadLinks(), 100);
@@ -467,6 +469,9 @@ function updateStatistics() {
   
   // Enable IAA Analysis button if both documents are loaded
   checkAndEnableIAAButton();
+  
+  // Enable sync scroll button if both documents are loaded
+  checkAndEnableSyncButton();
   
   // TODO: Calculate agreement score and common labels
 }

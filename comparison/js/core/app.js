@@ -8,6 +8,7 @@ import { initializeFileOperations } from '../features/fileOperations.js';
 import { initializeViewToggle } from '../features/viewToggle.js';
 import { initializeStatistics } from '../features/statistics.js';
 import { initializeComparisonView } from '../features/comparisonView.js';
+import { initializeSynchronizedScroll } from '../features/synchronizedScroll.js';
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeViewToggle();
   initializeStatistics();
   initializeComparisonView();
+  initializeSynchronizedScroll();
   
   console.log('Comparison Tool initialized - JavaScript functionality loaded');
 });

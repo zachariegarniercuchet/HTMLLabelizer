@@ -25,6 +25,7 @@ export const domElements = {
   // Action Buttons
   clearAllBtn: document.getElementById('clear-all'),
   iaaAnalysisBtn: document.getElementById('iaa-analysis-btn'),
+  syncScrollToggle: document.getElementById('sync-scroll-toggle'),
   
   // Document A Elements
   htmlContentA: document.getElementById('html-content-a'),

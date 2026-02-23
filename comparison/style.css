@@ -787,6 +787,59 @@ manual_label:hover, auto_label:hover {
 }
 
 /* ==============================================
+   SYNCHRONIZED SCROLL BUTTON
+   Toggle button for synchronized scrolling
+   ============================================== */
+
+.sync-scroll-btn {
+  padding: 10px 16px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  transition: all 0.3s ease !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon inside sync button */
+.sync-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  transition: all 0.3s ease;
+}
+
+/* Active state when sync scroll is enabled */
+.sync-scroll-btn.active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+  color: white !important;
+}
+
+.sync-scroll-btn:not(.active) {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  opacity: 0.6;
+}
+
+.sync-scroll-btn:not(.active):hover {
+  opacity: 0.9;
+}
+
+:root[data-theme="light"] .sync-scroll-btn.active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] .sync-scroll-btn:not(.active) {
+  background: #f5f5f5 !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* ==============================================
    STATISTICS STYLES
    Display statistics on card back
    ============================================== */
