@@ -8854,8 +8854,8 @@ window.addEventListener('click', (event) => {
 
   // ======= Prevent accidental page reload with unsaved work =======
   window.addEventListener('beforeunload', (e) => {
-    // Check if there's work that hasn't been saved
-    if (currentHtml && !isWorkSaved()) {
+    // Check if there's HTML content loaded
+    if (currentHtml) {
       // Modern browsers require returnValue to be set
       e.preventDefault();
       e.returnValue = ''; // Chrome requires returnValue to be set
@@ -8863,28 +8863,6 @@ window.addEventListener('click', (event) => {
       return 'You have unsaved changes. Are you sure you want to leave?';
     }
   });
-
-  // Helper function to check if work is saved
-  function isWorkSaved() {
-    // Work is considered unsaved if:
-    // 1. Source view has been modified but not applied
-    // 2. There are labeled elements in the HTML content (work has been done)
-    // 3. Timer is running (indicates active work)
-    
-    if (sourceViewModified) {
-      return false; // Source view changes not applied
-    }
-    
-    // Check if there are any manual_label elements (work has been done)
-    const hasLabels = elements.htmlContent.querySelectorAll('manual_label').length > 0;
-    
-    // If labels exist and timer has accumulated time, consider it unsaved work
-    if (hasLabels && accumulatedMs > 0) {
-      return false; // There's work that should be saved
-    }
-    
-    return true; // No unsaved work detected
-  }
 
   // ======= Initialize =======
   elements.newLabelColor.value = generateRandomColor();
