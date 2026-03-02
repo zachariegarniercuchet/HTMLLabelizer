@@ -328,6 +328,68 @@
       filter: brightness(0) invert(1);
     }
 
+    /* Auto-Save Button */
+    .auto-save-btn {
+      background: var(--danger) !important;
+      border: 1px solid var(--danger) !important;
+      padding: 8px 14px !important;
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      transition: all 0.2s ease !important;
+      color: white !important;
+      cursor: pointer !important;
+    }
+
+    .auto-save-btn:hover {
+      filter: brightness(1.2) !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3) !important;
+    }
+
+    .auto-save-btn.active {
+      background: var(--accent-2) !important;
+      border: 1px solid var(--accent-2) !important;
+      color: white !important;
+      animation: pulse-green 2s ease-in-out infinite;
+    }
+
+    .auto-save-btn.active:hover {
+      filter: brightness(1.15) !important;
+      box-shadow: 0 4px 12px rgba(32, 201, 151, 0.3) !important;
+    }
+
+    @keyframes pulse-green {
+      0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(32, 201, 151, 0.4);
+      }
+      50% {
+        opacity: 0.95;
+        box-shadow: 0 0 0 4px rgba(32, 201, 151, 0.1);
+      }
+    }
+
+    /* Light theme adjustments for auto-save button */
+    :root[data-theme="light"] .auto-save-btn {
+      background: var(--danger) !important;
+      border-color: var(--danger) !important;
+      color: white !important;
+    }
+
+    :root[data-theme="light"] .auto-save-btn:hover {
+      filter: brightness(0.9) !important;
+    }
+
+    :root[data-theme="light"] .auto-save-btn.active {
+      background: var(--accent-2) !important;
+      border-color: var(--accent-2) !important;
+      color: white !important;
+    }
+
+    :root[data-theme="light"] .auto-save-btn.active:hover {
+      filter: brightness(0.85) !important;
+    }
+
     /* Statistics and Upload Buttons - Styles moved to shared/statistics.css */
 
     /* Statistics Overlay - Styles moved to shared/statistics.css */

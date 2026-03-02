@@ -20,6 +20,12 @@
   const INACTIVITY_TIMEOUT = 60000; // 1 minute in milliseconds
   let lastSaveReminderMs = 0; // Track when we last showed save reminder
   const SAVE_REMINDER_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  // ======= Folder Access & Auto-Save State =======
+  let projectDirectoryHandle = null; // Directory handle for auto-save
+  let autoSaveInterval = null; // Interval ID for auto-save
+  let lastAutoSaveTime = 0; // Track last auto-save timestamp
+  const AUTO_SAVE_INTERVAL_MS = 1 * 60 * 1000; // 15 minutes in milliseconds
+  let autoSaveEnabled = false; // Track if auto-save is enabled
   // ======= Page Saver State =======
   let pageSavers = new Map(); // id -> { name, position }
   let pageSaverPlacementMode = false;
@@ -95,6 +101,9 @@
   elements.pageSaverMenu = document.getElementById('page-saver-menu');
   elements.pageSaverList = document.getElementById('page-saver-list');
   elements.newPageSaverBtn = document.getElementById('new-page-saver');
+
+  // Auto-Save UI element (button)
+  elements.autoSaveStatus = document.getElementById('auto-save-status');
 
   // ======= Timer Helper Functions =======
   function formatMsToHMS(ms) {
@@ -8169,11 +8178,218 @@ function navigateToPreviousMatch() {
     }
   }
 
+  // ======= Folder Access & Auto-Save Functions =======
+  
+  /**
+   * Request folder access from the user using File System Access API
+   */
+  async function requestFolderAccess() {
+    if (!('showDirectoryPicker' in window)) {
+      alert('Folder Access API is not supported in your browser. Please use Chrome, Edge, or another Chromium-based browser.');
+      return false;
+    }
+
+    try {
+      // Request directory access
+      const dirHandle = await window.showDirectoryPicker({
+        mode: 'readwrite',
+        startIn: 'documents'
+      });
+      
+      // Store the directory handle
+      projectDirectoryHandle = dirHandle;
+      
+      // Verify we can access it
+      const permissionStatus = await verifyDirectoryPermission(dirHandle);
+      if (!permissionStatus) {
+        alert('Could not get permission to access the folder.');
+        projectDirectoryHandle = null;
+        return false;
+      }
+      
+      console.log('✅ Folder access granted:', dirHandle.name);
+      
+      // Enable auto-save
+      enableAutoSave();
+      updateAutoSaveStatus();
+      
+      return true;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Error requesting folder access:', err);
+        alert('Failed to access folder: ' + err.message);
+      } else {
+        console.log('User cancelled folder selection');
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Verify we have permission to read/write to the directory
+   */
+  async function verifyDirectoryPermission(dirHandle) {
+    const opts = { mode: 'readwrite' };
+    
+    // Check if we already have permission
+    if (await dirHandle.queryPermission(opts) === 'granted') {
+      return true;
+    }
+    
+    // Request permission
+    if (await dirHandle.requestPermission(opts) === 'granted') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Enable automatic saving every 15 minutes
+   */
+  function enableAutoSave() {
+    if (!projectDirectoryHandle) {
+      console.warn('Cannot enable auto-save: no folder access');
+      return;
+    }
+    
+    if (autoSaveInterval) {
+      // Already enabled
+      return;
+    }
+    
+    autoSaveEnabled = true;
+    
+    // Set up interval for auto-save (15 minutes)
+    autoSaveInterval = setInterval(async () => {
+      if (currentHtml && projectDirectoryHandle) {
+        await performAutoSave();
+      }
+    }, AUTO_SAVE_INTERVAL_MS);
+    
+    console.log('✅ Auto-save enabled (every 15 minutes)');
+  }
+
+  /**
+   * Disable automatic saving
+   */
+  function disableAutoSave() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = null;
+    }
+    autoSaveEnabled = false;
+    projectDirectoryHandle = null;
+    updateAutoSaveStatus();
+    console.log('Auto-save disabled');
+  }
+
+  /**
+   * Perform an automatic backup save
+   */
+  async function performAutoSave() {
+    if (!projectDirectoryHandle || !currentHtml) {
+      console.warn('Cannot perform auto-save: missing folder access or content');
+      return;
+    }
+
+    try {
+      // Update HTML before saving
+      if (!isSourceView) {
+        updateCurrentHtmlFromDOM();
+      }
+      
+      const finalHtml = prepareHtmlForDownload();
+      if (!finalHtml) {
+        console.error('Failed to prepare HTML for auto-save');
+        return;
+      }
+
+      // Create backups folder if it doesn't exist
+      let backupsFolder;
+      try {
+        backupsFolder = await projectDirectoryHandle.getDirectoryHandle('backups', { create: true });
+      } catch (err) {
+        console.error('Failed to create backups folder:', err);
+        return;
+      }
+
+      // Generate backup filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString()
+        .replace(/:/g, '-')
+        .replace(/\..+/, '')
+        .replace('T', '_');
+      
+      const baseFileName = currentFileName || 'labeled.html';
+      const nameParts = baseFileName.split('.');
+      const extension = nameParts.length > 1 ? nameParts.pop() : 'html';
+      const nameWithoutExt = nameParts.join('.');
+      
+      const backupFileName = `${nameWithoutExt}_backup_${timestamp}.${extension}`;
+
+      // Write backup file
+      const fileHandle = await backupsFolder.getFileHandle(backupFileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(finalHtml);
+      await writable.close();
+
+      lastAutoSaveTime = Date.now();
+      updateAutoSaveStatus();
+      
+      console.log('✅ Auto-save completed:', backupFileName);
+      showTemporaryMessage(`Backup saved: ${backupFileName}`, 3000);
+      
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      
+      // If permission denied, disable auto-save
+      if (err.name === 'NotAllowedError') {
+        console.warn('Permission denied for auto-save, disabling...');
+        disableAutoSave();
+        alert('Auto-save was disabled because folder access permission was revoked. Please re-enable folder access if you want automatic backups.');
+      }
+    }
+  }
+
+  /**
+   * Update the auto-save status indicator in the UI
+   */
+  function updateAutoSaveStatus() {
+    if (!elements.autoSaveStatus) return;
+    
+    if (autoSaveEnabled && projectDirectoryHandle) {
+      const folderName = projectDirectoryHandle.name;
+      const statusText = `Auto-save: ON`;
+      elements.autoSaveStatus.textContent = statusText;
+      elements.autoSaveStatus.classList.add('active');
+      elements.autoSaveStatus.title = `Automatic backups enabled\nFolder: ${folderName}\nBackups saved every 15 minutes to backups/ subfolder\n\nClick to disable`;
+    } else {
+      elements.autoSaveStatus.textContent = 'Auto-save: OFF';
+      elements.autoSaveStatus.classList.remove('active');
+      elements.autoSaveStatus.title = 'Click to select backup folder';
+    }
+  }
+
   // Download button event listener
   elements.downloadBtn.addEventListener('click', downloadFile);
 
   // Save As button event listener
   elements.saveAsBtn.addEventListener('click', saveAsFile);
+
+  // Auto-Save button event listener
+  if (elements.autoSaveStatus) {
+    elements.autoSaveStatus.addEventListener('click', async () => {
+      if (autoSaveEnabled && projectDirectoryHandle) {
+        // Already enabled - simply disable it
+        disableAutoSave();
+        showTemporaryMessage('Auto-save disabled', 3000);
+      } else {
+        // Not enabled - request folder access
+        await requestFolderAccess();
+      }
+    });
+  }
 
   // Add root label
   elements.addRootLabel.addEventListener('click', () => {
@@ -8878,6 +9094,9 @@ window.addEventListener('click', (event) => {
   // Initialize timer UI
   updateTimerDisplay();
   if (elements.toggleTimerBtn) elements.toggleTimerBtn.disabled = true; // Disabled until file is loaded
+  
+  // Initialize auto-save status
+  updateAutoSaveStatus();
   
   // ======= Page Saver Event Listeners =======
   if (elements.pageSaverBtn) {
