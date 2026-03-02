@@ -64,8 +64,8 @@
       z-index: 10;
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 14px 20px;
+      gap: 12px;
+      padding: 10px 16px;
       background: rgba(11,16,32,.75);
       backdrop-filter: blur(6px);
       border-bottom: 1px solid rgba(42, 52, 65, 0.6);
@@ -115,15 +115,33 @@
     .controls {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
       flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(25, 34, 68, 0.4);
+      border: 1px solid rgba(42, 52, 85, 0.5);
+    }
+
+    .control-group.file-operations {
+      /* File operations group styling */
+    }
+
+    .control-group.app-controls {
+      /* App controls group styling */
     }
 
     button {
       border: 1px solid var(--hover);
       background: var(--muted);
       color: var(--text);
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-radius: 12px;
       cursor: pointer;
       box-shadow: var(--shadow);
@@ -295,8 +313,7 @@
     .settings-btn {
       background: var(--accent) !important;
       border: 1px solid var(--accent) !important;
-      padding: 8px 12px !important;
-      font-size: 16px !important;
+      padding: 6px 10px !important;
     }
 
     .settings-btn:hover {
@@ -308,7 +325,7 @@
     .fullscreen-btn {
       background: var(--card) !important;
       border: 1px solid var(--border) !important;
-      padding: 8px 12px !important;
+      padding: 6px 10px !important;
       cursor: pointer !important;
       transition: all 0.2s ease !important;
       display: flex;
@@ -321,7 +338,61 @@
       border-color: var(--accent) !important;
     }
 
+    /* Download and Save As Buttons */
+    #download-html,
+    #save-as {
+      padding: 6px 10px !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Documentation Button */
+    .docs-btn {
+      padding: 6px 10px !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Settings Button */
+    .settings-btn {
+      padding: 6px 10px !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .fullscreen-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+      filter: brightness(0) invert(1);
+    }
+
+    .download-icon,
+    .save-as-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+      filter: brightness(0) invert(1);
+    }
+
+    .auto-save-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+      filter: brightness(0) invert(1);
+    }
+
+    .docs-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+      filter: brightness(0) invert(1);
+    }
+
+    .settings-icon {
       width: 16px;
       height: 16px;
       display: block;
@@ -332,12 +403,15 @@
     .auto-save-btn {
       background: var(--danger) !important;
       border: 1px solid var(--danger) !important;
-      padding: 8px 14px !important;
+      padding: 6px 10px !important;
       font-size: 13px !important;
       font-weight: 500 !important;
       transition: all 0.2s ease !important;
       color: white !important;
       cursor: pointer !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .auto-save-btn:hover {

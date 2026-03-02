@@ -24,7 +24,7 @@
   let projectDirectoryHandle = null; // Directory handle for auto-save
   let autoSaveInterval = null; // Interval ID for auto-save
   let lastAutoSaveTime = 0; // Track last auto-save timestamp
-  const AUTO_SAVE_INTERVAL_MS = 1 * 60 * 1000; // 15 minutes in milliseconds
+  const AUTO_SAVE_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
   let autoSaveEnabled = false; // Track if auto-save is enabled
   // ======= Page Saver State =======
   let pageSavers = new Map(); // id -> { name, position }
@@ -8360,12 +8360,9 @@ function navigateToPreviousMatch() {
     
     if (autoSaveEnabled && projectDirectoryHandle) {
       const folderName = projectDirectoryHandle.name;
-      const statusText = `Auto-save: ON`;
-      elements.autoSaveStatus.textContent = statusText;
       elements.autoSaveStatus.classList.add('active');
       elements.autoSaveStatus.title = `Automatic backups enabled\nFolder: ${folderName}\nBackups saved every 15 minutes to backups/ subfolder\n\nClick to disable`;
     } else {
-      elements.autoSaveStatus.textContent = 'Auto-save: OFF';
       elements.autoSaveStatus.classList.remove('active');
       elements.autoSaveStatus.title = 'Click to select backup folder';
     }
