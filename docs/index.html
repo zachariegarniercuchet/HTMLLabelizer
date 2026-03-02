@@ -539,7 +539,7 @@
             <li><strong>Load your document:</strong> Drag and drop an HTML file or click "Load HTML File"</li>
             <li><strong>Define your schema:</strong> Click "Add Label" to create your annotation labels</li>
             <li><strong>Annotate content:</strong> Select text in the rendered view and apply labels from the context menu</li>
-            <li><strong>Save your work:</strong> Click "Download" or "Save as..." to export your annotated HTML with embedded schema</li>
+            <li><strong>Save your work:</strong> Click "Download" (<img src="../assets/icons-download.png" alt="Download" style="width: 16px; height: 16px; vertical-align: middle;">) to export manually, or enable automatic backups (<img src="../assets/auto-save.png" alt="Auto-save" style="width: 16px; height: 16px; vertical-align: middle;">) to save every 15 minutes</li>
           </ol>
           
           <div class="alert">
@@ -1012,13 +1012,30 @@ In Co-reference panel:
           <p>Save and reload your annotated documents with embedded schemas:</p>
 
           <h3>Export</h3>
-          <p>Click the "Download" button to save your work. The exported HTML includes:</p>
+          <p>Click the "Download" button (<img src="../assets/icons-download.png" alt="Download" style="width: 16px; height: 16px; vertical-align: middle;">) or "Save As" button (<img src="../assets/icons-save-as.png" alt="Save As" style="width: 16px; height: 16px; vertical-align: middle;">) to save your work. The exported HTML includes:</p>
           <ul>
             <li>Original document content</li>
             <li>Applied annotations using <code>&lt;manual_label&gt;</code> elements</li>
             <li>Label schema stored in HTML comments</li>
             <li>All attribute values preserved</li>
           </ul>
+
+          <h3>Automatic Backups</h3>
+          <p>Enable automatic saving every 15 minutes to protect your work:</p>
+          <ol>
+            <li>Click the auto-save button (<img src="../assets/auto-save.png" alt="Auto-save" style="width: 16px; height: 16px; vertical-align: middle;">) in the header</li>
+            <li>Select a backup folder on your computer</li>
+            <li>Backups will be automatically saved every 15 minutes to a <code>backups/</code> subfolder</li>
+            <li>Each backup is timestamped for easy recovery</li>
+            <li>Click the auto-save button again to disable automatic backups</li>
+          </ol>
+          <div class="alert alert-warning">
+            <div class="alert-title">⚠ Browser Requirement</div>
+            <p>
+              Automatic backups require the File System Access API, which is currently supported in 
+              Chrome, Edge, and other Chromium-based browsers. The feature may not work in Firefox or Safari.
+            </p>
+          </div>
 
           <h3>Import</h3>
           <p>Load a previously annotated document:</p>
@@ -1230,7 +1247,7 @@ In Co-reference panel:
             <div class="alert-title">Note on File Access</div>
             <p>
               For security reasons, browsers do not allow automatic writing to the file system. 
-              Use the "Download" button to save your work, which triggers a browser download.
+              Use the "Download" (<img src="../assets/icons-download.png" alt="Download" style="width: 16px; height: 16px; vertical-align: middle;">) or "Save As" (<img src="../assets/icons-save-as.png" alt="Save As" style="width: 16px; height: 16px; vertical-align: middle;">) button to save your work, which triggers a browser download.
             </p>
           </div>
         </section>
