@@ -672,7 +672,7 @@ manual_label:hover, auto_label:hover {
   background: var(--accent);
   color: white;
   border: none;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
@@ -768,7 +768,7 @@ manual_label:hover, auto_label:hover {
    ============================================== */
 
 .comparison-view-btn {
-  padding: 10px 16px !important;
+  padding: 8px 14px !important;
   font-size: 14px !important;
   line-height: 1 !important;
 }
@@ -793,7 +793,7 @@ manual_label:hover, auto_label:hover {
    ============================================== */
 
 .sync-scroll-btn {
-  padding: 10px 16px !important;
+  padding: 8px 14px !important;
   font-size: 18px !important;
   line-height: 1 !important;
   transition: all 0.3s ease !important;
@@ -812,8 +812,8 @@ manual_label:hover, auto_label:hover {
 }
 
 .comparison-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   display: block;
   filter: brightness(0) invert(1);
 }
@@ -2139,7 +2139,7 @@ auto_label[data-iaa-match="no-match"] {
 .fullscreen-btn {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
-  padding: 8px 12px !important;
+  padding: 8px 14px !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
   display: flex;

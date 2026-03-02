@@ -7,7 +7,7 @@ button {
   border: 1px solid var(--hover);
   background: var(--muted);
   color: var(--text);
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 12px;
   cursor: pointer;
   box-shadow: var(--shadow);
@@ -72,7 +72,7 @@ button:disabled {
 .settings-btn {
   background: var(--accent) !important;
   border: 1px solid var(--accent) !important;
-  padding: 8px 12px !important;
+  padding: 8px 14px !important;
   font-size: 16px !important;
 }
 
@@ -81,11 +81,22 @@ button:disabled {
   border-color: var(--accent-2) !important;
 }
 
+/* Button Icons - Header buttons */
+.docs-icon,
 .settings-icon {
   width: 16px;
   height: 16px;
   display: block;
   filter: brightness(0) invert(1);
+}
+
+/* Documentation and Settings Button Styles */
+.docs-btn,
+.settings-btn {
+  padding: 8px 14px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Special accent buttons in light mode */
