@@ -9246,6 +9246,9 @@ window.addEventListener('click', (event) => {
   window.getLabels = () => labels;
   window.getLabelByPath = getLabelByPath;
   window.getHtmlContent = () => elements.htmlContent;
+  window.refreshTreeUI = refreshTreeUI;
+  window.renderHtmlContent = renderHtmlContent;
+  window.extractExistingLabels = extractExistingLabels;
   
   // Expose state for statistics module
   Object.defineProperty(window, 'currentHtml', {

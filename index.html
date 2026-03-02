@@ -300,13 +300,19 @@
       font-size: 1.05rem;
     }
 
+    .cta-buttons-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
     .cta-button {
       display: flex;
       flex-direction: column;
       padding: 20px 24px;
       border-radius: 12px;
       text-decoration: none;
-      margin-bottom: 16px;
       transition: all 0.3s ease;
       border: 2px solid transparent;
     }
@@ -323,15 +329,15 @@
     }
 
     .cta-button.secondary {
-      background: var(--card-2);
-      border-color: var(--border);
-      color: var(--text);
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      color: white;
+      border-color: transparent;
     }
 
     .cta-button.secondary:hover {
-      border-color: var(--accent-2);
+      filter: brightness(1.1);
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(32, 201, 151, 0.2);
+      box-shadow: 0 8px 20px rgba(32, 201, 151, 0.3);
     }
 
     .button-text {
@@ -342,7 +348,79 @@
 
     .button-description {
       font-size: 0.9rem;
-      opacity: 0.8;
+      opacity: 0.85;
+    }
+
+    .cta-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--sub);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cta-divider::before,
+    .cta-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .secondary-tools {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tool-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.2s ease;
+    }
+
+    .tool-link:hover {
+      border-color: var(--accent);
+      background: var(--hover);
+      transform: translateX(4px);
+    }
+
+    .tool-link-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .tool-link-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .tool-link-desc {
+      font-size: 0.8rem;
+      color: var(--sub);
+    }
+
+    .tool-link-icon {
+      font-size: 1.2rem;
+      color: var(--sub);
+      transition: transform 0.2s ease;
+    }
+
+    .tool-link:hover .tool-link-icon {
+      transform: translateX(4px);
+      color: var(--accent);
     }
 
     .stats-row {
@@ -695,6 +773,24 @@
       color: #1a1a1a;
     }
 
+    @media (max-width: 1200px) {
+      .hero-container {
+        gap: 50px;
+      }
+
+      .cta-card {
+        padding: 32px 28px;
+      }
+
+      .button-text {
+        font-size: 1rem;
+      }
+
+      .button-description {
+        font-size: 0.85rem;
+      }
+    }
+
     @media (max-width: 1024px) {
       .hero-container {
         grid-template-columns: 1fr;
@@ -707,6 +803,19 @@
 
       .footer-content {
         grid-template-columns: 1fr 1fr;
+      }
+
+      .stats-row {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .stat-value {
+        font-size: 1.3rem;
+      }
+
+      .stat-label {
+        font-size: 0.8rem;
       }
     }
 
@@ -723,6 +832,10 @@
         padding: 30px 20px;
       }
 
+      .cta-card h3 {
+        font-size: 1.5rem;
+      }
+
       .footer-content {
         grid-template-columns: 1fr;
         gap: 30px;
@@ -730,6 +843,10 @@
 
       .site-footer {
         padding: 40px 20px 20px;
+      }
+
+      .stats-row {
+        gap: 10px;
       }
     }
   </style>
@@ -787,15 +904,29 @@
           <h3>Get Started</h3>
           <p>Choose your workflow</p>
           
-          <a href="labelizer/index.html" class="cta-button primary">
-            <span class="button-text">Start Labelizing</span>
-            <span class="button-description">Annotate and structure your documents</span>
-          </a>
-          
-          <a href="comparison/index.html" class="cta-button secondary">
-            <span class="button-text">Inter-Annotator Agreement</span>
-            <span class="button-description">Compare and analyze annotation consistency</span>
-          </a>
+          <div class="cta-buttons-wrapper">
+            <a href="labelizer/index.html" class="cta-button primary">
+              <span class="button-text">Start Labelizing</span>
+              <span class="button-description">Annotate and structure your documents</span>
+            </a>
+            
+            <a href="labelizer/index.html?demo=true" class="cta-button secondary">
+              <span class="button-text">Try Interactive Demo</span>
+              <span class="button-description">Explore with a pre-configured example</span>
+            </a>
+          </div>
+
+          <div class="cta-divider">More Tools</div>
+
+          <div class="secondary-tools">
+            <a href="comparison/index.html" class="tool-link">
+              <div class="tool-link-text">
+                <span class="tool-link-title">Inter-Annotator Agreement</span>
+                <span class="tool-link-desc">Compare and analyze annotation consistency</span>
+              </div>
+              <span class="tool-link-icon">→</span>
+            </a>
+          </div>
           
           <div class="stats-row">
             <div class="stat">
