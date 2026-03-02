@@ -119,14 +119,14 @@ function updateButtonState() {
       domElements.syncScrollToggle.classList.add('active');
       domElements.syncScrollToggle.title = 'Synchronized Scrolling: ON (Ctrl+Shift+S to toggle)';
       if (syncIcon) {
-        syncIcon.src = '../assets/icons-connect.png';
+        syncIcon.src = '../assets/link.png';
         syncIcon.alt = 'Connected';
       }
     } else {
       domElements.syncScrollToggle.classList.remove('active');
       domElements.syncScrollToggle.title = 'Synchronized Scrolling: OFF (Ctrl+Shift+S to toggle)';
       if (syncIcon) {
-        syncIcon.src = '../assets/icons-disconnect.png';
+        syncIcon.src = '../assets/unlink.png';
         syncIcon.alt = 'Disconnected';
       }
     }

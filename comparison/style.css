@@ -808,6 +808,14 @@ manual_label:hover, auto_label:hover {
   height: 18px;
   display: block;
   transition: all 0.3s ease;
+  filter: brightness(0) invert(1);
+}
+
+.comparison-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  filter: brightness(0) invert(1);
 }
 
 /* Active state when sync scroll is enabled */
@@ -818,26 +826,10 @@ manual_label:hover, auto_label:hover {
   color: white !important;
 }
 
-.sync-scroll-btn:not(.active) {
-  background: var(--card) !important;
-  border-color: var(--border) !important;
-  opacity: 0.6;
-}
-
-.sync-scroll-btn:not(.active):hover {
-  opacity: 0.9;
-}
-
 :root[data-theme="light"] .sync-scroll-btn.active {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
   color: white !important;
-}
-
-:root[data-theme="light"] .sync-scroll-btn:not(.active) {
-  background: #f5f5f5 !important;
-  border-color: var(--border) !important;
-  color: var(--text) !important;
 }
 
 /* ==============================================
