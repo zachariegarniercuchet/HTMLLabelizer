@@ -81,6 +81,13 @@ button:disabled {
   border-color: var(--accent-2) !important;
 }
 
+.settings-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  filter: brightness(0) invert(1);
+}
+
 /* Special accent buttons in light mode */
 :root[data-theme="light"] #add-root-label {
   background: var(--accent) !important;
