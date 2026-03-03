@@ -9,7 +9,7 @@
 async function loadTimeStatistics(projectFolderHandle) {
   console.log('Loading time statistics...');
   
-  const timeContainer = document.getElementById('time-statistics');
+  const timeContainer = document.getElementById('time-statistics-content');
   if (!timeContainer) {
     console.error('Time statistics container not found');
     return;

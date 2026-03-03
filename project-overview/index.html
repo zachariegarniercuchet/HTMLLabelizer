@@ -506,10 +506,7 @@
     .stat-card,
     .label-breakdown,
     .metadata-overview,
-    .metadata-stats,
-    .iaa-overview,
-    .iaa-per-document,
-    .iaa-detailed {
+    .metadata-stats {
       background: var(--card-2);
       border-radius: 12px;
       padding: 24px;
@@ -521,10 +518,7 @@
     .stat-card h3,
     .label-breakdown h3,
     .metadata-overview h3,
-    .metadata-stats h3,
-    .iaa-overview h3,
-    .iaa-per-document h3,
-    .iaa-detailed h3 {
+    .metadata-stats h3 {
       margin: 0 0 16px 0;
       font-size: 18px;
       font-weight: 600;
@@ -574,9 +568,7 @@
     .data-table-container,
     .categories-grid,
     .classification-charts,
-    .metrics-grid,
-    .iaa-list,
-    .iaa-details {
+    .metrics-grid {
       min-height: 200px;
       display: flex;
       align-items: center;
@@ -606,7 +598,6 @@
       min-height: 150px;
     }
 
-    /* IAA Section */
     .metrics-grid {
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 16px;
@@ -623,10 +614,11 @@
 
     /* Time Statistics Styles */
     .time-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      display: flex;
+      justify-content: center;
       gap: 20px;
       margin-bottom: 20px;
+      flex-wrap: wrap;
     }
 
     .time-stat-card {
@@ -634,6 +626,8 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 20px;
+      width: 400px;
+      max-width: 100%;
     }
 
     .time-stat-card h4 {
@@ -1145,7 +1139,8 @@
       }
 
       .time-stats-grid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: center;
       }
 
       .welcome-hero h1 {
@@ -1209,9 +1204,9 @@
           <div class="nav-section-title">Analytics</div>
           <ul class="nav-list">
             <li class="nav-item"><a href="#annotation-state" class="nav-link">Annotation State</a></li>
-            <li class="nav-item"><a href="#statistics" class="nav-link">Label Statistics</a></li>
+            <li class="nav-item"><a href="#label-statistics" class="nav-link">Label Statistics</a></li>
+            <li class="nav-item"><a href="#time-statistics" class="nav-link">Time Analysis</a></li>
             <li class="nav-item"><a href="#classification" class="nav-link">Document Classification</a></li>
-            <li class="nav-item"><a href="#iaa" class="nav-link">Inter-Annotator Agreement</a></li>
           </ul>
         </nav>
       </div>
@@ -1246,17 +1241,10 @@
                 </div>
               </div>
               <div class="folder-item">
-                <span class="folder-item-icon">├──</span>
+                <span class="folder-item-icon">└──</span>
                 <div class="folder-item-content">
                   <span class="folder-name">Annotated/</span>
                   <div class="folder-desc">Finalized annotated documents with completion metadata</div>
-                </div>
-              </div>
-              <div class="folder-item">
-                <span class="folder-item-icon">└──</span>
-                <div class="folder-item-content">
-                  <span class="folder-name">IAA_Experiments/</span>
-                  <div class="folder-desc">Inter-annotator agreement data organized by document</div>
                 </div>
               </div>
             </div>
@@ -1306,7 +1294,7 @@
                 </div>
               </div>
               <div class="folder-item">
-                <span class="folder-item-icon">├──</span>
+                <span class="folder-item-icon">└──</span>
                 <div class="folder-item-content">
                   <span class="folder-name">Annotated/</span>
                 </div>
@@ -1325,50 +1313,7 @@
                   <span class="folder-name" style="color: var(--sub); font-size: 13px;">doc3.html</span>
                 </div>
               </div>
-              <div class="folder-item">
-                <span class="folder-item-icon">└──</span>
-                <div class="folder-item-content">
-                  <span class="folder-name">IAA_Experiments/</span>
-                </div>
-              </div>
-              <div class="folder-children" style="margin-left: 40px;">
-                <div class="folder-item">
-                  <span class="folder-item-icon" style="color: var(--sub);">├──</span>
-                  <span class="folder-name" style="color: var(--sub); font-size: 13px;">doc1/</span>
-                </div>
-                <div class="folder-children" style="margin-left: 60px;">
-                  <div class="folder-item">
-                    <span class="folder-item-icon" style="color: var(--sub); font-size: 12px;">├──</span>
-                    <span class="folder-name" style="color: var(--sub); font-size: 12px;">doc1_annotator_1.html</span>
-                  </div>
-                  <div class="folder-item">
-                    <span class="folder-item-icon" style="color: var(--sub); font-size: 12px;">├──</span>
-                    <span class="folder-name" style="color: var(--sub); font-size: 12px;">doc1_annotator_2.html</span>
-                  </div>
-                  <div class="folder-item">
-                    <span class="folder-item-icon" style="color: var(--sub); font-size: 12px;">└──</span>
-                    <span class="folder-name" style="color: var(--sub); font-size: 12px;">doc1_annotator_3.html</span>
-                  </div>
-                </div>
-                <div class="folder-item">
-                  <span class="folder-item-icon" style="color: var(--sub);">├──</span>
-                  <span class="folder-name" style="color: var(--sub); font-size: 13px;">doc2/</span>
-                </div>
-                <div class="folder-children" style="margin-left: 60px;">
-                  <div class="folder-item">
-                    <span class="folder-item-icon" style="color: var(--sub); font-size: 12px;">├──</span>
-                    <span class="folder-name" style="color: var(--sub); font-size: 12px;">doc2_annotator_1.html</span>
-                  </div>
-                  <div class="folder-item">
-                    <span class="folder-item-icon" style="color: var(--sub); font-size: 12px;">├──</span>
-                    <span class="folder-name" style="color: var(--sub); font-size: 12px;">doc2_annotator_2.html</span>
-                  </div>
-                  <div class="folder-item">
-                    <span class="folder-item-icon" style="color: var(--sub); font-size: 12px;">└──</span>
-                    <span class="folder-name" style="color: var(--sub); font-size: 12px;">doc2_annotator_3.html</span>
-                  </div>
-                </div>
-              </div>
+
             </div>
             </div>
           </div>
@@ -1380,16 +1325,16 @@
             <p>Track completion rates across all documents with per-annotator contribution breakdowns and real-time status updates.</p>
           </div>
           <div class="feature-card">
-            <h4><span class="feature-number">2</span> Label Analytics</h4>
-            <p>Visualize label distribution, time metrics, and hierarchical breakdowns across your unified label schema.</p>
+            <h4><span class="feature-number">2</span> Label Statistics</h4>
+            <p>Visualize label distribution and hierarchical breakdowns across your unified label schema.</p>
           </div>
           <div class="feature-card">
-            <h4><span class="feature-number">3</span> Document Classification</h4>
+            <h4><span class="feature-number">3</span> Time Metrics</h4>
+            <p>Analyze annotation time patterns and productivity metrics across all documents and annotators.</p>
+          </div>
+          <div class="feature-card">
+            <h4><span class="feature-number">4</span> Document Classification</h4>
             <p>Organize and analyze documents by metadata attributes with aggregated statistics per category.</p>
-          </div>
-          <div class="feature-card">
-            <h4><span class="feature-number">4</span> Agreement Analysis</h4>
-            <p>Calculate inter-annotator agreement metrics with detailed per-document comparisons and conflict identification.</p>
           </div>
         </div>
 
@@ -1453,15 +1398,15 @@
       </div>
     </section>
 
-    <!-- Section 2: Label and Time Statistics -->
-    <section class="content-section" id="statistics">
+    <!-- Section 2: Label Statistics -->
+    <section class="content-section" id="label-statistics">
       <div class="section-inner">
         <div class="section-header">
           <div class="section-title-group">
             <span class="section-number">2</span>
-            <h2>Label & Time Statistics</h2>
+            <h2>Label Statistics</h2>
           </div>
-          <p class="section-description">Distribution of labels and time metrics across the project</p>
+          <p class="section-description">Distribution of labels across the project</p>
         </div>
         
         <div class="section-content">
@@ -1471,24 +1416,36 @@
               <p>Select a project folder to view label statistics</p>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
 
+    <!-- Section 3: Time Analysis -->
+    <section class="content-section" id="time-statistics">
+      <div class="section-inner">
+        <div class="section-header">
+          <div class="section-title-group">
+            <span class="section-number">3</span>
+            <h2>Time Analysis</h2>
+          </div>
+          <p class="section-description">Time metrics and productivity analysis across the project</p>
+        </div>
+        
+        <div class="section-content">
           <!-- Time Statistics -->
-          <div style="margin-top: 32px;">
-            <h3 style="margin-bottom: 16px; color: var(--text);">Time Statistics</h3>
-            <div id="time-statistics">
-              <p class="placeholder-text">Select a project folder to view time metrics</p>
-            </div>
+          <div id="time-statistics-content">
+            <p class="placeholder-text">Select a project folder to view time metrics</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Section 3: Document Classification -->
+    <!-- Section 4: Document Classification -->
     <section class="content-section" id="classification">
       <div class="section-inner">
         <div class="section-header">
           <div class="section-title-group">
-            <span class="section-number">3</span>
+            <span class="section-number">4</span>
             <h2>Document Classification</h2>
           </div>
           <p class="section-description">Metadata-based document organization and statistics</p>
@@ -1503,45 +1460,6 @@
           <!-- Unique Metadata Summary -->
           <div id="metadata-summary">
             <p class="placeholder-text">Unique metadata summary will be displayed here</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 4: Inter-Annotator Agreement -->
-    <section class="content-section" id="iaa">
-      <div class="section-inner">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-number">4</span>
-            <h2>Inter-Annotator Agreement</h2>
-          </div>
-          <p class="section-description">Agreement metrics and comparison between annotators</p>
-        </div>
-        
-        <div class="section-content">
-          <!-- IAA Overview -->
-          <div class="iaa-overview">
-            <h3>Agreement Metrics</h3>
-            <div class="metrics-grid" id="iaa-metrics">
-              <p class="placeholder-text">IAA metrics will be calculated and displayed here</p>
-            </div>
-          </div>
-
-          <!-- Per-Document IAA -->
-          <div class="iaa-per-document">
-            <h3>Agreement by Document</h3>
-            <div id="iaa-document-list" class="iaa-list">
-              <p class="placeholder-text">Per-document agreement scores will appear here</p>
-            </div>
-          </div>
-
-          <!-- Detailed IAA Analysis -->
-          <div class="iaa-detailed">
-            <h3>Detailed Analysis</h3>
-            <div id="iaa-detailed-view" class="iaa-details">
-              <p class="placeholder-text">Detailed IAA analysis will be available here</p>
-            </div>
           </div>
         </div>
       </div>
