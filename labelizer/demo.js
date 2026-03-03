@@ -258,7 +258,7 @@ console.log('🎬 Demo mode activated - Loading sample data...');
     toast.className = 'demo-welcome-toast';
     toast.innerHTML = `
       <div class="toast-content">
-        <h3>� Welcome to Demo Mode</h3>
+        <h3>Welcome to Demo Mode</h3>
         <p>Explore a Cannes Film Festival report with movie and series annotations.</p>
         <p><strong>Try:</strong> Click on labeled films, expand the label tree, or modify parameters!</p>
       </div>
