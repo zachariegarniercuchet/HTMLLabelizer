@@ -8025,100 +8025,169 @@ function navigateToPreviousMatch() {
 
   // ======= Download Functions =======
   function prepareHtmlForDownload() {
-    if (!currentHtml) return null;
+    // Validate currentHtml exists and is not empty
+    if (!currentHtml || currentHtml.trim() === '') {
+      console.error('Cannot prepare download: currentHtml is empty or null');
+      return null;
+    }
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(currentHtml, 'text/html');
-
-    // 1. Remove delete buttons
-    const deleteButtons = doc.querySelectorAll('.delete-btn');
-    deleteButtons.forEach(button => button.remove());
-
-    // 2. Clean class attributes from manual_label, auto_label, and htmllabelizer_bookmark elements
-    const labelElements = doc.querySelectorAll('manual_label, auto_label, htmllabelizer_bookmark');
-    labelElements.forEach(label => {
-      if (label.hasAttribute('class')) {
-        label.removeAttribute('class');
-      }
-    });
-
-    // 3. Build JSON schema from your current labels tree
-    const labeltree = buildSchemaFromLabels(labels);
-
-    // Update meta.time with current timer (milliseconds)
     try {
-      if (!meta || typeof meta !== 'object') meta = {};
-      const currentMs = getCurrentAccumulatedMs();
-      meta.time = currentMs; // store as number (ms)
-    } catch (e) {
-      console.warn('Could not update meta.time before download', e);
-    }
-
-    const schemaWrapper = {
-      labeltree: labeltree,
-      meta: meta || {}
-    };
-
-    const schemaJson = JSON.stringify(schemaWrapper, null, 2);
-
-    // 4. Find existing HTMLLabelizer comment
-    let found = false;
-    const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT, null);
-    let commentNode;
-    while ((commentNode = walker.nextNode())) {
-      if (commentNode.nodeValue && commentNode.nodeValue.trim().startsWith("HTMLLabelizer")) {
-        // Replace old content
-        commentNode.nodeValue = " HTMLLabelizer\n" + schemaJson + "\n";
-        found = true;
-        break;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(currentHtml, 'text/html');
+      
+      // Check for parser errors
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        console.error('HTML parsing failed:', parserError.textContent);
+        return null;
       }
-    }
 
-    // 5. If not found, insert before <head>
-    if (!found) {
-      const newComment = doc.createComment(" HTMLLabelizer\n" + schemaJson + "\n");
-      const htmlEl = doc.documentElement;
-      const headEl = htmlEl.querySelector("head");
-      htmlEl.insertBefore(newComment, headEl);
-    }
+      // 1. Remove delete buttons
+      const deleteButtons = doc.querySelectorAll('.delete-btn');
+      deleteButtons.forEach(button => button.remove());
 
-    // 6. Serialize back to HTML
-    return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+      // 2. Clean class attributes from manual_label, auto_label, and htmllabelizer_bookmark elements
+      const labelElements = doc.querySelectorAll('manual_label, auto_label, htmllabelizer_bookmark');
+      labelElements.forEach(label => {
+        if (label.hasAttribute('class')) {
+          label.removeAttribute('class');
+        }
+      });
+
+      // 3. Build JSON schema from your current labels tree
+      const labeltree = buildSchemaFromLabels(labels);
+
+      // Update meta.time with current timer (milliseconds)
+      try {
+        if (!meta || typeof meta !== 'object') meta = {};
+        const currentMs = getCurrentAccumulatedMs();
+        meta.time = currentMs; // store as number (ms)
+      } catch (e) {
+        console.warn('Could not update meta.time before download', e);
+      }
+
+      const schemaWrapper = {
+        labeltree: labeltree,
+        meta: meta || {}
+      };
+
+      const schemaJson = JSON.stringify(schemaWrapper, null, 2);
+
+      // 4. Find existing HTMLLabelizer comment
+      let found = false;
+      const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT, null);
+      let commentNode;
+      while ((commentNode = walker.nextNode())) {
+        if (commentNode.nodeValue && commentNode.nodeValue.trim().startsWith("HTMLLabelizer")) {
+          // Replace old content
+          commentNode.nodeValue = " HTMLLabelizer\n" + schemaJson + "\n";
+          found = true;
+          break;
+        }
+      }
+
+      // 5. If not found, insert before <head>
+      if (!found) {
+        const newComment = doc.createComment(" HTMLLabelizer\n" + schemaJson + "\n");
+        const htmlEl = doc.documentElement;
+        const headEl = htmlEl.querySelector("head");
+        if (headEl) {
+          htmlEl.insertBefore(newComment, headEl);
+        } else {
+          // If no head element, insert as first child
+          htmlEl.insertBefore(newComment, htmlEl.firstChild);
+        }
+      }
+
+      // 6. Serialize back to HTML
+      const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+      
+      // Validate output is not empty
+      if (!finalHtml || finalHtml.trim() === '') {
+        console.error('Generated HTML is empty');
+        return null;
+      }
+      
+      console.log('✅ HTML prepared successfully:', finalHtml.length, 'bytes');
+      return finalHtml;
+      
+    } catch (error) {
+      console.error('Error preparing HTML for download:', error);
+      return null;
+    }
   }
 
   function downloadFile() {
-    // Clear group filter before downloading
-    if (activeGroupFilter) {
-      clearGroupFilter();
-      // Force sync to currentHtml after clearing filter
-      updateCurrentHtmlFromDOM();
+    try {
+      // If in source view, sync changes from source textarea first
+      if (isSourceView && sourceViewModified) {
+        console.log('Syncing source view changes before download');
+        currentHtml = elements.sourceView.value;
+        sourceViewModified = false;
+      }
+      
+      // Clear group filter before downloading
+      if (activeGroupFilter) {
+        clearGroupFilter();
+        // Force sync to currentHtml after clearing filter
+        updateCurrentHtmlFromDOM();
+      } else if (!isSourceView) {
+        // Always sync DOM to currentHtml before saving
+        updateCurrentHtmlFromDOM();
+      }
+      
+      const finalHtml = prepareHtmlForDownload();
+      if (!finalHtml) {
+        alert('❌ Cannot save: Failed to prepare content for download.\n\nPossible causes:\n- Content is empty\n- Invalid HTML structure\n\nCheck the browser console for details.');
+        console.error('Download failed: prepareHtmlForDownload returned null');
+        return;
+      }
+
+      const fileName = currentFileName || 'labeled.html';
+      console.log('Downloading file:', fileName, 'Size:', finalHtml.length, 'bytes');
+
+      const blob = new Blob([finalHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      // Show success message
+      showTemporaryMessage(`✅ Downloaded: ${fileName} (${(finalHtml.length / 1024).toFixed(1)} KB)`, 3000);
+      
+    } catch (error) {
+      console.error('Download failed with error:', error);
+      alert(`❌ Download failed: ${error.message}\n\nCheck the browser console for details.`);
     }
-    
-    const finalHtml = prepareHtmlForDownload();
-    if (!finalHtml) return;
-
-    const fileName = currentFileName || 'labeled.html';
-    console.log('Downloading file:', fileName);
-
-    const blob = new Blob([finalHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   function saveAsFile() {
-    // Clear group filter before saving
-    if (activeGroupFilter) {
-      clearGroupFilter();
-      // Force sync to currentHtml after clearing filter
-      updateCurrentHtmlFromDOM();
-    }
-    
-    const finalHtml = prepareHtmlForDownload();
-    if (!finalHtml) return;
+    try {
+      // If in source view, sync changes from source textarea first
+      if (isSourceView && sourceViewModified) {
+        console.log('Syncing source view changes before Save As');
+        currentHtml = elements.sourceView.value;
+        sourceViewModified = false;
+      }
+      
+      // Clear group filter before saving
+      if (activeGroupFilter) {
+        clearGroupFilter();
+        // Force sync to currentHtml after clearing filter
+        updateCurrentHtmlFromDOM();
+      } else if (!isSourceView) {
+        // Always sync DOM to currentHtml before saving
+        updateCurrentHtmlFromDOM();
+      }
+      
+      const finalHtml = prepareHtmlForDownload();
+      if (!finalHtml) {
+        alert('❌ Cannot save: Failed to prepare content for saving.\n\nPossible causes:\n- Content is empty\n- Invalid HTML structure\n\nCheck the browser console for details.');
+        console.error('Save As failed: prepareHtmlForDownload returned null');
+        return;
+      }
 
     console.log('Save As - File System Access API available:', 'showSaveFilePicker' in window);
 
@@ -8143,12 +8212,14 @@ function navigateToPreviousMatch() {
           await writable.write(finalHtml);
           await writable.close();
           
-          console.log('File saved successfully using File System Access API');
+          console.log('✅ File saved successfully using File System Access API');
+          showTemporaryMessage(`✅ Saved: ${fileHandle.name} (${(finalHtml.length / 1024).toFixed(1)} KB)`, 3000);
         } catch (err) {
           if (err.name !== 'AbortError') {
             console.error('Failed to save file:', err);
-            // Fallback to regular download
-            downloadFile();
+            alert(`⚠️ Save failed with File System Access API: ${err.message}\n\nTrying fallback download method...`);
+            // Fallback to blob download
+            saveAsFileFallback(finalHtml);
           } else {
             console.log('User cancelled save dialog');
           }
@@ -8157,24 +8228,43 @@ function navigateToPreviousMatch() {
     } else {
       // Fallback for browsers that don't support File System Access API
       console.log('File System Access API not available, using fallback');
+      saveAsFileFallback(finalHtml);
+    }
+    
+    } catch (error) {
+      console.error('Save As failed with error:', error);
+      alert(`❌ Save failed: ${error.message}\n\nCheck the browser console for details.`);
+    }
+  }
+
+  function saveAsFileFallback(finalHtml) {
+    try {
+      // Validate finalHtml before attempting to save
+      if (!finalHtml || finalHtml.trim() === '') {
+        throw new Error('Cannot save empty content');
+      }
+      
+      // Use blob download which works reliably for files of any size
       const blob = new Blob([finalHtml], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = currentFileName || 'labeled.html';
       
-      // Try to open in new window for manual save
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(finalHtml)}`;
-      const newWindow = window.open(dataUrl, '_blank');
-      if (!newWindow) {
-        // If popup is blocked, fallback to regular download
-        console.log('Popup blocked, falling back to regular download');
-        a.click();
-      } else {
-        console.log('Opened in new window - user can save manually');
-      }
+      // Trigger download
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       
-      URL.revokeObjectURL(url);
+      // Clean up blob URL after a short delay
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      console.log('✅ File saved using blob download fallback');
+      showTemporaryMessage(`✅ Saved: ${currentFileName || 'labeled.html'} (${(finalHtml.length / 1024).toFixed(1)} KB)`, 3000);
+      
+    } catch (error) {
+      console.error('Fallback save failed:', error);
+      alert(`❌ Save failed: ${error.message}`);
     }
   }
 
@@ -8295,15 +8385,22 @@ function navigateToPreviousMatch() {
 
     try {
       // Update HTML before saving
-      if (!isSourceView) {
+      if (isSourceView && sourceViewModified) {
+        console.log('Syncing source view changes before auto-save');
+        currentHtml = elements.sourceView.value;
+        sourceViewModified = false;
+      } else if (!isSourceView) {
         updateCurrentHtmlFromDOM();
       }
       
       const finalHtml = prepareHtmlForDownload();
       if (!finalHtml) {
-        console.error('Failed to prepare HTML for auto-save');
+        console.error('Failed to prepare HTML for auto-save: content is empty or invalid');
+        showTemporaryMessage('⚠️ Auto-save skipped: Invalid content', 3000);
         return;
       }
+      
+      console.log('Auto-save preparing:', finalHtml.length, 'bytes');
 
       // Create backups folder if it doesn't exist
       let backupsFolder;
