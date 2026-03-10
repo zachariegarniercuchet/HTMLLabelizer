@@ -54,11 +54,18 @@ async function parseHTMLMetadata(fileHandle) {
   }
 }
 
-async function readFilesFromFolder(folderHandle, extension = '.html') {
+async function readFilesFromFolder(folderHandle, extensions = ['.html', '.htm']) {
   const files = [];
+  // Ensure extensions is always an array
+  const extArray = Array.isArray(extensions) ? extensions : [extensions];
+  
   for await (const entry of folderHandle.values()) {
-    if (entry.kind === 'file' && entry.name.endsWith(extension)) {
-      files.push(entry);
+    if (entry.kind === 'file') {
+      // Check if file ends with any of the allowed extensions
+      const hasValidExtension = extArray.some(ext => entry.name.endsWith(ext));
+      if (hasValidExtension) {
+        files.push(entry);
+      }
     }
   }
   return files;

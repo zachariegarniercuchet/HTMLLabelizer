@@ -37,7 +37,7 @@ async function handleFolderSelection() {
       displaySelectedFolder(directoryHandle.name);
       await loadProjectData(directoryHandle);
     } else {
-      alert('Invalid project structure. Please select a folder containing "Original", "Annotated", and "IAA_Experiments" subfolders.');
+      alert('Invalid project structure. Please select a folder containing "Original" and "Annotated" subfolders.');
     }
     
   } catch (error) {
@@ -52,7 +52,7 @@ async function handleFolderSelection() {
  * Validate that the selected folder has the required structure
  */
 async function validateFolderStructure(directoryHandle) {
-  const requiredFolders = ['Original', 'Annotated', 'IAA_Experiments'];
+  const requiredFolders = ['Original', 'Annotated'];
   const foundFolders = [];
   
   try {
@@ -106,8 +106,7 @@ async function loadProjectData(directoryHandle) {
   // This will be implemented in future phases:
   // 1. Load documents from Original folder
   // 2. Load annotated documents from Annotated folder
-  // 3. Load IAA experiments from IAA_Experiments folder
-  // 4. Process and display statistics
+  // 3. Process and display statistics
   
   console.log('Project data loading will be implemented in next phase');
 }

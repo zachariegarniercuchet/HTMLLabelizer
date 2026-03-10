@@ -351,39 +351,6 @@
   justify-content: center;
 }
 
-/* IAA Section */
-.iaa-overview,
-.iaa-per-document,
-.iaa-detailed {
-  background: var(--card-2);
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.iaa-overview h3,
-.iaa-per-document h3,
-.iaa-detailed h3 {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  min-height: 120px;
-}
-
-.iaa-list,
-.iaa-details {
-  min-height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* Placeholder Text */
 .placeholder-text {
   color: var(--sub);

@@ -30,7 +30,7 @@ async function handleFolderSelection() {
       displaySelectedFolder(directoryHandle.name);
       await loadProjectData(directoryHandle);
     } else {
-      alert('Invalid project structure. Please select a folder containing "Original", "Annotated", and "IAA_Experiments" subfolders.');
+      alert('Invalid project structure. Please select a folder containing "Original" and "Annotated" subfolders.');
     }
     
   } catch (error) {
@@ -42,7 +42,7 @@ async function handleFolderSelection() {
 }
 
 async function validateFolderStructure(directoryHandle) {
-  const requiredFolders = ['Original', 'Annotated', 'IAA_Experiments'];
+  const requiredFolders = ['Original', 'Annotated'];
   const foundFolders = [];
   
   try {

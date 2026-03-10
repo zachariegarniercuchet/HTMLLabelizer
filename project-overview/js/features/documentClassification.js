@@ -19,7 +19,7 @@ async function loadDocumentClassification(projectFolderHandle) {
   try {
     // Get the Annotated folder
     const annotatedFolder = await projectFolderHandle.getDirectoryHandle('Annotated');
-    const annotatedFiles = await readFilesFromFolder(annotatedFolder, '.html');
+    const annotatedFiles = await readFilesFromFolder(annotatedFolder);
     
     console.log(`Processing classification for ${annotatedFiles.length} documents`);
     

@@ -134,5 +134,4 @@ To add a new section (e.g., Label Statistics):
 - Customizable metadata fields
 - Real-time collaboration features
 - Automatic backup and versioning
-- Advanced IAA metrics (Krippendorff's alpha, Fleiss' kappa)
 - Keyboard shortcuts and accessibility improvements

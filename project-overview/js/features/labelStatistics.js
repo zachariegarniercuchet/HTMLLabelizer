@@ -18,9 +18,9 @@ async function loadLabelStatistics(projectFolderHandle) {
   try {
     // Get the Annotated folder
     const annotatedFolder = await projectFolderHandle.getDirectoryHandle('Annotated');
-    const annotatedFiles = await readFilesFromFolder(annotatedFolder, '.html');
+    const annotatedFiles = await readFilesFromFolder(annotatedFolder);
     
-    console.log(`Found ${annotatedFiles.length} HTML files in Annotated folder`);
+    console.log(`Found ${annotatedFiles.length} documents in Annotated folder`);
     
     if (annotatedFiles.length === 0) {
       statsContainer.innerHTML = `
