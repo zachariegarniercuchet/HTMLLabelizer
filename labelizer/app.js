@@ -190,7 +190,7 @@
     }
   }
 
-  // Auto-start timer on labeling activity
+  // Auto-start timer on any user activity (click, interaction, etc.)
   function autoStartTimerOnActivity() {
     if (!timerRunning && currentHtml) {
       startTimer();
@@ -203,6 +203,21 @@
   if (elements.toggleTimerBtn) {
     elements.toggleTimerBtn.addEventListener('click', toggleTimer);
   }
+  
+  // Global click listener - any click on the page resets the inactivity timer
+  // This is the simplified approach: user is considered "working" whenever they interact with the page
+  document.addEventListener('click', (e) => {
+    // Ignore clicks on the timer button itself (to avoid conflicts with manual control)
+    if (elements.toggleTimerBtn && e.target.closest('#toggle-timer')) {
+      return;
+    }
+    autoStartTimerOnActivity();
+  });
+  
+  // Also capture right-click (contextmenu) to reset timer
+  document.addEventListener('contextmenu', (e) => {
+    autoStartTimerOnActivity();
+  });
 
   // When downloading or saving, ensure meta.time is updated from current timer
   // prepareHtmlForDownload will read meta and include it, so ensure it's up-to-date
