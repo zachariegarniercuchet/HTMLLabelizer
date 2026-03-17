@@ -402,31 +402,7 @@
     }
   }
   
-  /**
-   * Clear all filters and reset to defaults
-   */
-  function clearAllFilters() {
-    // Reset filter state
-    activeFilters.labelTypes = new Set(['manual', 'auto']);
-    activeFilters.verifiedStatus = new Set(['true', 'false']);
-    
-    // Get all parent labels and add them to filter
-    const labels = window.getLabels ? window.getLabels() : null;
-    if (labels) {
-      activeFilters.labelNames = new Set(Array.from(labels.keys()));
-    }
-    
-    // Update UI
-    document.querySelectorAll('.filter-type').forEach(cb => cb.checked = true);
-    document.querySelectorAll('.filter-verified').forEach(cb => cb.checked = true);
-    document.querySelectorAll('.filter-label-name').forEach(cb => cb.checked = true);
-    
-    // Update filter counts
-    updateFilterCounts();
-    
-    // Re-apply filters (show all)
-    applyFilters();
-  }
+
   
   /**
    * Apply current filters and navigate to first matching label
@@ -931,7 +907,7 @@
   }
   
   /**
-   * Save parameter for current instance
+   * Save parameter for current instance using the shared function from app.js
    */
   function saveInstanceParameter(labelElement, paramName, inputElement) {
     let value = '';
@@ -942,11 +918,23 @@
       value = inputElement.value || '';
     }
     
-    labelElement.setAttribute(paramName, value);
+    // Build paramValues object with the single parameter
+    const paramValues = {};
+    paramValues[paramName] = value;
     
-    // Update HTML
-    if (typeof window.updateCurrentHtmlFromDOM === 'function') {
-      window.updateCurrentHtmlFromDOM();
+    // Use the shared function from app.js to save parameters
+    // This ensures group attribute syncing and stats updates happen
+    if (typeof window.saveParametersForElement === 'function') {
+      window.saveParametersForElement(labelElement, paramValues);
+    } else {
+      // Fallback to direct setAttribute if function not available
+      console.warn('saveParametersForElement not available, using direct setAttribute');
+      labelElement.setAttribute(paramName, value);
+      
+      // Update HTML
+      if (typeof window.updateCurrentHtmlFromDOM === 'function') {
+        window.updateCurrentHtmlFromDOM();
+      }
     }
   }
   
@@ -978,43 +966,7 @@
     }
   }
   
-  /**
-   * Navigate to next parent label
-   */
-  function navigateToNextParentLabel() {
-    const startIndex = currentParentLabelIndex;
-    let attempts = 0;
-    const maxAttempts = parentLabels.length;
-    
-    // Keep trying to find next parent with matching instances
-    do {
-      if (currentParentLabelIndex < parentLabels.length - 1) {
-        currentParentLabelIndex++;
-      } else {
-        currentParentLabelIndex = 0; // Loop back to first
-      }
-      
-      attempts++;
-      
-      const parentLabelName = parentLabels[currentParentLabelIndex];
-      
-      // Check if this label name is in the filter
-      if (!activeFilters.labelNames.has(parentLabelName)) {
-        continue;
-      }
-      
-      // Check if this parent has instances matching filters
-      const instances = collectFilteredInstances(parentLabelName);
-      if (instances.length > 0) {
-        showParentLabelDetails(parentLabelName);
-        return;
-      }
-      
-    } while (currentParentLabelIndex !== startIndex && attempts < maxAttempts);
-    
-    // If we looped back to start or tried all labels, show no labels message
-    showNoLabelsMessage();
-  }
+
   
   /**
    * Highlight a specific label instance in the HTML content
@@ -1032,13 +984,7 @@
     labelElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   
-  /**
-   * Navigate to the next unverified label (legacy - not used in parent label mode)
-   */
-  function navigateToNextUnverified() {
-    // This function is kept for compatibility but not used
-    // The new workflow uses navigateToNextParentLabel
-  }
+
   
   /**
    * Toggle verification status of current instance
@@ -1071,36 +1017,7 @@
     showCurrentInstance();
   }
   
-  /**
-   * Mark current instance as verified (kept for compatibility)
-   */
-  function markCurrentInstanceAsVerified() {
-    if (currentLabelInstances.length === 0 || currentInstanceIndex >= currentLabelInstances.length) return;
-    
-    const currentInstance = currentLabelInstances[currentInstanceIndex];
-    
-    // Set verified attribute to true for parent label
-    currentInstance.setAttribute('verified', 'true');
-    
-    // Also mark all nested sublabels as verified
-    const nestedSublabels = currentInstance.querySelectorAll('manual_label, auto_label');
-    nestedSublabels.forEach(sublabel => {
-      sublabel.setAttribute('verified', 'true');
-    });
-    
-    currentInstance.classList.remove('verification-highlight');
-    
-    // Update the actual HTML to persist the change
-    if (typeof window.updateCurrentHtmlFromDOM === 'function') {
-      window.updateCurrentHtmlFromDOM();
-    }
-    
-    // Update stats
-    updateVerificationStats();
-    
-    // Update the inspector display
-    showCurrentInstance();
-  }
+
   
   /**
    * Update verification statistics

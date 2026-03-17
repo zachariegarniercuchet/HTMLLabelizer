@@ -3574,53 +3574,37 @@ function showParameterMenu(labelElement, x, y) {
 }
 
   // ======= Enhanced Parameter Saving for Multi-Selection =======
-function saveParameters() {
-  if (!currentParamElement) return;
-  
-  // Validate that currentParamElement still exists in the DOM
-  if (!document.body.contains(currentParamElement)) {
-    console.warn('currentParamElement no longer exists in DOM, skipping save');
-    currentParamElement = null;
-    return;
+/**
+ * Core function to save parameters for a given label element
+ * This is extracted to allow both parameter menu and verification to use the same logic
+ * 
+ * @param {HTMLElement} labelElement - The label element to save parameters for
+ * @param {Object} paramValues - Object with parameter names as keys and values
+ */
+function saveParametersForElement(labelElement, paramValues) {
+  // Validate element exists in DOM
+  if (!document.body.contains(labelElement)) {
+    console.warn('labelElement no longer exists in DOM, skipping save');
+    return false;
   }
   
-  // Validate that currentParamElement is still a label element
-  const tagName = currentParamElement.tagName.toLowerCase();
+  // Validate it's a label element
+  const tagName = labelElement.tagName.toLowerCase();
   if (tagName !== 'manual_label' && tagName !== 'auto_label') {
-    console.warn('currentParamElement is not a label element:', tagName);
-    currentParamElement = null;
-    return;
+    console.warn('labelElement is not a label element:', tagName);
+    return false;
   }
 
-  // Get parameter values from form
-  const paramValues = {};
-  const elems = elements.paramForm.querySelectorAll('[data-param-name]');
-  elems.forEach(el => {
-    const paramName = el.dataset.paramName;
-    let paramValue = '';
-
-    if (el.tagName.toLowerCase() === 'input' && el.type === 'checkbox') {
-      paramValue = el.checked ? 'true' : 'false';
-    } else if (el.tagName.toLowerCase() === 'select') {
-      paramValue = el.value ?? '';
-    } else if (el.tagName.toLowerCase() === 'input') {
-      paramValue = el.value ?? '';
-    } else {
-      paramValue = el.value ?? '';
-    }
-
-    paramValues[paramName] = paramValue;
-  });
-
-  // Check if this label has group configuration
-  const labelName = currentParamElement.getAttribute('labelName');
-  const parent = currentParamElement.getAttribute('parent') || '';
+  // Get label information for group config handling
+  const labelName = labelElement.getAttribute('labelName');
+  const parent = labelElement.getAttribute('parent') || '';
   const path = parent ? [parent, labelName] : [labelName];
   const label = getLabelByPath(path);
   
+  // Handle group configuration if present
   if (label && label.groupConfig) {
     const groupIdAttr = label.groupConfig.groupIdAttribute;
-    const newGroupId = paramValues[groupIdAttr] || currentParamElement.getAttribute(groupIdAttr);
+    const newGroupId = paramValues[groupIdAttr] || labelElement.getAttribute(groupIdAttr);
     
     if (newGroupId) {
       // ===== PULL silver attribute values from existing group members =====
@@ -3630,7 +3614,7 @@ function saveParameters() {
       
       // Look for other elements with the same groupID
       for (let otherEl of otherGroupMembers) {
-        if (otherEl === currentParamElement) continue; // Skip self
+        if (otherEl === labelElement) continue; // Skip self
         
         const otherLabelName = otherEl.getAttribute('labelName');
         const otherParent = otherEl.getAttribute('parent') || '';
@@ -3674,23 +3658,78 @@ function saveParameters() {
       });
       
       if (groupUpdates.size > 0) {
-        syncGroupAttributes(currentParamElement, newGroupId, groupUpdates);
+        syncGroupAttributes(labelElement, newGroupId, groupUpdates);
       }
     }
   }
 
-  // Apply parameters to current element
+  // Apply parameters to the label element
   Object.entries(paramValues).forEach(([paramName, paramValue]) => {
-    currentParamElement.setAttribute(paramName, paramValue);
+    labelElement.setAttribute(paramName, paramValue);
   });
+
+  // Update storage based on context
+  const isInHtmlContent = elements.htmlContent.contains(labelElement);
+
+  if (isInHtmlContent) {
+    updateCurrentHtmlFromDOM();
+  }
+
+  // Always update stats and refresh the UI
+  updateStats();
+  refreshGroupsDisplay();
+  
+  return true;
+}
+
+function saveParameters() {
+  if (!currentParamElement) return;
+  
+  // Validate that currentParamElement still exists in the DOM
+  if (!document.body.contains(currentParamElement)) {
+    console.warn('currentParamElement no longer exists in DOM, skipping save');
+    currentParamElement = null;
+    return;
+  }
+  
+  // Validate that currentParamElement is still a label element
+  const tagName = currentParamElement.tagName.toLowerCase();
+  if (tagName !== 'manual_label' && tagName !== 'auto_label') {
+    console.warn('currentParamElement is not a label element:', tagName);
+    currentParamElement = null;
+    return;
+  }
+
+  // Get parameter values from form
+  const paramValues = {};
+  const elems = elements.paramForm.querySelectorAll('[data-param-name]');
+  elems.forEach(el => {
+    const paramName = el.dataset.paramName;
+    let paramValue = '';
+
+    if (el.tagName.toLowerCase() === 'input' && el.type === 'checkbox') {
+      paramValue = el.checked ? 'true' : 'false';
+    } else if (el.tagName.toLowerCase() === 'select') {
+      paramValue = el.value ?? '';
+    } else if (el.tagName.toLowerCase() === 'input') {
+      paramValue = el.value ?? '';
+    } else {
+      paramValue = el.value ?? '';
+    }
+
+    paramValues[paramName] = paramValue;
+  });
+
+  // Call the core function with collected parameters
+  const success = saveParametersForElement(currentParamElement, paramValues);
+  
+  if (!success) return;
 
   // If we have multiple elements from multi-selection, apply to all
   if (window.currentMultiLabelElements && window.currentMultiLabelElements.length > 1) {
     window.currentMultiLabelElements.forEach(element => {
       if (element !== currentParamElement) {
-        Object.entries(paramValues).forEach(([paramName, paramValue]) => {
-          element.setAttribute(paramName, paramValue);
-        });
+        saveParametersForElement(element, paramValues);
       }
     });
     
@@ -3698,18 +3737,8 @@ function saveParameters() {
     window.currentMultiLabelElements = null;
   }
 
-  // Update storage based on context
-  const isInAdvancedContent = elements.advancedContent.contains(currentParamElement);
-  const isInHtmlContent = elements.htmlContent.contains(currentParamElement);
-
-  if (isInHtmlContent) {
-    updateCurrentHtmlFromDOM();
-  }
-
   // Don't call hideParameterMenu() here to avoid infinite loop
   // The caller of saveParameters() will handle closing the menu
-  updateStats();
-  refreshGroupsDisplay();
 }
 
 // Function to collect existing parameter values for suggestions
@@ -9402,6 +9431,7 @@ window.addEventListener('click', (event) => {
   window.refreshTreeUI = refreshTreeUI;
   window.renderHtmlContent = renderHtmlContent;
   window.extractExistingLabels = extractExistingLabels;
+  window.saveParametersForElement = saveParametersForElement;
   
   // Expose state for statistics module
   Object.defineProperty(window, 'currentHtml', {
