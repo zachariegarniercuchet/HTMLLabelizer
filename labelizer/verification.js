@@ -9,6 +9,11 @@
   let currentLabelInstances = [];
   let currentInstanceIndex = 0;
   
+  // ======= Silver Attributes Menu State =======
+  let currentSilverAttributesMenu = null;
+  let currentSilverAttributesLabelElement = null;
+  let currentSilverAttributesGroupId = null;
+  
   // ======= Filter State =======
   let activeFilters = {
     labelTypes: new Set(['manual', 'auto']), // manual, auto
@@ -26,6 +31,81 @@
   // ======= Verification Functions =======
   
   /**
+   * Setup event handlers for silver attributes menu
+   * Closes menu on click outside or ESC key (same as parameter menu)
+   */
+  function setupSilverAttributesMenuHandlers() {
+    // Close on click outside
+    document.addEventListener('mousedown', (e) => {
+      if (currentSilverAttributesMenu && !currentSilverAttributesMenu.contains(e.target)) {
+        hideSilverAttributesMenu();
+      }
+    });
+    
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && currentSilverAttributesMenu) {
+        hideSilverAttributesMenu();
+      }
+    });
+  }
+  
+  /**
+   * Hide and save silver attributes menu
+   * Auto-saves changes before closing (same as hideParameterMenu)
+   */
+  function hideSilverAttributesMenu() {
+    if (!currentSilverAttributesMenu) return;
+    
+    // Auto-save changes before closing
+    saveSilverAttributes();
+    
+    // Remove the menu from DOM
+    currentSilverAttributesMenu.remove();
+    currentSilverAttributesMenu = null;
+    currentSilverAttributesLabelElement = null;
+    currentSilverAttributesGroupId = null;
+  }
+  
+  /**
+   * Save silver attributes from the current menu
+   */
+  function saveSilverAttributes() {
+    if (!currentSilverAttributesMenu || !currentSilverAttributesLabelElement) return;
+    
+    // Collect all silver attribute values
+    const inputs = currentSilverAttributesMenu.querySelectorAll('[data-attr-name]');
+    const newValues = new Map();
+    
+    inputs.forEach(input => {
+      const attrName = input.dataset.attrName;
+      let value;
+      
+      if (input.type === 'checkbox') {
+        value = input.checked ? 'true' : 'false';
+      } else {
+        value = input.value || '';
+      }
+      
+      newValues.set(attrName, value);
+    });
+    
+    // Apply changes to all group members
+    if (newValues.size > 0 && typeof window.updateGroupInDocument === 'function') {
+      const labelElement = currentSilverAttributesLabelElement;
+      const labelName = labelElement.getAttribute('labelName');
+      const oldGroupId = currentSilverAttributesGroupId || '';
+      
+      window.updateGroupInDocument(labelName, oldGroupId, newValues, currentSilverAttributesGroupId);
+      
+      // Refresh verification display
+      showCurrentInstance();
+    }
+  }
+  
+  // ======= Verification Functions =======
+  
+  /**
    * Initialize verification system
    */
   function initVerification() {
@@ -37,6 +117,9 @@
     
     // Setup filter event listeners
     setupFilterListeners();
+    
+    // Setup silver attributes menu close handlers
+    setupSilverAttributesMenuHandlers();
   }
   
   /**
@@ -802,13 +885,66 @@
       
       input.dataset.paramName = paramName;
       
-      // Save on change
-      input.addEventListener('change', () => {
-        saveInstanceParameter(labelElement, paramName, input);
-      });
+      // For group ID parameter, add a button to edit silver attributes
+      if (isGroupId && labelData.groupConfig && labelData.groupConfig.groupAttributes && labelData.groupConfig.groupAttributes.size > 0) {
+        // Create a container for the input and button
+        const inputContainer = document.createElement('div');
+        inputContainer.style.display = 'flex';
+        inputContainer.style.gap = '8px';
+        inputContainer.style.alignItems = 'center';
+        inputContainer.style.flex = '1';
+        
+        inputContainer.appendChild(input);
+        
+        // Create button to edit silver attributes
+        const editSilverBtn = document.createElement('button');
+        editSilverBtn.textContent = '*';
+        editSilverBtn.className = 'edit-silver-attributes-btn';
+        editSilverBtn.title = 'Edit group attributes (silver attributes)';
+        editSilverBtn.style.padding = '2px 8px';
+        editSilverBtn.style.fontSize = '12px';
+        editSilverBtn.style.fontWeight = 'bold';
+        editSilverBtn.style.cursor = 'pointer';
+        editSilverBtn.style.background = 'var(--card)';
+        editSilverBtn.style.color = 'var(--text)';
+        editSilverBtn.style.border = '1px solid var(--border)';
+        editSilverBtn.style.borderRadius = '4px';
+        editSilverBtn.style.minWidth = '30px';
+        
+        editSilverBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const labelName = labelElement.getAttribute('labelName');
+          const parent = labelElement.getAttribute('parent') || '';
+          const path = parent ? [parent, labelName] : [labelName];
+          const goldValue = input.value.trim();
+          
+          // Get button position for menu positioning
+          const rect = editSilverBtn.getBoundingClientRect();
+          const x = rect.left;
+          const y = rect.bottom + 8; // Position below the button
+          
+          openSilverAttributesModal(labelElement, path, goldValue, labelData, x, y);
+        });
+        
+        inputContainer.appendChild(editSilverBtn);
+        
+        // Save on change to input
+        input.addEventListener('change', () => {
+          saveInstanceParameter(labelElement, paramName, input);
+        });
+        
+        paramRow.appendChild(label);
+        paramRow.appendChild(inputContainer);
+      } else {
+        // Save on change
+        input.addEventListener('change', () => {
+          saveInstanceParameter(labelElement, paramName, input);
+        });
+        
+        paramRow.appendChild(label);
+        paramRow.appendChild(input);
+      }
       
-      paramRow.appendChild(label);
-      paramRow.appendChild(input);
       form.appendChild(paramRow);
     });
     
@@ -1056,6 +1192,195 @@
     
     // Return black or white based on luminance
     return luminance > 0.5 ? '#000000' : '#ffffff';
+  }
+
+  /**
+   * Open menu to edit silver attributes for a group ID
+   * Uses the same design and behavior as the parameter menu
+   * Reuses the update function from app.js to ensure consistency
+   */
+  function openSilverAttributesModal(labelElement, labelPath, currentGroupId, labelData, x, y) {
+    // Close any existing silver attributes menu
+    if (currentSilverAttributesMenu) {
+      hideSilverAttributesMenu();
+    }
+
+    // Create the menu container (same class structure as param-menu)
+    const menu = document.createElement('div');
+    menu.id = 'silver-attributes-menu';
+    menu.className = 'param-menu silver-attributes-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.zIndex = '1002';
+    
+    // Title with Group ID value
+    const title = document.createElement('h4');
+    title.className = 'silver-attributes-title';
+    title.textContent = `Co-reference - ${currentGroupId || '(no group ID)'}`;
+    title.style.cursor = 'grab';
+    title.style.userSelect = 'none';
+    menu.appendChild(title);
+
+    // Info message (same style as param-delete-info)
+    const infoMsg = document.createElement('div');
+    infoMsg.className = 'param-delete-info';
+    infoMsg.textContent = 'Changes will apply to all labels in this group';
+    menu.appendChild(infoMsg);
+
+    // Form container (same class as param-form)
+    const form = document.createElement('div');
+    form.className = 'param-form';
+    
+    // Create form for each silver attribute
+    if (labelData.groupConfig && labelData.groupConfig.groupAttributes) {
+      labelData.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+        const paramRow = document.createElement('div');
+        paramRow.className = 'param-row';
+        
+        const label = document.createElement('label');
+        label.textContent = attrName + ':';
+        label.style.color = '#C0C0C0'; // Silver color
+        
+        let input;
+        const currentVal = labelElement.getAttribute(attrName) || '';
+        
+        if (attrDef.type === 'string') {
+          input = document.createElement('input');
+          input.type = 'text';
+          input.value = currentVal;
+        } else if (attrDef.type === 'checkbox') {
+          input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = currentVal === 'true' || currentVal === true;
+        } else if (attrDef.type === 'dropdown') {
+          input = document.createElement('select');
+          (attrDef.options || []).forEach((optVal) => {
+            const opt = document.createElement('option');
+            opt.value = optVal;
+            opt.textContent = optVal;
+            if (optVal === currentVal) opt.selected = true;
+            input.appendChild(opt);
+          });
+        }
+        
+        input.dataset.attrName = attrName;
+        
+        paramRow.appendChild(label);
+        paramRow.appendChild(input);
+        form.appendChild(paramRow);
+      });
+    }
+    
+    menu.appendChild(form);
+
+    // Close button (same style as param-close-btn)
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'param-close-btn';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideSilverAttributesMenu();
+    });
+    menu.appendChild(closeBtn);
+
+    // Add to document
+    document.body.appendChild(menu);
+    
+    // Store references in state
+    currentSilverAttributesMenu = menu;
+    currentSilverAttributesLabelElement = labelElement;
+    currentSilverAttributesGroupId = currentGroupId;
+
+    // Make draggable by the title
+    makeSilverAttributeMenuDraggable(menu, title);
+
+    // Keep within viewport bounds
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = `${Math.max(0, window.innerWidth - rect.width - 10)}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = `${Math.max(0, window.innerHeight - rect.height - 10)}px`;
+    }
+    
+    // Focus on first input and setup Enter key navigation (same as parameter menu)
+    const allInputs = form.querySelectorAll('input, select');
+    if (allInputs.length > 0) {
+      // Focus on first input
+      allInputs[0].focus();
+      
+      // Add Enter key navigation to all inputs
+      allInputs.forEach((input, index) => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            if (index < allInputs.length - 1) {
+              // Move to next input
+              allInputs[index + 1].focus();
+            } else {
+              // Last input - close the menu (auto-saves)
+              hideSilverAttributesMenu();
+            }
+          }
+        });
+      });
+    }
+  }
+
+  /**
+   * Make an element draggable (same logic as app.js makeDraggable)
+   */
+  function makeSilverAttributeMenuDraggable(element, handle) {
+    let isDragging = false;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+
+    handle.addEventListener('mousedown', dragStart);
+
+    function dragStart(e) {
+      const rect = element.getBoundingClientRect();
+      xOffset = rect.left;
+      yOffset = rect.top;
+      
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      if (e.target === handle || e.target.closest('h4') === handle) {
+        isDragging = true;
+        handle.style.cursor = 'grabbing';
+      }
+    }
+
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', dragEnd);
+
+    function drag(e) {
+      if (isDragging) {
+        e.preventDefault();
+        
+        let currentX = e.clientX - initialX;
+        let currentY = e.clientY - initialY;
+
+        // Keep within viewport bounds
+        const rect = element.getBoundingClientRect();
+        const maxX = window.innerWidth - rect.width;
+        const maxY = window.innerHeight - rect.height;
+        
+        currentX = Math.max(0, Math.min(currentX, maxX));
+        currentY = Math.max(0, Math.min(currentY, maxY));
+
+        element.style.left = `${currentX}px`;
+        element.style.top = `${currentY}px`;
+      }
+    }
+
+    function dragEnd(e) {
+      isDragging = false;
+      handle.style.cursor = 'grab';
+    }
   }
   
   /**

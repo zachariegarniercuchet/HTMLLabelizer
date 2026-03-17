@@ -4475,7 +4475,10 @@ function toggleGroupEdit(groupDiv, groupKey) {
     
   } else {
     // Save and switch back to display mode
-    const [labelName, oldGroupId] = groupKey.split('_');
+    // Split on ||| separator to handle label names containing underscores
+    const parts = groupKey.split('|||');
+    const labelName = parts[0];
+    const oldGroupId = parts[1] || '';
     
     // Get new group ID from input
     const groupIdInput = groupDiv.querySelector('.group-id-value input');
@@ -4893,8 +4896,9 @@ function collectActiveGroups() {
       
       // Check if element has the group ID attribute (even if empty)
       if (labelEl.hasAttribute(groupIdAttr)) {
-        const groupId = labelEl.getAttribute(groupIdAttr) || 'undefined';
+        const groupId = labelEl.getAttribute(groupIdAttr) || '';
         const groupKey = `${labelName}_${groupId}`;
+        // Then: const [labelName, oldGroupId] = groupKey.split('_');
         
         if (!groups.has(groupKey)) {
           const values = new Map();
@@ -9433,6 +9437,7 @@ window.addEventListener('click', (event) => {
   window.renderHtmlContent = renderHtmlContent;
   window.extractExistingLabels = extractExistingLabels;
   window.saveParametersForElement = saveParametersForElement;
+  window.updateGroupInDocument = updateGroupInDocument;
   
   // Expose state for statistics module
   Object.defineProperty(window, 'currentHtml', {
