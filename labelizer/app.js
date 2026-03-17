@@ -3764,19 +3764,27 @@ function collectParameterSuggestions(labelName, parent, paramName) {
 }
 
 // Function to create suggestion dropdown
+// Renders as a global overlay aligned to the input, so it can
+// extend outside cards/containers and match the input width.
 function createSuggestionDropdown(input, suggestions) {
-  // Remove existing dropdown
-  const existingDropdown = input.parentElement.querySelector('.suggestion-dropdown');
+  // Remove any existing global dropdown
+  const existingDropdown = document.querySelector('.suggestion-dropdown');
   if (existingDropdown) {
     existingDropdown.remove();
   }
   
   if (suggestions.length === 0) return null;
   
+  const rect = input.getBoundingClientRect();
   const dropdown = document.createElement('div');
   dropdown.className = 'suggestion-dropdown';
 
-  
+  // Position as a fixed overlay aligned with the input
+  dropdown.style.position = 'fixed';
+  dropdown.style.top = `${rect.bottom + 2}px`;
+  dropdown.style.left = `${rect.left}px`;
+  dropdown.style.width = `${rect.width}px`;
+
   suggestions.forEach((suggestion, index) => {
     const item = document.createElement('div');
     item.className = 'suggestion-item';
@@ -3799,6 +3807,7 @@ function createSuggestionDropdown(input, suggestions) {
     dropdown.appendChild(item);
   });
   
+  document.body.appendChild(dropdown);
   return dropdown;
 }
 
