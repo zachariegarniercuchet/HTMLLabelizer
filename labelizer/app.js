@@ -3548,7 +3548,7 @@ function showParameterMenu(labelElement, x, y) {
   
   if (!label || !label.groupConfig) return;
   
-  // Find all elements with the same group ID (both manual and auto labels)
+  // Find all elements with the same group ID AND same label type (both manual and auto labels)
   const allLabelElements = elements.htmlContent.querySelectorAll('manual_label, auto_label');
   const sameGroupElements = Array.from(allLabelElements).filter(el => {
     const elLabelName = el.getAttribute('labelName');
@@ -3559,7 +3559,8 @@ function showParameterMenu(labelElement, x, y) {
     if (!elLabel || !elLabel.groupConfig) return false;
     
     const elGroupId = el.getAttribute(elLabel.groupConfig.groupIdAttribute);
-    return elGroupId === groupId;
+    // Only sync if same group ID AND same label AND same parent
+    return elGroupId === groupId && elLabelName === labelName && elParent === parent;
   });
   
   // Update all elements in the same group
@@ -3625,8 +3626,8 @@ function saveParametersForElement(labelElement, paramValues) {
           const otherGroupIdAttr = otherLabel.groupConfig.groupIdAttribute;
           const otherGroupId = otherEl.getAttribute(otherGroupIdAttr);
           
-          // Found a group member with matching groupID
-          if (otherGroupId === newGroupId) {
+          // Found a group member with matching groupID AND same label type
+          if (otherGroupId === newGroupId && otherLabelName === labelName && otherParent === parent) {
             // Inherit silver attribute values from this group member
             otherLabel.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
               // Only inherit if we haven't already inherited this value
