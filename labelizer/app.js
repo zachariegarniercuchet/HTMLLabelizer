@@ -3620,10 +3620,51 @@ function saveParameters() {
   
   if (label && label.groupConfig) {
     const groupIdAttr = label.groupConfig.groupIdAttribute;
-    const groupId = currentParamElement.getAttribute(groupIdAttr);
+    const newGroupId = paramValues[groupIdAttr] || currentParamElement.getAttribute(groupIdAttr);
     
-    if (groupId) {
-      // Separate group attributes from regular parameters
+    if (newGroupId) {
+      // ===== PULL silver attribute values from existing group members =====
+      // If this is a new groupID or changing to an existing group, inherit silver values
+      const otherGroupMembers = elements.htmlContent.querySelectorAll('manual_label, auto_label');
+      const inheritedSilverValues = new Map();
+      
+      // Look for other elements with the same groupID
+      for (let otherEl of otherGroupMembers) {
+        if (otherEl === currentParamElement) continue; // Skip self
+        
+        const otherLabelName = otherEl.getAttribute('labelName');
+        const otherParent = otherEl.getAttribute('parent') || '';
+        const otherPath = otherParent ? [otherParent, otherLabelName] : [otherLabelName];
+        const otherLabel = getLabelByPath(otherPath);
+        
+        if (otherLabel && otherLabel.groupConfig) {
+          const otherGroupIdAttr = otherLabel.groupConfig.groupIdAttribute;
+          const otherGroupId = otherEl.getAttribute(otherGroupIdAttr);
+          
+          // Found a group member with matching groupID
+          if (otherGroupId === newGroupId) {
+            // Inherit silver attribute values from this group member
+            otherLabel.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
+              // Only inherit if we haven't already inherited this value
+              if (!inheritedSilverValues.has(attrName)) {
+                const inheritedValue = otherEl.getAttribute(attrName);
+                if (inheritedValue) {
+                  inheritedSilverValues.set(attrName, inheritedValue);
+                }
+              }
+            });
+          }
+        }
+      }
+      
+      // Merge inherited values with current param values (current values take precedence)
+      inheritedSilverValues.forEach((inheritedValue, attrName) => {
+        if (paramValues[attrName] === undefined || paramValues[attrName] === '') {
+          paramValues[attrName] = inheritedValue;
+        }
+      });
+      
+      // ===== PUSH silver attribute values to other group members =====
       const groupUpdates = new Map();
       
       label.groupConfig.groupAttributes.forEach((attrDef, attrName) => {
@@ -3633,7 +3674,7 @@ function saveParameters() {
       });
       
       if (groupUpdates.size > 0) {
-        syncGroupAttributes(currentParamElement, groupId, groupUpdates);
+        syncGroupAttributes(currentParamElement, newGroupId, groupUpdates);
       }
     }
   }

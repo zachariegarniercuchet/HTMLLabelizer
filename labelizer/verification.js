@@ -759,7 +759,7 @@
     detailsPanel.className = 'instance-details';
     
     const detailsTitle = document.createElement('h4');
-    detailsTitle.textContent = 'Current Instance Parameters';
+    detailsTitle.textContent = 'Current Instance Attributes';
     detailsPanel.appendChild(detailsTitle);
     
     // Collect group attribute names (gold attributes)
