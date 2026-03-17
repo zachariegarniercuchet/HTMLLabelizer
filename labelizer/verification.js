@@ -863,6 +863,52 @@
           input = document.createElement('input');
           input.type = 'text';
           input.value = currentVal;
+
+          // Attach attribute predictor (same behavior as parameter menu), if available
+          if (
+            typeof window.collectParameterSuggestions === 'function' &&
+            typeof window.filterSuggestions === 'function' &&
+            typeof window.createSuggestionDropdown === 'function' &&
+            typeof window.handleSuggestionKeydown === 'function'
+          ) {
+            const labelName = labelElement.getAttribute('labelName');
+            const parent = labelElement.getAttribute('parent') || '';
+            const allSuggestions = window.collectParameterSuggestions(labelName, parent, paramName);
+            
+            let suggestionDropdown = null;
+            
+            input.oninput = (e) => {
+              const inputValue = e.target.value;
+              const filtered = window.filterSuggestions(allSuggestions, inputValue);
+              
+              if (suggestionDropdown) suggestionDropdown.remove();
+              suggestionDropdown = null; // Always clear the reference
+              
+              if (filtered.length > 0 && inputValue.length > 0) {
+                suggestionDropdown = window.createSuggestionDropdown(input, filtered);
+                if (suggestionDropdown) {
+                  paramRow.appendChild(suggestionDropdown);
+                }
+              }
+            };
+            
+            input.onkeydown = (e) => {
+              if (window.handleSuggestionKeydown(e, input, suggestionDropdown)) {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                  suggestionDropdown = null;
+                }
+              }
+            };
+            
+            input.onblur = () => {
+              setTimeout(() => {
+                if (suggestionDropdown) {
+                  suggestionDropdown.remove();
+                  suggestionDropdown = null;
+                }
+              }, 200);
+            };
+          }
         } else if (type === 'checkbox') {
           input = document.createElement('input');
           input.type = 'checkbox';
@@ -881,6 +927,52 @@
         input = document.createElement('input');
         input.type = 'text';
         input.value = currentVal;
+
+        // Attach attribute predictor for simple string parameters, if available
+        if (
+          typeof window.collectParameterSuggestions === 'function' &&
+          typeof window.filterSuggestions === 'function' &&
+          typeof window.createSuggestionDropdown === 'function' &&
+          typeof window.handleSuggestionKeydown === 'function'
+        ) {
+          const labelName = labelElement.getAttribute('labelName');
+          const parent = labelElement.getAttribute('parent') || '';
+          const allSuggestions = window.collectParameterSuggestions(labelName, parent, paramName);
+          
+          let suggestionDropdown = null;
+          
+          input.oninput = (e) => {
+            const inputValue = e.target.value;
+            const filtered = window.filterSuggestions(allSuggestions, inputValue);
+            
+            if (suggestionDropdown) suggestionDropdown.remove();
+            suggestionDropdown = null; // Always clear the reference
+            
+            if (filtered.length > 0 && inputValue.length > 0) {
+              suggestionDropdown = window.createSuggestionDropdown(input, filtered);
+              if (suggestionDropdown) {
+                paramRow.appendChild(suggestionDropdown);
+              }
+            }
+          };
+          
+          input.onkeydown = (e) => {
+            if (window.handleSuggestionKeydown(e, input, suggestionDropdown)) {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                suggestionDropdown = null;
+              }
+            }
+          };
+          
+          input.onblur = () => {
+            setTimeout(() => {
+              if (suggestionDropdown) {
+                suggestionDropdown.remove();
+                suggestionDropdown = null;
+              }
+            }, 200);
+          };
+        }
       }
       
       input.dataset.paramName = paramName;
@@ -898,18 +990,20 @@
         
         // Create button to edit silver attributes
         const editSilverBtn = document.createElement('button');
-        editSilverBtn.textContent = '*';
+        editSilverBtn.textContent = '⚙';
         editSilverBtn.className = 'edit-silver-attributes-btn';
         editSilverBtn.title = 'Edit group attributes (silver attributes)';
         editSilverBtn.style.padding = '2px 8px';
-        editSilverBtn.style.fontSize = '12px';
-        editSilverBtn.style.fontWeight = 'bold';
+        editSilverBtn.style.fontSize = '14px';
         editSilverBtn.style.cursor = 'pointer';
-        editSilverBtn.style.background = 'var(--card)';
-        editSilverBtn.style.color = 'var(--text)';
-        editSilverBtn.style.border = '1px solid var(--border)';
-        editSilverBtn.style.borderRadius = '4px';
+        editSilverBtn.style.background = 'var(--warning)';
+        editSilverBtn.style.color = 'black';
+        editSilverBtn.style.border = 'none';
+        editSilverBtn.style.borderRadius = '6px';
         editSilverBtn.style.minWidth = '30px';
+        editSilverBtn.style.display = 'flex';
+        editSilverBtn.style.alignItems = 'center';
+        editSilverBtn.style.justifyContent = 'center';
         
         editSilverBtn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -998,6 +1092,50 @@
                 input = document.createElement('input');
                 input.type = 'text';
                 input.value = currentVal;
+
+                // Attach attribute predictor for nested sublabel parameters, if available
+                if (
+                  typeof window.collectParameterSuggestions === 'function' &&
+                  typeof window.filterSuggestions === 'function' &&
+                  typeof window.createSuggestionDropdown === 'function' &&
+                  typeof window.handleSuggestionKeydown === 'function'
+                ) {
+                  const allSuggestions = window.collectParameterSuggestions(sublabelName, sublabelParent || '', paramName);
+                  
+                  let suggestionDropdown = null;
+                  
+                  input.oninput = (e) => {
+                    const inputValue = e.target.value;
+                    const filtered = window.filterSuggestions(allSuggestions, inputValue);
+                    
+                    if (suggestionDropdown) suggestionDropdown.remove();
+                    suggestionDropdown = null; // Always clear the reference
+                    
+                    if (filtered.length > 0 && inputValue.length > 0) {
+                      suggestionDropdown = window.createSuggestionDropdown(input, filtered);
+                      if (suggestionDropdown) {
+                        paramRow.appendChild(suggestionDropdown);
+                      }
+                    }
+                  };
+                  
+                  input.onkeydown = (e) => {
+                    if (window.handleSuggestionKeydown(e, input, suggestionDropdown)) {
+                      if (e.key === 'Enter' || e.key === 'Escape') {
+                        suggestionDropdown = null;
+                      }
+                    }
+                  };
+                  
+                  input.onblur = () => {
+                    setTimeout(() => {
+                      if (suggestionDropdown) {
+                        suggestionDropdown.remove();
+                        suggestionDropdown = null;
+                      }
+                    }, 200);
+                  };
+                }
               } else if (type === 'checkbox') {
                 input = document.createElement('input');
                 input.type = 'checkbox';
@@ -1016,6 +1154,50 @@
               input = document.createElement('input');
               input.type = 'text';
               input.value = currentVal;
+
+              // Attach attribute predictor for simple sublabel parameters, if available
+              if (
+                typeof window.collectParameterSuggestions === 'function' &&
+                typeof window.filterSuggestions === 'function' &&
+                typeof window.createSuggestionDropdown === 'function' &&
+                typeof window.handleSuggestionKeydown === 'function'
+              ) {
+                const allSuggestions = window.collectParameterSuggestions(sublabelName, sublabelParent || '', paramName);
+                
+                let suggestionDropdown = null;
+                
+                input.oninput = (e) => {
+                  const inputValue = e.target.value;
+                  const filtered = window.filterSuggestions(allSuggestions, inputValue);
+                  
+                  if (suggestionDropdown) suggestionDropdown.remove();
+                  suggestionDropdown = null; // Always clear the reference
+                  
+                  if (filtered.length > 0 && inputValue.length > 0) {
+                    suggestionDropdown = window.createSuggestionDropdown(input, filtered);
+                    if (suggestionDropdown) {
+                      paramRow.appendChild(suggestionDropdown);
+                    }
+                  }
+                };
+                
+                input.onkeydown = (e) => {
+                  if (window.handleSuggestionKeydown(e, input, suggestionDropdown)) {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      suggestionDropdown = null;
+                    }
+                  }
+                };
+                
+                input.onblur = () => {
+                  setTimeout(() => {
+                    if (suggestionDropdown) {
+                      suggestionDropdown.remove();
+                      suggestionDropdown = null;
+                    }
+                  }, 200);
+                };
+              }
             }
             
             input.dataset.paramName = paramName;

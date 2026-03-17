@@ -3791,6 +3791,9 @@ function createSuggestionDropdown(input, suggestions) {
       input.value = suggestion;
       dropdown.remove();
       input.focus();
+      // Ensure any change listeners (e.g., verification save) are triggered
+      const changeEvent = new Event('change', { bubbles: true });
+      input.dispatchEvent(changeEvent);
     };
     
     dropdown.appendChild(item);
@@ -3844,6 +3847,9 @@ function handleSuggestionKeydown(event, input, dropdown) {
       if (items.length > 0 && highlighted) {
         input.value = highlighted.textContent;
         dropdown.remove();
+        // Trigger change listeners so new value is persisted
+        const changeEvent = new Event('change', { bubbles: true });
+        input.dispatchEvent(changeEvent);
       } else if (dropdown) {
         dropdown.remove();
       }
@@ -9438,6 +9444,11 @@ window.addEventListener('click', (event) => {
   window.extractExistingLabels = extractExistingLabels;
   window.saveParametersForElement = saveParametersForElement;
   window.updateGroupInDocument = updateGroupInDocument;
+  // Attribute predictor helpers (reused by verification.js)
+  window.collectParameterSuggestions = collectParameterSuggestions;
+  window.createSuggestionDropdown = createSuggestionDropdown;
+  window.filterSuggestions = filterSuggestions;
+  window.handleSuggestionKeydown = handleSuggestionKeydown;
   
   // Expose state for statistics module
   Object.defineProperty(window, 'currentHtml', {
