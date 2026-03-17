@@ -309,6 +309,35 @@
       </div>
       <div class="settings-body">
         <div class="setting-group">
+          <h4>Labeling &amp; Time</h4>
+          <div class="label-time-grid">
+            <div class="label-time-setting">
+              <div class="setting-label-row">
+                <label for="auto-save-minutes">Auto-save interval</label>
+                <span class="setting-unit">minutes</span>
+              </div>
+              <input type="number" id="auto-save-minutes" min="1" max="240" step="1" />
+            </div>
+            <div class="label-time-setting">
+              <div class="setting-label-row">
+                <label for="timer-autostop-seconds">Timer auto-stop on inactivity</label>
+                <span class="setting-unit">seconds</span>
+              </div>
+              <input type="number" id="timer-autostop-seconds" min="10" max="3600" step="10" />
+            </div>
+          </div>
+          <div class="label-time-setting verified-setting">
+            <label class="checkbox-label" for="default-verified-checkbox">
+              <input type="checkbox" id="default-verified-checkbox" />
+              <span>New labels verified by default</span>
+            </label>
+            <div id="default-verified-status" class="setting-helper-text">
+              New labels will start as: <span class="status-pill status-unverified">Unverified</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
           <h4>Theme</h4>
           <div class="theme-toggle-container">
             <label class="theme-toggle">

@@ -17,14 +17,18 @@
   let timerIntervalId = null;
   let meta = {}; // store metadata loaded/saved with schema (e.g., time)
   let inactivityTimeoutId = null; // Track inactivity timeout
-  const INACTIVITY_TIMEOUT = 60000; // 1 minute in milliseconds
+  const DEFAULT_TIMER_INACTIVITY_SECONDS = 60; // default 60 seconds
+  let timerInactivitySeconds = DEFAULT_TIMER_INACTIVITY_SECONDS;
+  let inactivityTimeoutMs = timerInactivitySeconds * 1000; // derived inactivity timeout in ms
   let lastSaveReminderMs = 0; // Track when we last showed save reminder
   const SAVE_REMINDER_INTERVAL = 30 * 60 * 1000; // 30 minutes
   // ======= Folder Access & Auto-Save State =======
   let projectDirectoryHandle = null; // Directory handle for auto-save
   let autoSaveInterval = null; // Interval ID for auto-save
   let lastAutoSaveTime = 0; // Track last auto-save timestamp
-  const AUTO_SAVE_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+  const DEFAULT_AUTO_SAVE_MINUTES = 15; // default 15 minutes
+  let autoSaveMinutes = DEFAULT_AUTO_SAVE_MINUTES;
+  let autoSaveIntervalMs = autoSaveMinutes * 60 * 1000; // derived auto-save interval in ms
   let autoSaveEnabled = false; // Track if auto-save is enabled
   // ======= Page Saver State =======
   let pageSavers = new Map(); // id -> { name, position }
@@ -61,6 +65,10 @@
   // ======= Boundary Move Mode =======
   let boundaryMoveMode = false; // Track if we're in boundary move mode
   let selectedLabelForBoundaryMove = null; // The label element to adjust
+
+  // ======= Label Defaults =======
+  const DEFAULT_VERIFIED_IS_TRUE = false; // default: new labels start as unverified
+  let defaultVerifiedTrue = DEFAULT_VERIFIED_IS_TRUE;
   
 
   // ======= DOM Elements =======
@@ -186,7 +194,7 @@
     if (timerRunning) {
       inactivityTimeoutId = setTimeout(() => {
         stopTimer();
-      }, INACTIVITY_TIMEOUT);
+      }, inactivityTimeoutMs);
     }
   }
 
@@ -6075,7 +6083,7 @@ function applyLabelToAdvancedContent(range, labelPath, labelData) {
   }
   
   // Add verified attribute (not part of label schema, like style or class)
-  labelElement.setAttribute("verified", "false");
+  labelElement.setAttribute("verified", defaultVerifiedTrue ? "true" : "false");
   
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -6283,7 +6291,7 @@ function applyLabelToHtmlContent(range, labelPath, labelData) {
   }
   
   // Add verified attribute (not part of label schema, like style or class)
-  labelElement.setAttribute("verified", "false");
+  labelElement.setAttribute("verified", defaultVerifiedTrue ? "true" : "false");
   
   console.log("Final label element before insertion:", labelElement); // ZAG COMMENT
   labelElement.style.backgroundColor = labelData.color;
@@ -6357,7 +6365,7 @@ function applyLabelToHighlightedText(highlightSpan, labelPath, labelData) {
   }
   
   // Add verified attribute (not part of label schema, like style or class)
-  labelElement.setAttribute("verified", "false");
+  labelElement.setAttribute("verified", defaultVerifiedTrue ? "true" : "false");
   
   labelElement.style.backgroundColor = labelData.color;
   labelElement.style.color = getContrastColor(labelData.color);
@@ -8455,14 +8463,14 @@ function navigateToPreviousMatch() {
     
     autoSaveEnabled = true;
     
-    // Set up interval for auto-save (15 minutes)
+    // Set up interval for auto-save using current settings
     autoSaveInterval = setInterval(async () => {
       if (currentHtml && projectDirectoryHandle) {
         await performAutoSave();
       }
-    }, AUTO_SAVE_INTERVAL_MS);
+    }, autoSaveIntervalMs);
     
-    console.log('✅ Auto-save enabled (every 15 minutes)');
+    console.log(`✅ Auto-save enabled (every ${autoSaveMinutes} minutes)`);
   }
 
   /**
@@ -8563,7 +8571,7 @@ function navigateToPreviousMatch() {
     if (autoSaveEnabled && projectDirectoryHandle) {
       const folderName = projectDirectoryHandle.name;
       elements.autoSaveStatus.classList.add('active');
-      elements.autoSaveStatus.title = `Automatic backups enabled\nFolder: ${folderName}\nBackups saved every 15 minutes to backups/ subfolder\n\nClick to disable`;
+      elements.autoSaveStatus.title = `Automatic backups enabled\nFolder: ${folderName}\nBackups saved every ${autoSaveMinutes} minutes to backups/ subfolder\n\nClick to disable`;
     } else {
       elements.autoSaveStatus.classList.remove('active');
       elements.autoSaveStatus.title = 'Click to select backup folder';
@@ -8979,6 +8987,121 @@ window.addEventListener('click', (event) => {
   window.lastClickY = event.clientY;
 });
 
+  // ======= Tool Settings (Time & Label Defaults) =======
+  
+  // Tool settings keys for localStorage
+  const AUTO_SAVE_MINUTES_STORAGE_KEY = 'htmlLabelizer_autoSaveMinutes';
+  const TIMER_INACTIVITY_SECONDS_STORAGE_KEY = 'htmlLabelizer_timerInactivitySeconds';
+  const DEFAULT_VERIFIED_STORAGE_KEY = 'htmlLabelizer_defaultVerifiedTrue';
+
+  // Load tool settings from localStorage
+  function loadToolSettings() {
+    const savedAutoSaveMinutes = localStorage.getItem(AUTO_SAVE_MINUTES_STORAGE_KEY);
+    const savedTimerSeconds = localStorage.getItem(TIMER_INACTIVITY_SECONDS_STORAGE_KEY);
+    const savedDefaultVerified = localStorage.getItem(DEFAULT_VERIFIED_STORAGE_KEY);
+
+    if (savedAutoSaveMinutes !== null) {
+      const minutes = parseInt(savedAutoSaveMinutes, 10);
+      if (!isNaN(minutes) && minutes >= 1 && minutes <= 240) {
+        autoSaveMinutes = minutes;
+      }
+    }
+
+    if (savedTimerSeconds !== null) {
+      const seconds = parseInt(savedTimerSeconds, 10);
+      if (!isNaN(seconds) && seconds >= 10 && seconds <= 3600) {
+        timerInactivitySeconds = seconds;
+      }
+    }
+
+    if (savedDefaultVerified !== null) {
+      defaultVerifiedTrue = savedDefaultVerified === 'true';
+    }
+
+    // Recompute derived values
+    autoSaveIntervalMs = autoSaveMinutes * 60 * 1000;
+    inactivityTimeoutMs = timerInactivitySeconds * 1000;
+  }
+
+  // Save tool settings to localStorage
+  function saveToolSettings() {
+    try {
+      localStorage.setItem(AUTO_SAVE_MINUTES_STORAGE_KEY, autoSaveMinutes.toString());
+      localStorage.setItem(TIMER_INACTIVITY_SECONDS_STORAGE_KEY, timerInactivitySeconds.toString());
+      localStorage.setItem(DEFAULT_VERIFIED_STORAGE_KEY, defaultVerifiedTrue ? 'true' : 'false');
+    } catch (err) {
+      console.warn('Failed to save tool settings', err);
+    }
+  }
+
+  // Update tool settings controls in the settings modal
+  function updateToolSettingsControls() {
+    const autoSaveInput = document.getElementById('auto-save-minutes');
+    const timerInput = document.getElementById('timer-autostop-seconds');
+    const defaultVerifiedCheckbox = document.getElementById('default-verified-checkbox');
+    const defaultVerifiedStatus = document.getElementById('default-verified-status');
+
+    if (autoSaveInput) {
+      autoSaveInput.value = autoSaveMinutes.toString();
+    }
+
+    if (timerInput) {
+      timerInput.value = timerInactivitySeconds.toString();
+    }
+
+    if (defaultVerifiedCheckbox) {
+      defaultVerifiedCheckbox.checked = defaultVerifiedTrue;
+    }
+
+    if (defaultVerifiedStatus) {
+      const pillSpan = defaultVerifiedStatus.querySelector('.status-pill');
+      if (pillSpan) {
+        if (defaultVerifiedTrue) {
+          pillSpan.textContent = 'Verified';
+          pillSpan.classList.remove('status-unverified');
+          pillSpan.classList.add('status-verified');
+        } else {
+          pillSpan.textContent = 'Unverified';
+          pillSpan.classList.remove('status-verified');
+          pillSpan.classList.add('status-unverified');
+        }
+      }
+    }
+  }
+
+  // Reset tool settings back to defaults
+  function resetToolSettings() {
+    autoSaveMinutes = DEFAULT_AUTO_SAVE_MINUTES;
+    timerInactivitySeconds = DEFAULT_TIMER_INACTIVITY_SECONDS;
+    defaultVerifiedTrue = DEFAULT_VERIFIED_IS_TRUE;
+
+    autoSaveIntervalMs = autoSaveMinutes * 60 * 1000;
+    inactivityTimeoutMs = timerInactivitySeconds * 1000;
+
+    saveToolSettings();
+    updateToolSettingsControls();
+
+    // If auto-save is currently enabled, restart with the new interval
+    if (autoSaveEnabled && autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = setInterval(async () => {
+        if (currentHtml && projectDirectoryHandle) {
+          await performAutoSave();
+        }
+      }, autoSaveIntervalMs);
+    }
+
+    // Refresh inactivity timeout and auto-save status display
+    resetInactivityTimeout();
+    updateAutoSaveStatus();
+  }
+
+  // Initialize tool settings on app startup
+  function initializeToolSettings() {
+    loadToolSettings();
+    updateToolSettingsControls();
+  }
+
   // ======= Theme Management =======
   
   // Theme settings keys for localStorage
@@ -9202,6 +9325,11 @@ window.addEventListener('click', (event) => {
     // Background slider
     const backgroundSlider = document.getElementById('background-slider');
     
+    // Tool settings inputs
+    const autoSaveInput = document.getElementById('auto-save-minutes');
+    const timerInput = document.getElementById('timer-autostop-seconds');
+    const defaultVerifiedCheckbox = document.getElementById('default-verified-checkbox');
+
     // Reset button
     const resetBtn = document.getElementById('reset-settings');
     
@@ -9210,6 +9338,7 @@ window.addEventListener('click', (event) => {
       settingsBtn.addEventListener('click', () => {
         settingsModal.classList.remove('hidden');
         updateThemeControls();
+        updateToolSettingsControls();
       });
     }
     
@@ -9263,6 +9392,61 @@ window.addEventListener('click', (event) => {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         resetThemeSettings();
+        resetToolSettings();
+      });
+    }
+
+    // Auto-save interval handler
+    if (autoSaveInput) {
+      autoSaveInput.addEventListener('change', (e) => {
+        let minutes = parseInt(e.target.value, 10);
+        if (isNaN(minutes)) {
+          minutes = DEFAULT_AUTO_SAVE_MINUTES;
+        }
+        minutes = Math.max(1, Math.min(240, minutes));
+        autoSaveMinutes = minutes;
+        autoSaveIntervalMs = autoSaveMinutes * 60 * 1000;
+        e.target.value = autoSaveMinutes.toString();
+        saveToolSettings();
+
+        // If auto-save is enabled, restart the interval with the new value
+        if (autoSaveEnabled && autoSaveInterval) {
+          clearInterval(autoSaveInterval);
+          autoSaveInterval = setInterval(async () => {
+            if (currentHtml && projectDirectoryHandle) {
+              await performAutoSave();
+            }
+          }, autoSaveIntervalMs);
+        }
+
+        updateAutoSaveStatus();
+      });
+    }
+
+    // Timer auto-stop inactivity handler
+    if (timerInput) {
+      timerInput.addEventListener('change', (e) => {
+        let seconds = parseInt(e.target.value, 10);
+        if (isNaN(seconds)) {
+          seconds = DEFAULT_TIMER_INACTIVITY_SECONDS;
+        }
+        seconds = Math.max(10, Math.min(3600, seconds));
+        timerInactivitySeconds = seconds;
+        inactivityTimeoutMs = timerInactivitySeconds * 1000;
+        e.target.value = timerInactivitySeconds.toString();
+        saveToolSettings();
+
+        // If timer is running, update inactivity timeout
+        resetInactivityTimeout();
+      });
+    }
+
+    // Default verified flag handler
+    if (defaultVerifiedCheckbox) {
+      defaultVerifiedCheckbox.addEventListener('change', (e) => {
+        defaultVerifiedTrue = !!e.target.checked;
+        saveToolSettings();
+        updateToolSettingsControls();
       });
     }
   }
@@ -9283,6 +9467,9 @@ window.addEventListener('click', (event) => {
   elements.newLabelColor.value = generateRandomColor();
   initializeGroupsHeader();
   refreshTreeUI();
+  
+  // Initialize tool/time and label settings
+  initializeToolSettings();
   
   // Initialize theme system
   initializeTheme();
