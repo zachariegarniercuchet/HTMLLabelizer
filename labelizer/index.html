@@ -310,29 +310,46 @@
       <div class="settings-body">
         <div class="setting-group">
           <h4>Labeling &amp; Time</h4>
-          <div class="label-time-grid">
-            <div class="label-time-setting">
-              <div class="setting-label-row">
-                <label for="auto-save-minutes">Auto-save interval</label>
-                <span class="setting-unit">minutes</span>
+          <div class="settings-list">
+            <div class="settings-row">
+              <div class="settings-row-main">
+                <div class="settings-row-title">Auto-save interval</div>
+                <div class="settings-row-description">Automatically save a backup copy of your work on a timer.</div>
               </div>
-              <input type="number" id="auto-save-minutes" min="1" max="240" step="1" />
-            </div>
-            <div class="label-time-setting">
-              <div class="setting-label-row">
-                <label for="timer-autostop-seconds">Timer auto-stop on inactivity</label>
-                <span class="setting-unit">seconds</span>
+              <div class="settings-row-control">
+                <div class="settings-row-control-inner">
+                  <input type="number" id="auto-save-minutes" min="1" max="240" step="1" />
+                  <span class="settings-row-unit">minutes</span>
+                </div>
               </div>
-              <input type="number" id="timer-autostop-seconds" min="10" max="3600" step="10" />
             </div>
-          </div>
-          <div class="label-time-setting verified-setting">
-            <label class="checkbox-label" for="default-verified-checkbox">
-              <input type="checkbox" id="default-verified-checkbox" />
-              <span>New labels verified by default</span>
-            </label>
-            <div id="default-verified-status" class="setting-helper-text">
-              New labels will start as: <span class="status-pill status-unverified">Unverified</span>
+
+            <div class="settings-row">
+              <div class="settings-row-main">
+                <div class="settings-row-title">Timer auto-stop on inactivity</div>
+                <div class="settings-row-description">Stop the activity timer after a period without interaction.</div>
+              </div>
+              <div class="settings-row-control">
+                <div class="settings-row-control-inner">
+                  <input type="number" id="timer-autostop-seconds" min="10" max="3600" step="10" />
+                  <span class="settings-row-unit">seconds</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-main">
+                <div class="settings-row-title">New labels verified by default</div>
+                <div id="default-verified-status" class="settings-row-description setting-helper-text">
+                  New labels will start as: <span class="status-pill status-unverified">Unverified</span>
+                </div>
+              </div>
+              <div class="settings-row-control">
+                <label class="settings-switch" for="default-verified-checkbox">
+                  <input type="checkbox" id="default-verified-checkbox" aria-label="New labels verified by default" />
+                  <span class="settings-switch-slider"></span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
