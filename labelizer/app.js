@@ -4388,7 +4388,7 @@ function toggleGroupEdit(groupDiv, groupKey) {
         const targetGroup = Array.from(allGroups).find(item => {
           const titleSpan = item.querySelector('.tree-label');
           const groupIdValue = titleSpan.querySelector('.group-id-value');
-          const [labelName, groupId] = groupKey.split('_');
+          const [labelName, groupId] = groupKey.split('|||');
           const expectedText = groupId === 'undefined' ? '' : groupId;
           return titleSpan.textContent.includes(labelName) && 
                  (groupIdValue ? groupIdValue.textContent === expectedText : true);
@@ -4446,7 +4446,7 @@ function toggleGroupEdit(groupDiv, groupKey) {
         const currentValue = attrValueDiv.textContent;
         
         // Get attribute definition to know the type
-        const [labelName, groupId] = groupKey.split('_');
+        const [labelName, groupId] = groupKey.split('|||');
         const label = getLabelByPath([labelName]);
         
         if (label && label.groupConfig) {
@@ -4920,8 +4920,10 @@ function collectActiveGroups() {
       // Check if element has the group ID attribute (even if empty)
       if (labelEl.hasAttribute(groupIdAttr)) {
         const groupId = labelEl.getAttribute(groupIdAttr) || '';
-        const groupKey = `${labelName}_${groupId}`;
-        // Then: const [labelName, oldGroupId] = groupKey.split('_');
+        // Use a separator that cannot appear in label names / IDs to
+        // safely encode both parts into a single key.
+        const groupKey = `${labelName}|||${groupId}`;
+        // Decoding side: const [labelName, oldGroupId] = groupKey.split('|||');
         
         if (!groups.has(groupKey)) {
           const values = new Map();
