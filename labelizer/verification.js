@@ -1016,19 +1016,6 @@
       instanceNav.appendChild(instanceInfo);
       instanceNav.appendChild(nextBtn);
       
-      // Add keyboard shortcuts hint
-      const shortcutsHint = document.createElement('small');
-      shortcutsHint.className = 'keyboard-shortcuts-hint';
-      shortcutsHint.textContent = 'Keyboard: ← → arrows or < > keys to navigate | Alt+Click labels to jump';
-      shortcutsHint.style.display = 'block';
-      shortcutsHint.style.marginTop = '8px';
-      shortcutsHint.style.color = 'var(--sub)';
-      shortcutsHint.style.fontSize = '12px';
-      shortcutsHint.style.textAlign = 'center';
-      shortcutsHint.style.fontStyle = 'italic';
-      
-      instanceNav.appendChild(shortcutsHint);
-      
       inspector.appendChild(instanceNav);
       
       // Current instance details
