@@ -28,6 +28,146 @@
     verificationTab: document.getElementById('tab-verification')
   };
 
+  // ======= DOM Change Detection State =======
+  let mutationObserver = null;
+  let refreshTimeout = null;
+  const REFRESH_DEBOUNCE_MS = 300; // Wait 300ms after changes stop before refreshing
+
+  // ======= Utility Functions =======
+  
+  /**
+   * Debounced refresh to avoid excessive recalculations
+   * Waits for changes to stabilize before refreshing the instance list
+   */
+  function debounceRefreshInstanceList() {
+    // Clear previous timeout if it exists
+    if (refreshTimeout) {
+      clearTimeout(refreshTimeout);
+    }
+    
+    // Schedule a new refresh
+    refreshTimeout = setTimeout(() => {
+      if (verificationMode) {
+        refreshInstanceList();
+      }
+      refreshTimeout = null;
+    }, REFRESH_DEBOUNCE_MS);
+  }
+  
+  /**
+   * Refresh the instance list by re-collecting filtered instances
+   * Maintains user's current position as much as possible
+   */
+  function refreshInstanceList() {
+    if (!verificationMode) return;
+    
+    const labels = window.getLabels ? window.getLabels() : null;
+    if (!labels) return;
+    
+    const htmlContent = window.getHtmlContent();
+    if (!htmlContent) return;
+    
+    // Get the currently displayed instance before refresh
+    const previousInstance = currentLabelInstances[currentInstanceIndex] || null;
+    const previousLabelName = previousInstance ? previousInstance.getAttribute('labelName') : null;
+    
+    // Rebuild the filtered instances list
+    const allParentLabels = Array.from(labels.keys());
+    let newFilteredInstances = [];
+    
+    allParentLabels.forEach(parentLabelName => {
+      if (activeFilters.labelNames.has(parentLabelName)) {
+        const instances = collectFilteredInstances(parentLabelName);
+        newFilteredInstances.push(...instances);
+      }
+    });
+    
+    // Sort by document order
+    if (newFilteredInstances.length > 0) {
+      newFilteredInstances.sort((a, b) => {
+        const position = a.compareDocumentPosition(b);
+        if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+        if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+        return 0;
+      });
+    }
+    
+    // Update the instances list
+    currentLabelInstances = newFilteredInstances;
+    
+    // Try to maintain position intelligently
+    if (previousInstance && previousInstance.parentElement) {
+      // Previous instance still exists and is in DOM - find its new position
+      const newIndex = currentLabelInstances.indexOf(previousInstance);
+      if (newIndex !== -1) {
+        // Found the same instance - stay on it
+        currentInstanceIndex = newIndex;
+      } else {
+        // Previous instance was deleted/modified - keep same index position
+        // The next item naturally shifts into view at this index
+        // But clamp if now out of bounds
+        if (currentInstanceIndex >= currentLabelInstances.length) {
+          currentInstanceIndex = Math.max(0, currentLabelInstances.length - 1);
+        }
+      }
+    } else {
+      // Previous instance was removed - clamp index if out of bounds
+      if (currentInstanceIndex >= currentLabelInstances.length) {
+        currentInstanceIndex = Math.max(0, currentLabelInstances.length - 1);
+      }
+    }
+    
+    // Refresh the display
+    if (currentLabelInstances.length > 0 && currentInstanceIndex >= 0) {
+      showCurrentInstance();
+    } else {
+      showNoLabelsMessage();
+    }
+  }
+  
+  /**
+   * Setup MutationObserver to detect DOM changes and refresh verification list
+   */
+  function setupDOMChangeDetection() {
+    const htmlContent = window.getHtmlContent();
+    if (!htmlContent) return;
+    
+    // Create a MutationObserver to watch for changes
+    mutationObserver = new MutationObserver((mutations) => {
+      // Only trigger refresh if we're in verification mode
+      // and the changes are not triggered by our own code
+      if (verificationMode) {
+        debounceRefreshInstanceList();
+      }
+    });
+    
+    // Watch for attribute changes, text changes, and child node additions/removals
+    const observerConfig = {
+      attributes: true,           // Watch for attribute changes (verified, parameters)
+      attributeFilter: ['verified', 'labelName', 'parent'], // Only watch relevant attributes
+      childList: true,            // Watch for added/removed nodes
+      subtree: true,              // Watch all descendants
+      characterData: false        // Don't watch text node changes (too noisy)
+    };
+    
+    mutationObserver.observe(htmlContent, observerConfig);
+  }
+  
+  /**
+   * Stop watching for DOM changes
+   */
+  function stopDOMChangeDetection() {
+    if (mutationObserver) {
+      mutationObserver.disconnect();
+      mutationObserver = null;
+    }
+    
+    if (refreshTimeout) {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = null;
+    }
+  }
+
   // ======= Verification Functions =======
   
   /**
@@ -627,6 +767,9 @@
   function stopVerification() {
     verificationMode = false;
     
+    // Stop watching for DOM changes
+    stopDOMChangeDetection();
+    
     // Clear all highlights
     document.querySelectorAll('.verification-highlight').forEach(el => {
       el.classList.remove('verification-highlight');
@@ -655,6 +798,9 @@
       showNoLabelsMessage();
       return;
     }
+    
+    // Setup DOM change detection to refresh instance list on modifications
+    setupDOMChangeDetection();
     
     // Apply filters to collect all matching instances in document order
     applyFilters();
