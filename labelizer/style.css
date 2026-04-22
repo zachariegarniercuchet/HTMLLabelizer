@@ -2178,6 +2178,20 @@
       }
     }
 
+    /* Alt+Click feedback - brief flash on label */
+    .alt-click-selected {
+      animation: alt-click-flash 0.2s ease-out;
+    }
+
+    @keyframes alt-click-flash {
+      0% {
+        background-color: rgba(106, 163, 255, 0.4);
+      }
+      100% {
+        background-color: transparent;
+      }
+    }
+
     /* Label Inspector Panel */
     .label-inspector {
       background: var(--card-2);

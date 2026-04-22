@@ -260,6 +260,49 @@
     
     // Setup silver attributes menu close handlers
     setupSilverAttributesMenuHandlers();
+    
+    // Setup Alt+Click navigation
+    setupAltClickNavigation();
+  }
+  
+  /**
+   * Setup Alt+Click navigation to jump to label instances
+   * When user Alt+Clicks a label in the rendered HTML, navigate to it in verification
+   */
+  function setupAltClickNavigation() {
+    const htmlContent = window.getHtmlContent();
+    if (!htmlContent) return;
+    
+    htmlContent.addEventListener('click', (e) => {
+      // Only process in verification mode
+      if (!verificationMode) return;
+      
+      // Only process Alt+Click
+      if (!e.altKey) return;
+      
+      // Check if clicked element is a label
+      const labelElement = e.target.closest('manual_label, auto_label');
+      if (!labelElement) return;
+      
+      // Find this element in currentLabelInstances array
+      const index = currentLabelInstances.indexOf(labelElement);
+      
+      if (index !== -1) {
+        // Found it - navigate to this instance
+        currentInstanceIndex = index;
+        showCurrentInstance();
+        
+        // Provide feedback to user
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Optional: brief visual feedback
+        labelElement.classList.add('alt-click-selected');
+        setTimeout(() => {
+          labelElement.classList.remove('alt-click-selected');
+        }, 200);
+      }
+    }, true); // Use capture phase to catch click before other handlers
   }
   
   /**
