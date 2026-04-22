@@ -263,6 +263,9 @@
     
     // Setup Alt+Click navigation
     setupAltClickNavigation();
+    
+    // Setup keyboard navigation
+    setupKeyboardNavigation();
   }
   
   /**
@@ -303,6 +306,43 @@
         }, 200);
       }
     }, true); // Use capture phase to catch click before other handlers
+  }
+  
+  /**
+   * Setup keyboard navigation for verification menu
+   * Left/Right arrow keys or < / > to navigate through instances
+   */
+  function setupKeyboardNavigation() {
+    document.addEventListener('keydown', (e) => {
+      // Only process if verification mode is active
+      if (!verificationMode || currentLabelInstances.length === 0) return;
+      
+      // Check for navigation keys
+      let shouldNavigate = false;
+      let goNext = false;
+      
+      // Right arrow or > (Shift+period)
+      if (e.key === 'ArrowRight' || (e.shiftKey && e.key === '>')) {
+        shouldNavigate = true;
+        goNext = true;
+      }
+      // Left arrow or < (Shift+comma)
+      else if (e.key === 'ArrowLeft' || (e.shiftKey && e.key === '<')) {
+        shouldNavigate = true;
+        goNext = false;
+      }
+      
+      if (shouldNavigate) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (goNext) {
+          navigateToNextInstance();
+        } else {
+          navigateToPreviousInstance();
+        }
+      }
+    }, true); // Use capture phase
   }
   
   /**
@@ -960,6 +1000,7 @@
       prevBtn.textContent = '◀ Previous';
       prevBtn.onclick = () => navigateToPreviousInstance();
       prevBtn.disabled = false; // Always enabled, loops around
+      prevBtn.title = 'Navigate to previous instance (Keyboard: ← arrow or <)';
       
       const instanceInfo = document.createElement('span');
       instanceInfo.className = 'instance-info';
@@ -969,10 +1010,24 @@
       nextBtn.textContent = 'Next ▶';
       nextBtn.onclick = () => navigateToNextInstance();
       nextBtn.disabled = false; // Always enabled, loops around
+      nextBtn.title = 'Navigate to next instance (Keyboard: → arrow or >)';
       
       instanceNav.appendChild(prevBtn);
       instanceNav.appendChild(instanceInfo);
       instanceNav.appendChild(nextBtn);
+      
+      // Add keyboard shortcuts hint
+      const shortcutsHint = document.createElement('small');
+      shortcutsHint.className = 'keyboard-shortcuts-hint';
+      shortcutsHint.textContent = 'Keyboard: ← → arrows or < > keys to navigate | Alt+Click labels to jump';
+      shortcutsHint.style.display = 'block';
+      shortcutsHint.style.marginTop = '8px';
+      shortcutsHint.style.color = 'var(--sub)';
+      shortcutsHint.style.fontSize = '12px';
+      shortcutsHint.style.textAlign = 'center';
+      shortcutsHint.style.fontStyle = 'italic';
+      
+      instanceNav.appendChild(shortcutsHint);
       
       inspector.appendChild(instanceNav);
       
